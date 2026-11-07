@@ -23,4 +23,4 @@ Lint com OXLint e formatação com OXFmt, configurados na raiz (`.oxlintrc.json`
 
 - Positivas: `bun run lint` volta a passar; um comando de correção (`bun run code:fix`); hooks rápidos.
 - Negativas: regras de React/Next específicas do ESLint não existem; OXFmt (0.x) pode mudar a formatação entre versões. A mitigação é manter `tsc --noEmit` (`check-types`) como gate e fixar versões no `bun.lock`.
-- Impacto em código, operação e time: escopo de `format` e `code:fix` limitado por `ignorePatterns` (skills de terceiros, artefatos gerados, `bun.lock`); ESLint não deve ser reintroduzido como fallback silencioso. Os hooks do lefthook ainda precisam ser instalados (`bun run hooks:install`) e validados com um commit real.
+- Impacto em código, operação e time: escopo de `format` e `code:fix` limitado por `ignorePatterns` (skills de terceiros, artefatos gerados, `bun.lock`); ESLint não deve ser reintroduzido como fallback silencioso. Os hooks do lefthook precisam ser instalados em cada clone (`bun run hooks:install`). O `lint-staged` usa `--no-error-on-unmatched-pattern`, porque os lotes só com arquivos ignorados (ex.: `.claude/skills/**`) fariam o OXFmt sair com erro.
