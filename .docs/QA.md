@@ -5,19 +5,19 @@
 
 ## 1. Estado atual
 
-| Recurso                     | Estado                                                                                   |
-| --------------------------- | ---------------------------------------------------------------------------------------- |
-| Lint (OXLint)               | Configurado; passa                                                                       |
-| Formatação (OXFmt)          | Configurada; idempotente                                                                 |
-| Tipos                       | Configurado em `app`, `api`, `docs` e `@repo/ui`; passa                                  |
-| Build                       | `apps/app/dist`, `apps/api/dist` e `apps/docs/.next`; passa                              |
-| Testes unitários            | Vitest em `app` e `api`; passam                                                          |
-| Testes de integração        | Vitest + Supertest em `api` (`GET /`); passa                                             |
-| Testes E2E                  | Playwright (`e2e/home.spec.ts`); passa                                                   |
-| Cobertura                   | `bun run test:coverage` gera `coverage/`; sem threshold                                  |
-| Hooks de pre-commit         | Configurados (`lefthook.yml`); **não validados** (repo git criado, hooks não instalados) |
-| CI                          | Não configurado                                                                          |
-| Acessibilidade automatizada | Não configurada                                                                          |
+| Recurso                     | Estado                                                            |
+| --------------------------- | ----------------------------------------------------------------- |
+| Lint (OXLint)               | Configurado; passa                                                |
+| Formatação (OXFmt)          | Configurada; idempotente                                          |
+| Tipos                       | Configurado em `app`, `api`, `docs` e `@repo/ui`; passa           |
+| Build                       | `apps/app/dist`, `apps/api/dist` e `apps/docs/.next`; passa       |
+| Testes unitários            | Vitest em `app` e `api`; passam                                   |
+| Testes de integração        | Vitest + Supertest em `api` (`GET /`); passa                      |
+| Testes E2E                  | Playwright (`e2e/home.spec.ts`); passa                            |
+| Cobertura                   | `bun run test:coverage` gera `coverage/`; sem threshold           |
+| Hooks de pre-commit         | Configurados (`lefthook.yml`); validados no commit raiz `227e0ad` |
+| CI                          | Não configurado                                                   |
+| Acessibilidade automatizada | Não configurada                                                   |
 
 ### 1.1 Baseline verificado em 2026-11-07
 
@@ -91,7 +91,7 @@ Outros comandos:
 | `bun run infra:up`      | `supabase start` + `docker compose up -d --wait` (até 300 s); sai != 0 se algo falhar |
 | `bun run infra:down`    | `supabase stop` + `docker compose down`; idempotente                                  |
 | `bun run db:migrate`    | `supabase migration up --local`; idempotente                                          |
-| `bun run hooks:install` | `lefthook install` (grava `.git/hooks`; ainda não executado)                          |
+| `bun run hooks:install` | `lefthook install` (grava `.git/hooks`; rode uma vez em cada clone)                   |
 
 `bun run lint` cobre apenas os workspaces. `scripts/` e `e2e/` na raiz passam por `bun run code:fix` e por lint-staged, mas não pelo `lint` do Turbo.
 
@@ -171,7 +171,7 @@ Aplique apenas o que a mudança afeta, mas registre o que foi verificado.
 | #   | Problema                                                                          | Impacto                                                 |
 | --- | --------------------------------------------------------------------------------- | ------------------------------------------------------- |
 | 1   | Sem CI                                                                            | Gates dependem de execução manual                       |
-| 2   | Hooks de pre-commit não instalados nem validados                                  | `lefthook`/`lint-staged` não comprovados                |
+| 2   | Hooks só validados no commit raiz, sem teste automatizado                         | `lefthook`/`lint-staged` não comprovados                |
 | 3   | `lint` do Turbo não cobre `scripts/` e `e2e/`                                     | Erros nesses arquivos passam no gate                    |
 | 4   | Sem verificação de acessibilidade automatizada                                    | Regressões de a11y só aparecem na revisão manual        |
 | 5   | Leitor de tela, hover/disabled/loading e `prefers-reduced-motion` não verificados | Cobertura parcial de a11y (ver §1.2)                    |

@@ -1,6 +1,6 @@
 # Plano — 0000 Fundação
 
-- **Status:** em implementação (fundação executada; só R21 pendente, ver "Critério de pronto")
+- **Status:** concluída (todos os itens de "Critério de pronto" atendidos; commit `227e0ad`)
 - **Slug:** 0000-foundation
 - **Spec:** `.specs/0000-fundation.md`
 - **Data:** 2026-11-06
@@ -102,7 +102,7 @@ Nenhuma entidade de domínio. `.env.example` documenta as variáveis; `.env` é 
 ## Critério de pronto
 
 - [x] R1–R20, R22 e R23 atendidos e verificados (evidências em `.docs/QA.md` §1.1).
-- [ ] R21 (hooks de pre-commit): configurado; repositório git criado em 2026-11-07 (sem commits), mas `bun run hooks:install` ainda não foi executado e o pre-commit não foi comprovado com um commit real.
+- [x] R21 (hooks de pre-commit): `bun run hooks:install` executado e o pre-commit comprovado no commit raiz. A primeira tentativa foi barrada pelo `lint-staged` (lote só com arquivos ignorados pelo OXFmt); corrigido com `--no-error-on-unmatched-pattern` e o commit `227e0ad` passou pelos hooks.
 - [x] `bun run lint`, `check-types`, `build`, `test`, `test:integration` passam.
 - [x] `bun run test:e2e` passa (browsers do Playwright já instalados nesta máquina).
 - [x] `infra:up`, `db:migrate`, `infra:down` executados (2× no `down`), com evidência.

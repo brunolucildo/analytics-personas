@@ -50,23 +50,23 @@ packages/
 
 ### 3.1 Instalada e utilizável
 
-| Camada           | Tecnologia                                       | Versão (lockfile)       | Observação                                              |
-| ---------------- | ------------------------------------------------ | ----------------------- | ------------------------------------------------------- |
-| Runtime          | Node.js                                          | >= 24                   | `engines` da raiz                                       |
-| Package manager  | Bun                                              | 1.4.4                   | `devEngines` da raiz                                    |
-| Monorepo         | Turborepo                                        | 2.11.10                 | `turbo.json`                                            |
-| Cliente          | React + Vite                                     | 19.3.1 / 8.3.6          | `apps/app`; ADR 0001                                    |
-| Docs             | Next.js                                          | 16.4.5                  | `apps/docs`, App Router                                 |
-| API              | Nest.js                                          | 12.4.0                  | `apps/api`; `class-validator` para DTOs                 |
-| Linguagem        | TypeScript                                       | 6.0.3                   | Config base estrita                                     |
-| Estilo           | TailwindCSS (CSS-first) + shadcn/ui              | 4.3.5                   | Tokens em `packages/ui/src/styles.css`                  |
-| Dados no cliente | TanStack Query / Table / Charts                  | 5.107.1 / 9.3.1 / 1.4.0 | Só Query tem uso (provider); `date-fns` 4.4.0 instalado |
-| Backend de dados | Supabase (`@supabase/supabase-js`)               | 2.119.0                 | Cliente em `apps/app/src/lib/supabase.ts`; sem fluxos   |
-| Testes           | Vitest 5.1.0, Supertest 7.3.1, Playwright 1.65.0 | —                       | Ver `QA.md`                                             |
-| Lint / format    | OXLint 1.92.0, OXFmt 0.77.0                      | —                       | ADR 0002                                                |
-| Hooks            | lefthook 2.2.2 + lint-staged 17.6.0              | —                       | Exigem `bun run hooks:install`; ainda não validados     |
-| Observabilidade  | OpenTelemetry SDK 0.301.0, pino 10.4.0           | —                       | Traces, métricas e logs via OTLP HTTP                   |
-| Infra local      | Supabase CLI 3.0.0, Docker Compose               | —                       | Grafana LGTM + OTel Collector                           |
+| Camada           | Tecnologia                                       | Versão (lockfile)       | Observação                                                     |
+| ---------------- | ------------------------------------------------ | ----------------------- | -------------------------------------------------------------- |
+| Runtime          | Node.js                                          | >= 24                   | `engines` da raiz                                              |
+| Package manager  | Bun                                              | 1.4.4                   | `devEngines` da raiz                                           |
+| Monorepo         | Turborepo                                        | 2.11.10                 | `turbo.json`                                                   |
+| Cliente          | React + Vite                                     | 19.3.1 / 8.3.6          | `apps/app`; ADR 0001                                           |
+| Docs             | Next.js                                          | 16.4.5                  | `apps/docs`, App Router                                        |
+| API              | Nest.js                                          | 12.4.0                  | `apps/api`; `class-validator` para DTOs                        |
+| Linguagem        | TypeScript                                       | 6.0.3                   | Config base estrita                                            |
+| Estilo           | TailwindCSS (CSS-first) + shadcn/ui              | 4.3.5                   | Tokens em `packages/ui/src/styles.css`                         |
+| Dados no cliente | TanStack Query / Table / Charts                  | 5.107.1 / 9.3.1 / 1.4.0 | Só Query tem uso (provider); `date-fns` 4.4.0 instalado        |
+| Backend de dados | Supabase (`@supabase/supabase-js`)               | 2.119.0                 | Cliente em `apps/app/src/lib/supabase.ts`; sem fluxos          |
+| Testes           | Vitest 5.1.0, Supertest 7.3.1, Playwright 1.65.0 | —                       | Ver `QA.md`                                                    |
+| Lint / format    | OXLint 1.92.0, OXFmt 0.77.0                      | —                       | ADR 0002                                                       |
+| Hooks            | lefthook 2.2.2 + lint-staged 17.6.0              | —                       | Instalar com `bun run hooks:install`; validados no commit raiz |
+| Observabilidade  | OpenTelemetry SDK 0.301.0, pino 10.4.0           | —                       | Traces, métricas e logs via OTLP HTTP                          |
+| Infra local      | Supabase CLI 3.0.0, Docker Compose               | —                       | Grafana LGTM + OTel Collector                                  |
 
 ### 3.2 Alvo (planejada, ainda não instalada)
 
@@ -163,7 +163,7 @@ ADRs vivem em `./.adrs/` (`0001`, `0002`). Crie `./.adrs/NNNN-titulo.md` ao toma
 2. **Sem autenticação:** nenhuma rota protegida ou sessão; `GET /` é público.
 3. **Sem CI:** nenhum workflow de lint, tipos, build ou testes.
 4. **Sem roteador no `apps/app`:** a fundação entrega só `/`.
-5. **Repositório git sem commits e com `origin` ainda inexistente:** o `git init` foi feito em 2026-11-07 (branch `main`) e o `origin` aponta para `https://github.com/brunolucildo/analytics-personas.git`, mas esse repositório ainda não foi criado no GitHub (resposta "Repository not found"). Também não há commit nem hooks instalados; `lefthook`/`lint-staged` estão configurados e não foram validados.
+5. **Hooks e push sem automação em CI:** o repositório existe desde 2026-11-07 (`main`, `origin` = `https://github.com/brunolucildo/analytics-personas.git`, commit raiz `227e0ad`). Os hooks do `lefthook` só rodam depois de `bun run hooks:install` em cada clone e não há pipeline que repita os gates. O push exige login do Git Credential Manager na conta `brunolucildo`.
 6. **`bun run lint` cobre só os workspaces:** `scripts/` e `e2e/` na raiz não são linted por esse comando.
 7. **Imagens LGTM em `:latest`** e Grafana com `admin/admin`: aceitável só para uso local; fixe versões e troque credenciais antes de qualquer ambiente compartilhado.
 8. **`supabase migration up --local`:** a CLI 3.x avisa que `--local` será removido na v4.
