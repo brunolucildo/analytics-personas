@@ -1,0 +1,56 @@
+{
+  "name": "analytics-personas",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "format": "oxfmt --write .",
+    "code:fix": "oxlint --fix . && oxfmt --write .",
+    "check-types": "turbo run check-types",
+    "types:check": "turbo run check-types",
+    "test": "turbo run test",
+    "test:integration": "turbo run test:integration",
+    "test:e2e": "playwright test",
+    "test:coverage": "turbo run test:coverage",
+    "infra:up": "bun run scripts/infra-up.ts",
+    "infra:down": "bun run scripts/infra-down.ts",
+    "db:migrate": "bun run scripts/db-migrate.ts",
+    "hooks:install": "lefthook install"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.65.0",
+    "lefthook": "^2.2.2",
+    "lint-staged": "^17.6.0",
+    "oxfmt": "^0.77.0",
+    "oxlint": "^1.92.0",
+    "supabase": "^3.0.0",
+    "turbo": "^2.11.10",
+    "typescript": "^6.0.3"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": [
+      "oxlint --fix --no-error-on-unmatched-pattern",
+      "oxfmt --write --no-error-on-unmatched-pattern"
+    ],
+    "*.{json,md,css,html,yml,yaml}": [
+      "oxfmt --write --no-error-on-unmatched-pattern"
+    ]
+  },
+  "devEngines": {
+    "packageManager": {
+      "name": "bun",
+      "version": "1.4.4"
+    }
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "trustedDependencies": [
+    "protobufjs"
+  ]
+}

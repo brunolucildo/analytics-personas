@@ -1,0 +1,36 @@
+{
+  "uid": "analytics-personas-api",
+  "title": "Analytics Personas — API",
+  "tags": ["analytics-personas", "api"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-15m", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Requisições HTTP por segundo",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "mimir" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(http_server_request_duration_seconds_count[5m]))",
+          "legendFormat": "req/s"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "text",
+      "title": "Como usar",
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 8 },
+      "options": {
+        "mode": "markdown",
+        "content": "Logs em **Loki**, traces em **Tempo** e métricas em **Mimir**. Este dashboard é mínimo e intencional: dashboards de produto ficam fora da fundação."
+      }
+    }
+  ]
+}

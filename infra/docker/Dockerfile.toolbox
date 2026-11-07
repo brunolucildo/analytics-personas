@@ -1,0 +1,9 @@
+# Adds a static BusyBox binary to distroless Grafana/OTel images so Docker
+# healthchecks can call HTTP endpoints without bundling a shell.
+ARG BASE_IMAGE
+
+FROM busybox:1.36-musl AS toolbox
+
+FROM ${BASE_IMAGE}
+
+COPY --from=toolbox /bin/busybox /bin/busybox

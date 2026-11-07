@@ -1,0 +1,10 @@
+@import "tailwindcss";
+@import "@repo/ui/styles.css";
+
+body {
+  margin: 0;
+  min-width: 320px;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  background-color: var(--background);
+  color: var(--foreground);
+}

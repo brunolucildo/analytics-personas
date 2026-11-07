@@ -1,0 +1,2 @@
+# Migrations locais entram aqui como `YYYYMMDDHHMMSS_descricao.sql`.
+# A fundação não cria migrations de produto; `bun run db:migrate` avisa quando não há nada a aplicar.

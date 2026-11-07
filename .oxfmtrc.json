@@ -1,0 +1,15 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "ignorePatterns": [
+    ".claude/skills/**",
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/.next/**",
+    "**/.turbo/**",
+    "coverage/**",
+    "test-results/**",
+    "playwright-report/**",
+    "supabase/.temp/**",
+    "bun.lock"
+  ]
+}
