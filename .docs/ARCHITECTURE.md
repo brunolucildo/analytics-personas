@@ -159,7 +159,7 @@ Regras já aplicadas e que devem ser mantidas:
 - `EMAIL_PROVIDER` (`mailtrap`, `resend` ou `capture`), `EMAIL_FROM` e a credencial do provedor escolhido são validadas no boot (`validateEnvironment`). Com `NODE_ENV=production` só `resend` sobe.
 - Logs: apenas `event` (`email_sent` ou `email_delivery_failed`), provedor, `purpose`, duração, tentativas e código de erro; nunca destinatário, assunto, corpo, token, link ou chave.
 - Sem fila nem outbox: e-mail em andamento se perde se o processo cair (reenvio nas specs 0006 e 0009). `drain()` roda no desligamento gracioso.
-- Decisão registrada no ADR `XXXX-0002-email-transacional-via-api-http` (número definitivo atribuído na integração).
+- Decisão registrada no ADR `0006-email-transacional-via-api-http`.
 
 ## 5. Decisões já tomadas
 

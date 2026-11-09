@@ -61,6 +61,7 @@ describe("Rate limiting", () => {
     const environment: Record<string, unknown> = {
       appUrl: "http://localhost:5173",
       trustProxy,
+      email: { provider: "capture", from: { name: "Test", address: "no-reply@test.local" } },
     };
     let builder = Test.createTestingModule({
       imports: [AppModule],
