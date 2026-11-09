@@ -12,12 +12,12 @@ Monorepo que entrega uma SPA (`apps/app`) para operar experts de futebol, apoiad
 
 | Caminho                        | O que é                                                 | Estado                                                                                                     |
 | ------------------------------ | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `apps/app`                     | Cliente de produto em React + Vite (porta 5173)         | TanStack Router: `/` → `/app` (home placeholder), grupos `/auth/*` e `/app/*`, 404; `QueryClientProvider`; página `/auth/sign-up` (`features/auth/`) e `lib/api-client.ts` |
-| `apps/api`                     | API Nest.js (porta 3002)                                | Prefixo `/api/v1`, `GET /api/v1/health`, envelope de erro, CORS (`APP_URL`); env validada; OTel; logs JSON; `POST /api/v1/auth/sign-up` (`modules/auth`) |
+| `apps/app`                     | Cliente de produto em React + Vite (porta 5173)         | TanStack Router: `/` → `/app` (home placeholder), grupos `/auth/*` e `/app/*`, 404; `QueryClientProvider`; página `/auth/sign-up` (`features/auth/`) e `lib/api-client.ts`; `/app/*` exige sessão (guard) e a home mostra `Welcome, <nome>` |
+| `apps/api`                     | API Nest.js (porta 3002)                                | Prefixo `/api/v1`, `GET /api/v1/health`, envelope de erro, CORS (`APP_URL`); env validada; OTel; logs JSON; `POST /api/v1/auth/sign-up` (`modules/auth`); **fechada por padrão**: `AuthGuard` global, `@Public()`, `GET /api/v1/auth/session` |
 | `apps/docs`                    | Site de documentação em Next.js (porta 3001)            | Página mínima                                                                                              |
 | `packages/ui`                  | `@repo/ui`: Tailwind v4 + shadcn, tokens de `DESIGN.md` | `Button`, `Input` e `Label`; exports `./button`, `./input`, `./label`, `./styles.css`, `./lib/utils`                                         |
 | `packages/typescript-config`   | tsconfig base (`strict`, `noUncheckedIndexedAccess`)    | `base`, `nestjs`, `nextjs`, `vite`, `react-library`                                                        |
-| `supabase/`                    | Supabase local via CLI (`config.toml`, `migrations/`)   | Migration `users` e `auth_tokens` (RLS sem policies) e a função `auth_sign_up`                                                                                  |
+| `supabase/`                    | Supabase local via CLI (`config.toml`, `migrations/`)   | Migrations `users`/`auth_tokens` (função `auth_sign_up`) e `sessions` (função `auth_issue_session`), RLS sem policies                                                                                  |
 | `docker-compose.yml`, `infra/` | Grafana, Loki, Tempo, Mimir e OTel Collector            | Datasources e dashboard mínimo provisionados                                                               |
 | `scripts/`                     | `infra:up`, `infra:down`, `db:migrate` (Bun)            | Funcionais                                                                                                 |
 | `e2e/`, `playwright.config.ts` | Testes E2E                                              | Rotas `/`, 404 e `/auth/sign-up` (app e API reais, e-mail em `capture`)                                                                                        |
@@ -32,7 +32,7 @@ packages/
   typescript-config/  base.json, nestjs.json, nextjs.json, vite.json, react-library.json
 ```
 
-**Não existem hoje:** modelo de domínio além de `users` e `auth_tokens`, sessão e proteção de rotas, upload/storage, conectores, orquestração de agentes, CI/CD e deploy.
+**Não existem hoje:** modelo de domínio além de `users`, `auth_tokens` e `sessions`, emissão de sessão por fluxo de usuário (confirmação e sign-in), upload/storage, conectores, orquestração de agentes, CI/CD e deploy.
 
 ### 2.1 Portas
 
@@ -62,6 +62,7 @@ packages/
 | Estilo           | TailwindCSS (CSS-first) + shadcn/ui              | 4.3.5                   | Tokens em `packages/ui/src/styles.css`                         |
 | Dados no cliente | TanStack Query / Table / Charts                  | 5.107.1 / 9.3.1 / 1.4.0 | Só Query tem uso (provider); `date-fns` 4.4.0 instalado        |
 | Roteamento       | TanStack Router                                  | 1.170.46                | `apps/app`; rotas em código (`router.tsx`); ADR 0003           |
+| JWT              | jose                                             | 6.2.17                  | `apps/api`, HS256; ver §4.7 e ADR da spec `0005`               |
 | Backend de dados | Supabase (`@supabase/supabase-js`)               | 2.119.0                 | Cliente em `apps/app/src/lib/supabase.ts` (sem fluxos); a API o usa com a service role em `modules/auth` (§4.6)          |
 | Testes           | Vitest 5.1.0, Supertest 7.3.1, Playwright 1.65.0 | —                       | Ver `QA.md`                                                    |
 | Lint / format    | OXLint 1.92.0, OXFmt 0.77.0                      | —                       | ADR 0002                                                       |
@@ -183,6 +184,23 @@ Primeira fatia de produto e referência das próximas specs de auth (`0005` a `0
 
 **SPA:** `lib/api-client.ts` (base `${VITE_API_URL}/api/v1`, JSON, erro tipado `ApiError { status, code, message, details }`, `status` 0 e `NETWORK_ERROR` quando a rede falha) e `features/auth/` (página, validação por função pura, `useMutation` do TanStack Query).
 
+### 4.7 Sessão e proteção de rotas (spec `0005`)
+
+Bearer JWT cujo `sid` é conferido no banco a cada request; **sessão única por usuário**; **API fechada por padrão** (ADR `XXXX-0005-modelo-de-sessao-jwt-com-sid-no-banco`). Mesmo módulo `modules/auth`.
+
+| Camada           | Conteúdo                                                                                                                                                                                                  |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `domain`         | `session-rules` (7 dias, mínimo de 32 caracteres do segredo, `isUuid`), `session-ports` (`SessionRepository`, `AccessTokenSigner`, `SessionUser`, `IssuedSession`, `ActiveSession`), `SessionUserNotFoundError` |
+| `application`    | `SessionService`: `issue(userId)` (devolve `{accessToken, expiresAt, user}`), `validate(sid)`, `authenticate(token)` (assinatura, depois sessão no banco e `sub` igual ao dono), `revoke(sid)`           |
+| `infrastructure` | `JoseAccessTokenSigner` (HS256, `sub` e `sid` precisam ser UUID), `SupabaseSessionRepository` (RPC `auth_issue_session`; leitura de `sessions` com o usuário; revogação)                                    |
+| `interface`      | `AuthGuard` (global, `APP_GUARD`), `@CurrentSession()`, `presentSession`/`presentUser`, `GET /api/v1/auth/session`; `@Public()` vive em `src/common/public.decorator.ts`                                  |
+
+- **Banco** (`supabase/migrations/20261109210000_create_sessions.sql`): `sessions` (`id` = `sid`, `user_id` com `on delete cascade`, `created_at`, `expires_at`, `revoked_at`), índice único parcial `sessions_user_id_active_key` (uma ativa por usuário), RLS ligada e sem policies, `revoke all` de `anon`/`authenticated`. `auth_issue_session(p_user_id, p_expires_at)` trava a linha do usuário, revoga a ativa e insere a nova na mesma transação; devolve a sessão e os campos públicos do usuário (ou nenhuma linha se o usuário não existe). `execute` só para `service_role`. Rollback no comentário da migration.
+- **Contrato:** token `{sub, sid, iat, exp}` (sem PII); resposta de sessão `{accessToken, expiresAt, user:{id, firstName, lastName, email}}` (use `presentSession` nos endpoints de 0006 e 0007); `401 UNAUTHENTICATED` ("Authentication required.") para qualquer problema com o token, sem dizer qual. `AUTH_JWT_SECRET` (>= 32 caracteres) é obrigatória: a API não sobe sem ela.
+- **Ordem dos guards:** `RateLimitModule` antes de `AuthModule` em `AppModule`: o limite roda antes da autenticação.
+- **SPA:** `lib/access-token.ts` (`access_token` no `localStorage`, `try/catch`, cópia em memória), `api-client` (`get`, `Authorization: Bearer`, 401 `UNAUTHENTICATED` limpa o token), `lib/query-client.ts` (um 401 em qualquer query ou mutation leva a `/auth/sign-in` fora das páginas de auth), `features/auth/use-session.ts` (`GET /auth/session`; o token faz parte da chave), `auth-redirect.ts` (função pura de `/auth/*`), `session-states.tsx` (`role="status"` e "We couldn't verify your session."/`Try again`). Guard de `/app`: `beforeLoad` (sem token: `/auth/sign-in` sem chamar a API) mais `AppLayout`. `AuthLayout` manda quem tem sessão para `/app`, exceto `confirm-account` e `reset-password`.
+- **Para 0006, 0007 e 0008:** emita com `SessionService.issue(userId)` e responda `presentSession(...)`; no SPA, grave com `setAccessToken` e navegue para `/app` (a chave da query muda com o token, então nada de cache antigo é reaproveitado); sign-out: `SessionService.revoke(sid)` no servidor (o `sid` vem de `@CurrentSession()`) e `clearAccessToken()` no cliente.
+
 ## 5. Decisões já tomadas
 
 | Decisão                                         | Motivo                                                            | Consequência                                             |
@@ -199,13 +217,14 @@ Primeira fatia de produto e referência das próximas specs de auth (`0005` a `0
 | Limite de requisições próprio, em memória       | Chave por rota + IP + e-mail e envelope próprio — ADR 0005   | Sem `@nestjs/throttler`; instância única; ver §6 item 10 |
 | Auth própria na API (Nest + Postgres), Argon2id  | Sessão única, e-mails próprios e identidade no domínio — ADR 0007 | Sem Supabase Auth; segurança de credenciais é nossa (§4.6) |
 | `supabase-js` (service role) + funções RPC      | Decisão do solicitante; transação no banco — ADR 0008 | RLS sem policies; `execute` revogado de `anon`/`authenticated` |
+| Sessão: bearer JWT com `sid` conferido no banco | Sessão única e revogação imediata — ADR `XXXX-0005`               | API fechada por padrão; uma leitura por request; token em `localStorage` (§4.7) |
 
 ADRs vivem em `./.adrs/` (`0001` a `0006`; os dois da spec `0004` entram com o número definido na integração). Crie `./.adrs/NNNN-titulo.md` ao tomar decisões estruturais (template em `RULES.md`).
 
 ## 6. Dívidas e lacunas conhecidas
 
 1. **Modelo de dados mínimo:** só `users` e `auth_tokens` (spec `0004`); sem tabelas de clube, expert ou conector. Não há rollback automático: o SQL fica no comentário da migration.
-2. **Autenticação parcial:** só o cadastro existe (spec `0004`); nenhuma rota protegida ou sessão; `/app/*` e toda a API são públicas até a spec `0005` (`.plans/auth-breakdown.md`).
+2. **Autenticação parcial:** existem o cadastro (spec `0004`) e a sessão com a proteção de rotas (spec `0005`: API e `/app/*` fechadas); ainda não há fluxo que emita sessão para uma pessoa (confirmação e sign-in, specs `0006` e `0007`) nem sign-out (`0008`). O token no `localStorage` é legível por XSS (risco aceito, ADR `XXXX-0005`); sessões expiradas ou revogadas não são apagadas (backlog) (`.plans/auth-breakdown.md`).
 3. **Sem CI:** nenhum workflow de lint, tipos, build ou testes.
 4. **Sem páginas de produto:** o roteador e os grupos `/auth/*` e `/app/*` existem, mas só há a home placeholder e a 404.
 5. **Hooks e push sem automação em CI:** o repositório existe desde 2026-11-07 (`main`, `origin` = `https://github.com/brunolucildo/analytics-personas.git`, commit raiz `227e0ad`). Os hooks do `lefthook` só rodam depois de `bun run hooks:install` em cada clone e não há pipeline que repita os gates. O push exige login do Git Credential Manager na conta `brunolucildo`.

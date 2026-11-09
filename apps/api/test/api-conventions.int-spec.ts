@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { AppModule } from "../src/app.module";
 import { configureApp } from "../src/bootstrap";
 import { ApiException } from "../src/common/api-exception";
+import { Public } from "../src/common/public.decorator";
 
 class ProbeBody {
   @IsString()
@@ -16,6 +17,8 @@ class ProbeBody {
   age!: number;
 }
 
+// Public: these probes exercise the error envelope, not authentication.
+@Public()
 @Controller("probe")
 class ProbeController {
   @Post("validate")

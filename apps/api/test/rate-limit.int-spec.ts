@@ -4,6 +4,7 @@ import { Test } from "@nestjs/testing";
 import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AppModule } from "../src/app.module";
+import { Public } from "../src/common/public.decorator";
 import { configureApp } from "../src/bootstrap";
 import {
   AUTH_RATE_LIMIT_POLICIES,
@@ -22,6 +23,8 @@ const TEST_POLICIES = {
   "probe-email": { limit: 3, windowSeconds: 60, keyBy: "ip-and-email" },
 } as const;
 
+// Public: these probes exercise the rate limit, not authentication.
+@Public()
 @Controller("probe")
 class RateLimitProbeController {
   @Get("limited")
@@ -62,6 +65,7 @@ describe("Rate limiting", () => {
       appUrl: "http://localhost:5173",
       supabaseUrl: "http://127.0.0.1:54321",
       supabaseServiceRoleKey: "test-service-role-key",
+      authJwtSecret: "test-only-jwt-secret-0123456789-abcdefghij",
       trustProxy,
       email: { provider: "capture", from: { name: "Test", address: "no-reply@test.local" } },
     };

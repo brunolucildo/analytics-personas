@@ -90,7 +90,7 @@ apps/app/src/
 - Erros de domínio são mapeados para HTTP na camada de interface; não vaze stack trace.
 - Nenhum acesso direto ao Supabase dentro do controller.
 - Toda integração externa tem timeout, retry limitado e erro tipado.
-- Endpoints precisam de autenticação/autorização explícitas, exceto health check.
+- **A API é fechada por padrão:** um `AuthGuard` global exige sessão em todo endpoint; só `@Public()` (`src/common/public.decorator.ts`) abre uma rota (hoje: `GET /api/v1/health`, `POST /api/v1/auth/sign-up` e `/test-support/emails`, que já é 404 fora do `capture`). Endpoint novo não precisa de nada para ser protegido; para ler a pessoa logada use `@CurrentSession()` (ver §13.5). Autorização além da sessão (papéis) fica explícita no caso de uso.
 - E-mail sai só por `EmailService` (`apps/api/src/modules/email`): o caso de uso chama `dispatch` **depois do commit**, para que falha do provedor não mude o resultado do request; use `send` só quando precisar do erro. Monte o corpo com `renderEmailLayout` e a tag `html` (ela escapa valores dinâmicos). Nunca importe SDK ou cliente de provedor fora do módulo `email` nem logue destinatário, assunto, corpo, link ou token.
 
 ## 6. Dados (PostgreSQL/Supabase)
@@ -143,7 +143,9 @@ Regras:
 - Testes da API definem env fictícia em `apps/api/test/setup-env.ts`; não use chave real nem a service role.
 - Teste que envolve e-mail roda com `EMAIL_PROVIDER=capture` (já definido em `setup-env.ts`) e lê as mensagens com `getCapturedEmails({ to })`; um processo separado (E2E) usa `GET /api/v1/test-support/emails?to=<endereço>` e `DELETE` no mesmo caminho para limpar. Nenhum teste envia e-mail real nem chama Mailtrap ou Resend.
 - Teste de integração roda contra o **Supabase local** (`bun run infra:up` e `bun run db:migrate` antes): a `globalSetup` (`apps/api/test/support/global-setup.ts`) lê as chaves de `supabase status -o env` quando não estão no ambiente e falha com a instrução se o banco não estiver no ar. Use e-mails únicos (`uniqueEmail` de `test/support/supabase.ts`) e apague o que criou (`deleteUsersByEmail`); o banco é compartilhado. Teste unitário usa os fakes de `test/support/in-memory-auth.ts`.
-- Testes de `AppModule` que sobrescrevem o `ConfigService` com um objeto fake precisam incluir `email`, `supabaseUrl` e `supabaseServiceRoleKey` (exemplo em `apps/api/test/rate-limit.int-spec.ts`).
+- Testes de `AppModule` que sobrescrevem o `ConfigService` com um objeto fake precisam incluir `email`, `supabaseUrl`, `supabaseServiceRoleKey` e `authJwtSecret` (exemplo em `apps/api/test/rate-limit.int-spec.ts`). `AUTH_JWT_SECRET` fictícia vem de `apps/api/test/setup-env.ts`.
+- Rota de teste declarada num módulo de teste (`controllers: [Probe]`) é fechada como qualquer outra: marque com `@Public()` quando o teste não for de autenticação, ou use um token de `SessionService.issue` (ver `apps/api/test/auth-sessions.int-spec.ts`). Para semear um usuário confirmado sem passar por sign-up/sign-in use `seedConfirmedUser` de `apps/api/test/support/sessions.ts`; no E2E, `seedSignedInUser` de `e2e/support/session.ts` (usuários `e2e-session-*`, apagados no `globalTeardown`).
+- No SPA, `renderApp` de `apps/app/src/test/render-app.tsx` monta router e `QueryClient` como o `main.tsx`; use `stubSessionFetch` para responder `GET /auth/session` e grave o token em `localStorage` (`access_token`).
 
 ## 10. Dependências
 
@@ -190,10 +192,10 @@ Definidas pela spec `0001-platform-routing-conventions` (ADRs `0003` e `0004`). 
 | Zona                    | Prefixo     | Acesso                                                                   | Onde vive                                                               |
 | ----------------------- | ----------- | ------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
 | Páginas de autenticação | `/auth/*`   | Públicas                                                                 | Grupo `/auth` em `apps/app/src/router.tsx` (`AuthLayout`)               |
-| Páginas do produto      | `/app/*`    | Privadas (o guard chega com a spec `0005`; até lá `/app` está acessível) | Grupo `/app` em `apps/app/src/router.tsx` (`AppLayout`)                 |
+| Páginas do produto      | `/app/*`    | Privadas: exigem sessão (guard da spec `0005`, ver §13.5)                | Grupo `/app` em `apps/app/src/router.tsx` (`AppLayout`)                 |
 | API                     | `/api/v1/*` | Autenticação explícita, exceto `GET /api/v1/health`                      | `apps/api`; o prefixo é aplicado em `configureApp` (`src/bootstrap.ts`) |
 
-- `/` redireciona para `/app`; qualquer caminho sem rota mostra a página "Page not found".
+- `/` redireciona para `/app` (e, sem sessão, `/app` para `/auth/sign-in`); qualquer caminho sem rota mostra a página "Page not found".
 - Página nova entra como filha de `authRoute` ou de `appRoute`; nunca direto na raiz.
 - A API só serve `/api/v1/*`; fora dele responde 404 no envelope de erro. Uma `v2` exige ADR.
 
@@ -255,3 +257,15 @@ signIn(@Body() body: SignInDto) { /* ... */ }
 - **`TRUST_PROXY`** (`false` por padrão): com `true`, o IP vem do primeiro endereço de `X-Forwarded-For` (use só atrás de um proxy confiável; do contrário qualquer cliente forja o IP). Com `false`, o cabeçalho é ignorado e atrás de um proxy todos compartilham a cota do IP do proxy: configure antes do deploy.
 - **Limitação:** contadores em memória, **instância única**. Reiniciar a API zera as contagens e com mais de uma instância cada uma conta sozinha. O armazenamento fica atrás da interface `RateLimitStore`; Redis é backlog. Teto de 10 000 entradas, com evicção da mais antiga e descarte das expiradas.
 - **Testes:** use `resetRateLimitStore(app)` de `apps/api/test/support/rate-limit.ts` em `beforeEach`, e `createFakeClock()` com o provider `RATE_LIMIT_CLOCK` para avançar o tempo. Para uma política de teste, sobrescreva `RATE_LIMIT_POLICIES` (exemplo em `apps/api/test/rate-limit.int-spec.ts`).
+
+### 13.5 Sessão e proteção de rotas
+
+Módulo `apps/api/src/modules/auth/` (spec `0005`; modelo no ADR `XXXX-0005`, resumo em `ARCHITECTURE.md` §4.7).
+
+- **Header:** `Authorization: Bearer <jwt>`. O JWT só carrega `sub`, `sid`, `iat` e `exp`; a validade vem da linha em `sessions` (a API a lê a cada request). Emitir uma sessão revoga a anterior do mesmo usuário (uma ativa por usuário, garantido pelo banco).
+- **Resposta de sessão** (para os endpoints que emitem sessão): `presentSession(await sessions.issue(userId))` devolve `{accessToken, expiresAt, user:{id, firstName, lastName, email}}`. `GET /api/v1/auth/session` devolve só `{user}`.
+- **Rota aberta:** `@Public()` no método ou no controller; sem ele, 401 `UNAUTHENTICATED` ("Authentication required.") para token ausente, malformado, de assinatura inválida, expirado, sem `sid` ou de sessão revogada/inexistente, sem dizer qual. Rota inexistente continua 404.
+- **Rota fechada:** `@CurrentSession() session: ActiveSession` dá `session.userId`, `session.sessionId` e `session.user`.
+- **Ordem dos guards:** o de limite de requisições roda antes do de sessão (ver §13.4), então tentativas anônimas também contam.
+- **Segredo:** `AUTH_JWT_SECRET` (>= 32 caracteres) só no servidor, nunca em log nem em `VITE_*`. Falha do banco ao validar é 500, não 401.
+- **SPA:** o token fica em `localStorage` (`access_token`) via `lib/access-token.ts` (`getAccessToken`, `setAccessToken`, `clearAccessToken`; nunca lance, caem para memória). `lib/api-client.ts` envia o header e, num 401 `UNAUTHENTICATED`, limpa o token. Telas privadas entram como filhas de `appRoute` (o guard já cobre); páginas de `/auth/*` entram em `authRoute` (quem tem sessão é mandado para `/app`, exceto `confirm-account` e `reset-password`; a regra é `features/auth/auth-redirect.ts`). Leia a pessoa logada com `useSession()` (`GET /auth/session`).

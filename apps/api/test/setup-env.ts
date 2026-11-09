@@ -7,3 +7,4 @@ process.env.EMAIL_FROM ??= "Analytics Personas <no-reply@analytics-personas.loca
 process.env.OTEL_SDK_DISABLED ??= "true";
 process.env.LOG_LEVEL ??= "silent";
 process.env.TRUST_PROXY ??= "false";
+process.env.AUTH_JWT_SECRET ??= "test-only-jwt-secret-0123456789-abcdefghij";

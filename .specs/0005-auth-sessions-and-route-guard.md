@@ -3,7 +3,7 @@
 > Spec executável. Preencha todas as seções; `TODO` é lacuna, não requisito.
 > Use `create-spec` para criar, `refine-spec` para auditar e `implement-me` para executar.
 
-- **Status:** rascunho
+- **Status:** concluída (R1–R10 atendidos; gates verdes em 2026-11-09)
 - **Slug:** 0005-auth-sessions-and-route-guard
 - **Data:** 2026-11-09
 - **Atualizado em:** 2026-11-09
@@ -87,15 +87,15 @@ Duas specs (confirmação e sign-in) emitem sessão, e todas as rotas privadas a
 
 ## 6. Acceptance Criteria
 
-- [ ] Given `db:migrate`, When inspecionar `sessions`, Then RLS ligada, índice único parcial e nada acessível pela chave `anon`. (R1)
-- [ ] Given um usuário semeado, When `issue` duas vezes, Then só a última sessão está ativa, inclusive sob concorrência. (R2)
-- [ ] Given `AUTH_JWT_SECRET` ausente ou curta, When iniciar, Then a API falha citando a variável. (R3)
-- [ ] Given rota sem `@Public()`, When chamada sem token ou com token inválido/expirado/revogado, Then 401 `UNAUTHENTICATED`; `health` continua público. (R4)
-- [ ] Given token válido, When `GET /api/v1/auth/session`, Then 200 com o usuário e sem campos internos. (R5)
-- [ ] Given tokens A e B do mesmo usuário (B depois de A), When usar A, Then 401; When usar B, Then 200. (R6)
-- [ ] Given o SPA sem token / com token inválido / com token válido, When abrir `/app`, Then redireciona para `/auth/sign-in` / limpa o token e redireciona / mostra a home. (R7, R8, R10)
-- [ ] Given a função de redirecionamento, When sessão válida em cada caminho de `/auth/*`, Then só `confirm-account` e `reset-password` ficam acessíveis. (R9)
-- [ ] Given `bun run lint`, `check-types`, `build`, `test`, `test:integration` e `test:e2e`, Then passam.
+- [x] Given `db:migrate`, When inspecionar `sessions`, Then RLS ligada, índice único parcial e nada acessível pela chave `anon`. (R1)
+- [x] Given um usuário semeado, When `issue` duas vezes, Then só a última sessão está ativa, inclusive sob concorrência. (R2)
+- [x] Given `AUTH_JWT_SECRET` ausente ou curta, When iniciar, Then a API falha citando a variável. (R3)
+- [x] Given rota sem `@Public()`, When chamada sem token ou com token inválido/expirado/revogado, Then 401 `UNAUTHENTICATED`; `health` continua público. (R4)
+- [x] Given token válido, When `GET /api/v1/auth/session`, Then 200 com o usuário e sem campos internos. (R5)
+- [x] Given tokens A e B do mesmo usuário (B depois de A), When usar A, Then 401; When usar B, Then 200. (R6)
+- [x] Given o SPA sem token / com token inválido / com token válido, When abrir `/app`, Then redireciona para `/auth/sign-in` / limpa o token e redireciona / mostra a home. (R7, R8, R10)
+- [x] Given a função de redirecionamento, When sessão válida em cada caminho de `/auth/*`, Then só `confirm-account` e `reset-password` ficam acessíveis. (R9)
+- [x] Given `bun run lint`, `check-types`, `build`, `test`, `test:integration` e `test:e2e`, Then passam.
 
 ## 7. O que fazer
 
@@ -141,6 +141,10 @@ Como validar que a spec foi atendida:
 | ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- | ----------- | ------------------ |
 | Premissa: JWT HS256 com segredo único (`AUTH_JWT_SECRET`); sem rotação nesta fase.                                | Segurança do segredo.                                | Não         | Time de engenharia |
 | Premissa: `/auth/sign-in` ainda não tem página (0007): o redirecionamento termina na 404 do grupo `/auth` até lá. | O E2E verifica só a URL final.                       | Não         | Time de engenharia |
+| Premissa (implementação): `issue` não verifica `email_confirmed_at`; quem chama (0006 e 0007) decide se a pessoa pode entrar. | Sessão para conta não confirmada se o chamador esquecer. | Não | Time de engenharia |
+| Premissa (implementação): só 401 com `code` `UNAUTHENTICATED` limpa o token no SPA; um 401 de credencial inválida (0007) deve usar outro código. | Sign-in errado não pode derrubar a sessão da página. | Não | Time de engenharia |
+| Premissa (implementação): `GET /auth/session` devolve só `{user}` (sem `accessToken`, conforme R5); falha do banco na validação é 500, nunca 401. | Indisponibilidade não parece "deslogado". | Não | Time de engenharia |
+| Premissa (implementação): numa página `/auth/*` um token inválido apenas é limpo (a pessoa fica na página); falha de rede/5xx na verificação deixa a página abrir e mantém o token. | UX de páginas de auth com token velho. | Não | Produto |
 | Premissa: uma sessão revogada por outro login mostra só o redirecionamento, sem aviso específico.                 | UX de "você entrou em outro lugar" fica para depois. | Não         | Produto            |
 | Premissa: sem `?redirect=` na volta ao sign-in.                                                                   | Após login, sempre `/app`.                           | Não         | Produto            |
 | Premissa: sessões expiradas ou revogadas não são apagadas (job de limpeza no backlog).                            | Crescimento lento da tabela.                         | Não         | Time de engenharia |
@@ -150,4 +154,5 @@ Como validar que a spec foi atendida:
 | Data       | O que mudou                                                                                    | Motivo                                                                                             |
 | ---------- | ---------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
 | 2026-11-09 | Spec criada pela skill `breakdown-specs` (épico de autenticação).                              | Habilitadora usada por 0006, 0007, 0008 e 0010; entrega "rotas privadas em /app" e "sessão única". |
+| 2026-11-09 | Spec implementada (`implement-me`): premissas de implementação registradas em §11, status `concluída`, critérios marcados. | Execução da spec 0005. |
 | 2026-11-09 | A emissão de sessão passa a ser uma função SQL chamada por RPC; RPC sem `execute` para `anon`. | Decisão de acesso a dados (supabase-js + RPC) no quiz de perguntas abertas.                        |

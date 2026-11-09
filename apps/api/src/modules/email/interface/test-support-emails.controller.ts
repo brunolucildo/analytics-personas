@@ -10,6 +10,7 @@ import {
   Query,
   UseGuards,
 } from "@nestjs/common";
+import { Public } from "../../../common/public.decorator";
 import { EMAIL_CONFIG } from "../email.tokens";
 import {
   type CapturedEmail,
@@ -37,6 +38,8 @@ export class CaptureOnlyGuard implements CanActivate {
 
 /** Test support: lets E2E tests (a separate process) read captured e-mails. */
 @Controller("test-support/emails")
+// Open to the session guard on purpose: `CaptureOnlyGuard` answers 404 unless the `capture` provider is on.
+@Public()
 @UseGuards(CaptureOnlyGuard)
 export class TestSupportEmailsController {
   constructor(@Inject(CapturedEmailStore) private readonly store: CapturedEmailStore) {}

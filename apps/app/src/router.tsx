@@ -8,6 +8,7 @@ import {
   type RouterHistory,
 } from "@tanstack/react-router";
 import { SignUpPage } from "./features/auth/sign-up-page";
+import { getAccessToken } from "./lib/access-token";
 import { AppLayout } from "./routes/app-layout";
 import { AuthLayout } from "./routes/auth-layout";
 import { HomePage } from "./routes/home-page";
@@ -42,10 +43,16 @@ export function createAppRouter({ history, extraRoutes }: CreateAppRouterOptions
     component: AuthLayout,
   });
 
-  // Private group: every page under /app/*.
+  // Private group: every page under /app/*. Without a token the visitor never reaches the layout
+  // (and the API is never called); with one, `AppLayout` checks it against the API.
   const appRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: "app",
+    beforeLoad: () => {
+      if (getAccessToken() === null) {
+        throw redirect({ to: "/auth/sign-in", replace: true });
+      }
+    },
     component: AppLayout,
   });
 
@@ -77,3 +84,13 @@ export function createAppRouter({ history, extraRoutes }: CreateAppRouterOptions
 }
 
 export type AppRouter = ReturnType<typeof createAppRouter>;
+
+/**
+ * Leaves for the sign-in page when the API says the session is gone. Auth pages stay
+ * where they are: a stale token must not push someone off the sign-up page.
+ */
+export function redirectToSignIn(router: AppRouter): void {
+  if (!router.state.location.pathname.startsWith("/auth")) {
+    void router.navigate({ to: "/auth/sign-in", replace: true });
+  }
+}

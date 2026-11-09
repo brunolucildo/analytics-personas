@@ -13,7 +13,7 @@
 | Build                       | `apps/app/dist`, `apps/api/dist` e `apps/docs/.next`; passa        |
 | Testes unitários            | Vitest em `app` e `api`; passam                                    |
 | Testes de integração        | Vitest + Supertest em `api`, contra o Supabase local (exige `infra:up` e `db:migrate`); passa |
-| Testes E2E                  | Playwright (`home`, `routing`, `sign-up`); sobe app e API (`capture`) e exige o Supabase local; passa |
+| Testes E2E                  | Playwright (`home`, `routing`, `sign-up`, `session`); sobe app e API (`capture`) e exige o Supabase local; passa |
 | Cobertura                   | `bun run test:coverage` gera `coverage/`; sem threshold            |
 | Hooks de pre-commit         | Configurados (`lefthook.yml`); validados no commit raiz `227e0ad`  |
 | CI                          | Não configurado                                                    |
@@ -112,6 +112,25 @@ Banco (`psql` no container): RLS ligada em `users` e `auth_tokens`, 0 policies e
 Verificação manual de UI (`/auth/sign-up`, Chromium via Playwright, vite em dev): 375 / 768 / 1280 px sem scroll horizontal (`scrollWidth` = largura da viewport, inclusive com os erros de validação abertos); um único `h1` (30px); `lang="en-US"`; ordem de Tab: nome, sobrenome, e-mail, senha, confirmação, botão, link `Sign in`; foco com anel de 2px + 4px `#5C8001`; alvos de toque: campos 44px, botão 48px, link `Sign in` 52×44px; console sem erro nem warning (o 409 aparece só como log de rede do browser). Contraste calculado: erro `#B91C1C` sobre `#FFFDF5` 6,35:1; texto secundário `#6B6B6B` 5,23:1; texto do botão 6,42:1; anel de foco 4,54:1. **Achado e corrigido:** o erro de campo mostrado no `blur` deslocava o botão e engolia o clique (o `click` caía no `form`); os erros de validação agora aparecem no envio. **Não verificado:** leitor de tela; hover/active; `prefers-reduced-motion` (o spinner tem `motion-reduce:animate-none`, sem teste); `vite preview`.
 
 **Pré-requisitos novos:** `test:integration` e `test:e2e` exigem Docker, `bun run infra:up` e `bun run db:migrate` (sem o banco a `globalSetup` falha com a instrução). As chaves do Supabase vêm do ambiente ou de `supabase status -o env`. O E2E sobe uma API própria com `EMAIL_PROVIDER=capture` na 3002 e o app na 5173 (`E2E_APP_PORT` e `E2E_API_PORT` mudam as portas).
+
+### 1.7 Verificação da spec 0005 em 2026-11-09
+
+Executado no worktree da spec (código de saída 0), com o Supabase local no ar e a migration `20261109210000_create_sessions.sql` aplicada. O `test:e2e` rodou com `E2E_APP_PORT=5195 E2E_API_PORT=3025` porque a 5173 estava ocupada por outro processo.
+
+| Gate                       | Resultado | Observação                                                                                                                                                                                                                       |
+| -------------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bun run lint`             | Passa     | 4 tasks, 0 warnings, 0 erros                                                                                                                                                                                                     |
+| `bun run check-types`      | Passa     | 4 tasks                                                                                                                                                                                                                          |
+| `bun run build`            | Passa     | `app`, `api` e `docs`; `service_role`, `auth_issue_session` e `AUTH_JWT_SECRET` não aparecem em `apps/app/dist`                                                                                                                  |
+| `bun run test`             | Passa     | `api`: 214 testes (23 arquivos: serviço de sessão, assinador JWT, guard, repositório, ambiente); `app`: 89 testes (9 arquivos: token, `api-client`, `query-client`, redirecionamento, guard de `/app` e de `/auth/*`)            |
+| `bun run test:integration` | Passa     | 96 testes (8 arquivos): `auth-sessions-database` (10: RLS e RPC com `anon`/`authenticated`, índice único parcial, concorrência), `auth-sessions` (R2 a R6: 401 sem motivo distinguível, sessão única, A 401 e B 200, ordem dos guards) |
+| `bun run test:e2e`         | Passa     | 22 testes (Chromium): API fechada, `/app` sem token, com token inválido e com token semeado, `/auth/sign-up` logado, carregando anunciado, retry, sessão única                                                                  |
+
+Banco: `sessions` com RLS ligada, 0 policies, índice `sessions_user_id_active_key` (parcial), `auth_issue_session` com `execute` só para `service_role` (`anon` e `authenticated` recebem erro pela API REST; conferido por `psql`: RLS ligada, 0 policies, `has_function_privilege` falso para `anon` e `authenticated` e verdadeiro para `service_role`). Ao final, `count(*)` de `public.sessions` e de `public.users` = 0 (os testes apagam o que criam). `AUTH_JWT_SECRET` ausente ou com 31 caracteres: `node dist/main.js` termina com erro citando a variável e sem ecoar o valor.
+
+Verificação manual de UI (`/app` carregando, erro e home, Chromium via Playwright, vite em dev): 375 / 768 / 1280 px sem scroll horizontal (`scrollWidth` = largura da viewport); um único `h1` em cada estado (home 36px no mobile e 60px a partir de 768px); `lang="en-US"`; o estado de carregamento tem `role="status"` e o texto "Verifying your session…"; botão `Try again` com 97×44px, foco por `Tab` com `:focus-visible` verdadeiro e anel de 2px + 4px `#5C8001`. Contraste calculado: `h1` e texto de carregamento sobre o fundo 19,44:1; texto secundário `#6B6B6B` 5,23:1. Console sem erro nem warning, exceto o `ERR_CONNECTION_REFUSED` provocado de propósito no teste de falha de rede. **Não verificado:** leitor de tela (o `role="status"` foi checado só pela árvore de acessibilidade do Playwright); hover/active; `prefers-reduced-motion` (o spinner tem `motion-reduce:animate-none`, sem teste); `vite preview`.
+
+**Pré-requisito novo:** a API exige `AUTH_JWT_SECRET` (>= 32 caracteres; ver `.env.example`); `.env` antigos precisam dela para a API subir. Os testes usam um valor fictício em `apps/api/test/setup-env.ts` e o E2E, em `playwright.config.ts`.
 
 ## 2. Pré-requisitos
 
