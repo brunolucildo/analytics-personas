@@ -25,7 +25,7 @@ Monorepo que entrega uma SPA (`apps/app`) para operar experts de futebol, apoiad
 ```text
 apps/
   app/    src/ (App.tsx, main.tsx, router.tsx, routes/, lib/supabase.ts, test/)
-  api/    src/ (main.ts, bootstrap.ts, app.module.ts, common/, config/, health/, observability/) + test/
+  api/    src/ (main.ts, bootstrap.ts, app.module.ts, common/, config/, health/, modules/rate-limit/, observability/) + test/
   docs/   app/ (rotas, layout, CSS Modules)
 packages/
   ui/                 src/button.tsx, src/styles.css, src/lib/utils.ts, components.json
@@ -158,6 +158,7 @@ Regras já aplicadas e que devem ser mantidas:
 | Supabase local via CLI; Compose só para LGTM    | Evitar conflito entre Compose e o fluxo da CLI                    | `infra:up` orquestra os dois                             |
 | API em `/api/v1`, rotas `/auth` e `/app`, en-US | Espaço de URLs e idioma estáveis antes da autenticação — ADR 0004 | Ver `DEVELOPMENT.md` §13; `APP_URL` é obrigatória na API |
 | TanStack Router, rotas em código                | Combina com o stack TanStack — ADR 0003                           | Sem plugin de geração de rotas                           |
+| Limite de requisições próprio, em memória       | Chave por rota + IP + e-mail e envelope próprio — ADR XXXX-0003   | Sem `@nestjs/throttler`; instância única; ver §6 item 10 |
 
 ADRs vivem em `./.adrs/` (`0001` a `0004`). Crie `./.adrs/NNNN-titulo.md` ao tomar decisões estruturais (template em `RULES.md`).
 
@@ -172,6 +173,7 @@ ADRs vivem em `./.adrs/` (`0001` a `0004`). Crie `./.adrs/NNNN-titulo.md` ao tom
 7. **Imagens LGTM em `:latest`** e Grafana com `admin/admin`: aceitável só para uso local; fixe versões e troque credenciais antes de qualquer ambiente compartilhado.
 8. **`supabase migration up --local`:** a CLI 3.x avisa que `--local` será removido na v4.
 9. **TanStack Table/Charts e `date-fns`** estão instalados sem uso; a primeira tela com dados deve consumi-los ou removê-los.
+10. **Limite de requisições em memória (spec `0003`):** os contadores são de instância única e zeram ao reiniciar a API; com mais de uma instância o limite não é compartilhado. A interface `RateLimitStore` permite trocar por Redis (backlog). `TRUST_PROXY` precisa ser definido antes do deploy atrás de proxy (ver `DEVELOPMENT.md` §13.4).
 
 ## 7. Regras ao evoluir a arquitetura
 

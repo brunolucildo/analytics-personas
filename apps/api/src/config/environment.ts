@@ -6,6 +6,7 @@ export interface Environment {
   apiPort: number;
   otelEndpoint: string;
   otelServiceName: string;
+  trustProxy: boolean;
 }
 
 const REQUIRED_VARIABLES = [
@@ -27,6 +28,16 @@ function parseAppOrigin(value: string): string {
   }
 
   throw new Error("APP_URL must be an http(s) URL, for example http://localhost:5173.");
+}
+
+function parseTrustProxy(value: string | undefined): boolean {
+  const normalized = (value ?? "false").trim().toLowerCase();
+
+  if (normalized === "true" || normalized === "false") {
+    return normalized === "true";
+  }
+
+  throw new Error('TRUST_PROXY must be "true" or "false".');
 }
 
 export function validateEnvironment(env: Record<string, string | undefined>): Environment {
@@ -55,5 +66,6 @@ export function validateEnvironment(env: Record<string, string | undefined>): En
     apiPort,
     otelEndpoint: env.OTEL_EXPORTER_OTLP_ENDPOINT ?? "http://localhost:4318",
     otelServiceName: env.OTEL_SERVICE_NAME ?? "analytics-personas-api",
+    trustProxy: parseTrustProxy(env.TRUST_PROXY),
   };
 }

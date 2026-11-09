@@ -222,3 +222,27 @@ Definidas pela spec `0001-platform-routing-conventions` (ADRs `0003` e `0004`). 
 - **pt-BR:** `.docs/`, specs, planos, ADRs e mensagens de commit.
 - Strings em pt-BR de código antigo migram quando o arquivo for alterado (hoje: `apps/app/src/lib/supabase.ts` e `apps/api/src/observability/telemetry.ts`).
 - Não há biblioteca de i18n; adotar uma (vários idiomas) exige decisão e ADR.
+
+### 13.4 Limite de requisições
+
+Módulo `apps/api/src/modules/rate-limit/` (spec `0003`, ADR `XXXX-0003`). O limite é **opt-in por rota**: o guard é global, mas só age em rota com `@RateLimit('<policy>')`; rota sem o decorator nunca é limitada (inclusive `GET /api/v1/health`).
+
+Aplicar uma política a uma rota:
+
+```ts
+import { RateLimit } from "../rate-limit"; // ou o caminho relativo do módulo
+
+@Post("sign-in")
+@RateLimit("sign-in")
+signIn(@Body() body: SignInDto) { /* ... */ }
+```
+
+- **Políticas:** `AUTH_RATE_LIMIT_POLICIES` em `rate-limit.policies.ts` é o único lugar com os números (`sign-up` 5/60 min por IP; `sign-in` 10/10 min por IP + e-mail; `confirm-account` 10/10 min por IP; `resend-confirmation` 3/10 min por IP + e-mail; `forgot-password` 3/10 min por IP + e-mail; `reset-password` 10/10 min por IP). Política nova entra nesse registro; nome inexistente no decorator faz a rota responder 500 (erro de programação, nunca rota sem proteção em silêncio).
+- **Chave:** rota (`Classe.metodo`) + política + IP + (se a política é `ip-and-email`) o `email` string do corpo com trim e minúsculas, tudo em hash SHA-256 na memória. Sem `email` string, cai para a chave só por IP.
+- **Resposta ao exceder:** 429, header `Retry-After` (segundos, inteiro >= 1) e envelope `RATE_LIMITED` com `details: [{ "retryAfterSeconds": n }]`. Janela fixa por chave.
+- **Logs:** só `event: "rate_limited"` com o nome da política (e `rate_limit_store_error` quando o armazenamento falha). Nunca IP, e-mail ou chave.
+- **Fail-open:** se o armazenamento lançar erro, a requisição passa.
+- **Ordem de guards:** o `RateLimitModule` é importado logo após o `ConfigModule` no `AppModule`; guards globais futuros (ex.: sessão) devem ser registrados depois, para o limite rodar antes da autenticação.
+- **`TRUST_PROXY`** (`false` por padrão): com `true`, o IP vem do primeiro endereço de `X-Forwarded-For` (use só atrás de um proxy confiável; do contrário qualquer cliente forja o IP). Com `false`, o cabeçalho é ignorado e atrás de um proxy todos compartilham a cota do IP do proxy: configure antes do deploy.
+- **Limitação:** contadores em memória, **instância única**. Reiniciar a API zera as contagens e com mais de uma instância cada uma conta sozinha. O armazenamento fica atrás da interface `RateLimitStore`; Redis é backlog. Teto de 10 000 entradas, com evicção da mais antiga e descarte das expiradas.
+- **Testes:** use `resetRateLimitStore(app)` de `apps/api/test/support/rate-limit.ts` em `beforeEach`, e `createFakeClock()` com o provider `RATE_LIMIT_CLOCK` para avançar o tempo. Para uma política de teste, sobrescreva `RATE_LIMIT_POLICIES` (exemplo em `apps/api/test/rate-limit.int-spec.ts`).
