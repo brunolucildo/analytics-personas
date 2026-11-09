@@ -256,6 +256,7 @@ Consulte o catálogo antes de começar. Skills de referência:
 | Refinar/auditar spec existente    | `refine-spec` (obrigatória no fluxo)             |
 | Interrogatório profundo + plano   | `feature-concept`                                |
 | Executar uma spec                 | `implement-me <slug>` (obrigatória no fluxo)     |
+| Executar um range de specs        | `orchestrate-me <range>` (subagents em paralelo) |
 | Commitar e subir ao fim da spec   | `commit-and-push` (obrigatória no fluxo)         |
 | UI/design                         | `frontend-design`, `web-design-guidelines`       |
 | Next.js (`apps/docs`)             | `next-best-practices`                            |
@@ -266,6 +267,6 @@ Consulte o catálogo antes de começar. Skills de referência:
 | shadcn/ui e design system         | `shadcn`                                         |
 | Documentos                        | skills de `.docx`, `.pdf`, `.xlsx`, `pptx`       |
 
-As skills próprias do projeto vivem em `.claude/skills/` (carregadas pelo Claude Code, invocáveis por `/<nome>`): `breakdown-specs/`, `create-spec/`, `refine-spec/`, `feature-concept/`, `implement-me/` e `commit-and-push/`. É o único local de skills; a antiga `.agents/skills/` (OpenCode) foi removida. Ao alterar uma skill, atualize este documento e `AGENTS.md` na mesma mudança.
+As skills próprias do projeto vivem em `.claude/skills/` (carregadas pelo Claude Code, invocáveis por `/<nome>`): `breakdown-specs/`, `create-spec/`, `refine-spec/`, `feature-concept/`, `implement-me/`, `orchestrate-me/` e `commit-and-push/`. É o único local de skills; a antiga `.agents/skills/` (OpenCode) foi removida. Ao alterar uma skill, atualize este documento e `AGENTS.md` na mesma mudança.
 
 Se uma skill de terceiro não estiver instalada, **não invente** e **não bloqueie**: siga estes documentos, aplique o checklist equivalente e registre a ausência no relatório.

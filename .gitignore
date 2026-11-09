@@ -39,3 +39,6 @@ yarn-error.log*
 # Misc
 .DS_Store
 *.pem
+
+# Estado de execuções do orchestrate-me
+.claude/orchestrate/
