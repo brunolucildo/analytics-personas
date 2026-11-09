@@ -5,19 +5,19 @@
 
 ## 1. Estado atual
 
-| Recurso                     | Estado                                                            |
-| --------------------------- | ----------------------------------------------------------------- |
-| Lint (OXLint)               | Configurado; passa                                                |
-| Formatação (OXFmt)          | Configurada; idempotente                                          |
-| Tipos                       | Configurado em `app`, `api`, `docs` e `@repo/ui`; passa           |
-| Build                       | `apps/app/dist`, `apps/api/dist` e `apps/docs/.next`; passa       |
-| Testes unitários            | Vitest em `app` e `api`; passam                                   |
-| Testes de integração        | Vitest + Supertest em `api` (`GET /`); passa                      |
-| Testes E2E                  | Playwright (`e2e/home.spec.ts`); passa                            |
-| Cobertura                   | `bun run test:coverage` gera `coverage/`; sem threshold           |
-| Hooks de pre-commit         | Configurados (`lefthook.yml`); validados no commit raiz `227e0ad` |
-| CI                          | Não configurado                                                   |
-| Acessibilidade automatizada | Não configurada                                                   |
+| Recurso                     | Estado                                                             |
+| --------------------------- | ------------------------------------------------------------------ |
+| Lint (OXLint)               | Configurado; passa                                                 |
+| Formatação (OXFmt)          | Configurada; idempotente                                           |
+| Tipos                       | Configurado em `app`, `api`, `docs` e `@repo/ui`; passa            |
+| Build                       | `apps/app/dist`, `apps/api/dist` e `apps/docs/.next`; passa        |
+| Testes unitários            | Vitest em `app` e `api`; passam                                    |
+| Testes de integração        | Vitest + Supertest em `api` (`/api/v1/health` e convenções); passa |
+| Testes E2E                  | Playwright (`e2e/home.spec.ts`, `e2e/routing.spec.ts`); passa      |
+| Cobertura                   | `bun run test:coverage` gera `coverage/`; sem threshold            |
+| Hooks de pre-commit         | Configurados (`lefthook.yml`); validados no commit raiz `227e0ad`  |
+| CI                          | Não configurado                                                    |
+| Acessibilidade automatizada | Não configurada                                                    |
 
 ### 1.1 Baseline verificado em 2026-11-07
 
@@ -53,6 +53,27 @@ Rota `/` de `apps/app` no browser embutido do app (Chromium), servidor `vite` em
 | Network               | 22 requisições, todas 200                                                                                                                                                            |
 
 Não verificado: leitor de tela; estados hover, active, disabled e loading do `Button`; `prefers-reduced-motion` (o `Button` tem transição de 150ms e deslocamento no `active` sem variante `motion-reduce`); build de produção (`vite preview`) visualmente. A medição do `box-shadow` logo após o `Tab` mostra o anel quase transparente porque a transição de 150ms ainda corre; meça após ~1 s.
+
+### 1.3 Verificação da spec 0001 em 2026-11-09
+
+Executado na raiz, nesta ordem (todos com código de saída 0):
+
+| Gate                       | Resultado | Observação                                                           |
+| -------------------------- | --------- | -------------------------------------------------------------------- |
+| `bun run lint`             | Passa     | 4 tasks, 0 warnings, 0 erros                                         |
+| `bun run check-types`      | Passa     | 4 tasks                                                              |
+| `bun run build`            | Passa     | `app`, `api` e `docs`                                                |
+| `bun run test`             | Passa     | `app`: 8 testes; `api`: 8 testes                                     |
+| `bun run test:integration` | Passa     | 11 testes (health, 404 fora do prefixo, envelope de erro, CORS)      |
+| `bun run test:e2e`         | Passa     | 4 testes (Chromium): `/` → `/app` e 404 em `/x`, `/auth/x`, `/app/x` |
+| `bun run test:coverage`    | Passa     | `app` e `api`                                                        |
+| `bun run format` (2×)      | Passa     | Segunda execução sem diff novo                                       |
+
+Verificação manual de UI (browser embutido, `/does-not-exist`, `/auth/does-not-exist`, `/` e `/app`): 375 / 768 / 1280 px sem scroll horizontal (`scrollWidth` = largura da viewport); `h1` de 36px no mobile e 60px a partir de 768px; um único `h1` por página; `lang="en-US"`; link "Go to the home page" com 175×44px, foco por `Tab` com `:focus-visible` verdadeiro e anel de 2px + 4px `#5C8001`; console sem erro; todas as requisições do Vite com 200.
+
+Observabilidade (R9), com `bun run infra:up` (5 containers `healthy`) e a API compilada (`bun run start` em `apps/api`, `APP_URL` passada na linha de comando): `GET /api/v1/health?secret=abc` com `x-request-id: r1-spec0001-check` respondeu 200 `{"status":"ok"}`; o Loki devolveu o log `request completed` com `requestId`, `req_url` = `/api/v1/health` (sem a query string), método e status, sem headers nem IP; o Tempo devolveu o trace por `trace_id`. `GET /` respondeu 404 no envelope e o preflight de `http://localhost:5173` respondeu 204 com `Access-Control-Allow-Origin` (outra origem: nenhum header CORS). Com `docker compose stop otel-collector`, `GET /api/v1/health` seguiu 200 (2 chamadas); o Collector foi religado em seguida.
+
+**Pré-requisito novo:** a API exige `APP_URL` (ver `.env.example`); `.env` antigos precisam dela para a API subir. Os testes usam `http://localhost:5173` em `apps/api/test/setup-env.ts`.
 
 ## 2. Pré-requisitos
 
@@ -134,7 +155,7 @@ Aplique apenas o que a mudança afeta, mas registre o que foi verificado.
 - [ ] Console do browser sem erro ou warning novo.
 - [ ] Nenhuma chamada de rede falhando (aba Network).
 - [ ] Links internos e externos não retornam 404.
-- [ ] Textos em pt-BR e sem `lorem ipsum`/placeholder de template.
+- [ ] Textos em en-US e sem `lorem ipsum`/placeholder de template.
 - [ ] A mudança não expõe token, chave ou dado pessoal; `service_role` não aparece em `apps/app/dist`.
 
 ### 5.2 UI e responsividade
@@ -163,7 +184,7 @@ Aplique apenas o que a mudança afeta, mas registre o que foi verificado.
 - [ ] Nenhuma chamada externa em loop ou sem limite.
 - [ ] Permissões verificadas (um usuário não acessa dado de outro clube).
 - [ ] Migration/rollback documentados.
-- [ ] Com `infra:up` e a API rodando, `GET /` gera trace no Tempo e log no Loki com `requestId` e sem PII.
+- [ ] Com `infra:up` e a API rodando, `GET /api/v1/health` gera trace no Tempo e log no Loki com `requestId` e sem PII.
 - [ ] Com o Collector parado (`docker compose stop otel-collector`), a API continua respondendo.
 
 ## 6. Dívidas de QA conhecidas
@@ -201,7 +222,7 @@ Copie para o relatório final da tarefa:
 - [ ] Teclado e foco
 - [ ] Contraste
 - [ ] Console/Network
-- [ ] pt-BR e conteúdo final
+- [ ] en-US e conteúdo final
 
 ### Não verificado
 

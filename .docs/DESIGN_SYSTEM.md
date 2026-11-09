@@ -113,4 +113,4 @@ Os stubs herdados do template (`Card`, `Code` e o `Button` com `alert`) foram re
 - [ ] Escolher e carregar fonte display (hoje só Geist em `apps/docs`; `apps/app` usa a fonte do sistema).
 - [ ] Revisar contraste real dos pares de cor (DevTools/axe), por exemplo `--primary` com `--primary-foreground`.
 - [ ] Adicionar verificação de acessibilidade no QA.
-- [x] `lang="pt-BR"` e `<title>` corretos em `apps/app/index.html` e `apps/docs/app/layout.tsx`.
+- [x] `lang="en-US"` e `<title>` corretos em `apps/app/index.html` e `apps/docs/app/layout.tsx`.

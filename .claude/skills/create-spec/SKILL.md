@@ -15,6 +15,7 @@ Esta skill escreve o documento que descreve **o que** deve ser feito e **como sa
 - **Saída:** `.specs/<slug>.md` preenchido, mais um resumo curto e a lista de perguntas abertas.
 - **Não faz:** implementar código, criar plano de implementação, instalar dependências, alterar arquivos de produto.
 - **Handoff:** `refine-spec <slug>` para auditar a spec, `feature-concept` para gerar o plano, `implement-me <slug>` para executar.
+- **Skills relacionadas:** se o pedido junta várias capacidades (ex.: autenticação inteira, CRUD completo), use `breakdown-specs` para quebrá-lo em várias specs; ela chama esta skill uma vez por spec (ver §8).
 
 ## 1. Resolver nome e arquivo
 
@@ -141,6 +142,17 @@ Status: rascunho | pronta
 Perguntas abertas: <n> (<m> bloqueantes)
 Próximo passo: refine-spec <slug> para auditar, feature-concept para planejar ou implement-me <slug> para executar
 ```
+
+## 8. Modo lote (chamada por `breakdown-specs`)
+
+Quando a entrada vier de `breakdown-specs` (começa com `create-spec — modo lote`), o épico já foi entendido e o mapa já foi definido; as premissas estão registradas. Então:
+
+1. **Arquivo e slug:** use exatamente o `Arquivo` do brief; o número e o slug já estão reservados. Pule §1, exceto verificar que o alvo está vazio ou não existe.
+2. **Pré-spec e entrevista:** o brief é o pré-spec já definido (§3). Pule a confirmação e a entrevista do épico. Em §4, pergunte **apenas** o que é específico desta spec e bloqueante; o resto vira premissa.
+3. **Decisões compartilhadas:** copie-as para a spec como requisitos ou premissas. Não as reabra nem as contradiga; se achar que uma está errada, levante como pergunta ao `breakdown-specs`.
+4. **Escopo:** em “Fora do escopo”, cite pelo número as specs vizinhas que cobrem o que esta exclui. Em “Relacionados”, liste o mapa do épico e as specs de que depende.
+5. **Mudança de corte:** se descobrir que a capacidade é grande demais, pequena demais ou depende de algo fora do mapa, pare e devolva o achado em vez de resolver sozinha.
+6. **§5 a §7:** valem como sempre (template completo, auto-revisão), mas o handoff do §7 pode ser uma linha, pois o resumo final é do `breakdown-specs`.
 
 ## Guardrails
 

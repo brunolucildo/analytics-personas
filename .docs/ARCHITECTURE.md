@@ -1,7 +1,7 @@
 # Arquitetura
 
 > **Público:** agentes de código e pessoas que precisam alterar estrutura, stack ou integrações.
-> **Verificado contra o código em:** 2026-11-07.
+> **Verificado contra o código em:** 2026-11-09.
 > Leia `BUSINESS.md` para o contexto de produto e `DEVELOPMENT.md` para as regras de código.
 
 ## 1. Visão em uma frase
@@ -10,22 +10,22 @@ Monorepo que entrega uma SPA (`apps/app`) para operar experts de futebol, apoiad
 
 ## 2. Estado atual (implementado)
 
-| Caminho                        | O que é                                                 | Estado                                                               |
-| ------------------------------ | ------------------------------------------------------- | -------------------------------------------------------------------- |
-| `apps/app`                     | Cliente de produto em React + Vite (porta 5173)         | Rota `/` com `h1` "Hello World"; `QueryClientProvider`; sem roteador |
-| `apps/api`                     | API Nest.js (porta 3002)                                | `GET /` → `{"message":"Hello World"}`; env validada; OTel; logs JSON |
-| `apps/docs`                    | Site de documentação em Next.js (porta 3001)            | Página mínima                                                        |
-| `packages/ui`                  | `@repo/ui`: Tailwind v4 + shadcn, tokens de `DESIGN.md` | Apenas `Button`; exports `./button`, `./styles.css`, `./lib/utils`   |
-| `packages/typescript-config`   | tsconfig base (`strict`, `noUncheckedIndexedAccess`)    | `base`, `nestjs`, `nextjs`, `vite`, `react-library`                  |
-| `supabase/`                    | Supabase local via CLI (`config.toml`, `migrations/`)   | Sem migrations de domínio                                            |
-| `docker-compose.yml`, `infra/` | Grafana, Loki, Tempo, Mimir e OTel Collector            | Datasources e dashboard mínimo provisionados                         |
-| `scripts/`                     | `infra:up`, `infra:down`, `db:migrate` (Bun)            | Funcionais                                                           |
-| `e2e/`, `playwright.config.ts` | Testes E2E                                              | 1 teste da rota `/`                                                  |
+| Caminho                        | O que é                                                 | Estado                                                                                                     |
+| ------------------------------ | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `apps/app`                     | Cliente de produto em React + Vite (porta 5173)         | TanStack Router: `/` → `/app` (home placeholder), grupos `/auth/*` e `/app/*`, 404; `QueryClientProvider`  |
+| `apps/api`                     | API Nest.js (porta 3002)                                | Prefixo `/api/v1`, `GET /api/v1/health`, envelope de erro, CORS (`APP_URL`); env validada; OTel; logs JSON |
+| `apps/docs`                    | Site de documentação em Next.js (porta 3001)            | Página mínima                                                                                              |
+| `packages/ui`                  | `@repo/ui`: Tailwind v4 + shadcn, tokens de `DESIGN.md` | Apenas `Button`; exports `./button`, `./styles.css`, `./lib/utils`                                         |
+| `packages/typescript-config`   | tsconfig base (`strict`, `noUncheckedIndexedAccess`)    | `base`, `nestjs`, `nextjs`, `vite`, `react-library`                                                        |
+| `supabase/`                    | Supabase local via CLI (`config.toml`, `migrations/`)   | Sem migrations de domínio                                                                                  |
+| `docker-compose.yml`, `infra/` | Grafana, Loki, Tempo, Mimir e OTel Collector            | Datasources e dashboard mínimo provisionados                                                               |
+| `scripts/`                     | `infra:up`, `infra:down`, `db:migrate` (Bun)            | Funcionais                                                                                                 |
+| `e2e/`, `playwright.config.ts` | Testes E2E                                              | 1 teste da rota `/`                                                                                        |
 
 ```text
 apps/
-  app/    src/ (App.tsx, main.tsx, lib/supabase.ts, test/)
-  api/    src/ (main.ts, bootstrap.ts, app.module.ts, config/, observability/) + test/
+  app/    src/ (App.tsx, main.tsx, router.tsx, routes/, lib/supabase.ts, test/)
+  api/    src/ (main.ts, bootstrap.ts, app.module.ts, common/, config/, health/, observability/) + test/
   docs/   app/ (rotas, layout, CSS Modules)
 packages/
   ui/                 src/button.tsx, src/styles.css, src/lib/utils.ts, components.json
@@ -61,6 +61,7 @@ packages/
 | Linguagem        | TypeScript                                       | 6.0.3                   | Config base estrita                                            |
 | Estilo           | TailwindCSS (CSS-first) + shadcn/ui              | 4.3.5                   | Tokens em `packages/ui/src/styles.css`                         |
 | Dados no cliente | TanStack Query / Table / Charts                  | 5.107.1 / 9.3.1 / 1.4.0 | Só Query tem uso (provider); `date-fns` 4.4.0 instalado        |
+| Roteamento       | TanStack Router                                  | 1.170.46                | `apps/app`; rotas em código (`router.tsx`); ADR 0003           |
 | Backend de dados | Supabase (`@supabase/supabase-js`)               | 2.119.0                 | Cliente em `apps/app/src/lib/supabase.ts`; sem fluxos          |
 | Testes           | Vitest 5.1.0, Supertest 7.3.1, Playwright 1.65.0 | —                       | Ver `QA.md`                                                    |
 | Lint / format    | OXLint 1.92.0, OXFmt 0.77.0                      | —                       | ADR 0002                                                       |
@@ -115,7 +116,7 @@ Cada domínio é uma fatia vertical em `apps/api/src/modules/<dominio>/`, com as
 | `infrastructure` | Implementações concretas dos ports                   | Repositórios Supabase, clients de conectores, LLM, filas |
 | `interface`      | Entrada/saída HTTP                                   | Controllers, DTOs, presenters, guards                    |
 
-Hoje `apps/api/src` tem só `app.controller.ts`, `bootstrap.ts`, `config/` e `observability/`; ainda não há `modules/`. Código compartilhado entre fatias vive em `apps/api/src/modules/shared` **somente** quando for estável e usado por dois ou mais módulos. Não crie `shared` preventivamente.
+Hoje `apps/api/src` tem só `bootstrap.ts`, `common/` (envelope de erro, filtro e validação), `config/`, `health/` e `observability/`; ainda não há `modules/`. Código compartilhado entre fatias vive em `apps/api/src/modules/shared` **somente** quando for estável e usado por dois ou mais módulos. Não crie `shared` preventivamente.
 
 ### 4.3 Frontend: composição
 
@@ -124,6 +125,7 @@ apps/app/
   src/
     features/<dominio>/   # componentes, hooks e chamadas da fatia (a criar)
     lib/                  # clients, configuração e utilitários
+    router.tsx, routes/   # árvore de rotas (grupos /auth e /app), layouts e páginas de composição
     main.tsx, App.tsx
 ```
 
@@ -145,24 +147,26 @@ Regras já aplicadas e que devem ser mantidas:
 
 ## 5. Decisões já tomadas
 
-| Decisão                                      | Motivo                                         | Consequência                                           |
-| -------------------------------------------- | ---------------------------------------------- | ------------------------------------------------------ |
-| Monorepo com Turborepo e workspaces          | Compartilhar UI e tsconfig entre apps          | Mudanças em pacotes exigem atenção a consumidores      |
-| Cliente em Vite; `apps/docs` em Next.js      | Produto sem SSR e com API própria — ADR 0001   | `apps/web` removido; sem Server Components no produto  |
-| OXLint + OXFmt no lugar de ESLint + Prettier | Baseline quebrado e stack-alvo — ADR 0002      | Sem plugins ESLint; `tsc` é o gate de tipos            |
-| Pacote `@repo/ui` compartilhado              | Evitar duplicação de primitivos                | Contrato de exports (`@repo/ui/*`) precisa ser estável |
-| TypeScript estrito                           | Segurança de tipos em domínio rico             | `any` e asserções não justificadas são proibidos       |
-| Backend separado do cliente                  | API, conectores e jobs sem acoplar ao frontend | O cliente nunca acessa o banco com segredo             |
-| Supabase local via CLI; Compose só para LGTM | Evitar conflito entre Compose e o fluxo da CLI | `infra:up` orquestra os dois                           |
+| Decisão                                         | Motivo                                                            | Consequência                                             |
+| ----------------------------------------------- | ----------------------------------------------------------------- | -------------------------------------------------------- |
+| Monorepo com Turborepo e workspaces             | Compartilhar UI e tsconfig entre apps                             | Mudanças em pacotes exigem atenção a consumidores        |
+| Cliente em Vite; `apps/docs` em Next.js         | Produto sem SSR e com API própria — ADR 0001                      | `apps/web` removido; sem Server Components no produto    |
+| OXLint + OXFmt no lugar de ESLint + Prettier    | Baseline quebrado e stack-alvo — ADR 0002                         | Sem plugins ESLint; `tsc` é o gate de tipos              |
+| Pacote `@repo/ui` compartilhado                 | Evitar duplicação de primitivos                                   | Contrato de exports (`@repo/ui/*`) precisa ser estável   |
+| TypeScript estrito                              | Segurança de tipos em domínio rico                                | `any` e asserções não justificadas são proibidos         |
+| Backend separado do cliente                     | API, conectores e jobs sem acoplar ao frontend                    | O cliente nunca acessa o banco com segredo               |
+| Supabase local via CLI; Compose só para LGTM    | Evitar conflito entre Compose e o fluxo da CLI                    | `infra:up` orquestra os dois                             |
+| API em `/api/v1`, rotas `/auth` e `/app`, en-US | Espaço de URLs e idioma estáveis antes da autenticação — ADR 0004 | Ver `DEVELOPMENT.md` §13; `APP_URL` é obrigatória na API |
+| TanStack Router, rotas em código                | Combina com o stack TanStack — ADR 0003                           | Sem plugin de geração de rotas                           |
 
-ADRs vivem em `./.adrs/` (`0001`, `0002`). Crie `./.adrs/NNNN-titulo.md` ao tomar decisões estruturais (template em `RULES.md`).
+ADRs vivem em `./.adrs/` (`0001` a `0004`). Crie `./.adrs/NNNN-titulo.md` ao tomar decisões estruturais (template em `RULES.md`).
 
 ## 6. Dívidas e lacunas conhecidas
 
 1. **Sem modelo de dados:** não há migrations, schema ou RLS; `supabase/migrations/` só tem `.gitkeep`.
-2. **Sem autenticação:** nenhuma rota protegida ou sessão; `GET /` é público.
+2. **Sem autenticação:** nenhuma rota protegida ou sessão; `/app/*` e toda a API são públicas até a spec `0005` (`.plans/auth-breakdown.md`).
 3. **Sem CI:** nenhum workflow de lint, tipos, build ou testes.
-4. **Sem roteador no `apps/app`:** a fundação entrega só `/`.
+4. **Sem páginas de produto:** o roteador e os grupos `/auth/*` e `/app/*` existem, mas só há a home placeholder e a 404.
 5. **Hooks e push sem automação em CI:** o repositório existe desde 2026-11-07 (`main`, `origin` = `https://github.com/brunolucildo/analytics-personas.git`, commit raiz `227e0ad`). Os hooks do `lefthook` só rodam depois de `bun run hooks:install` em cada clone e não há pipeline que repita os gates. O push exige login do Git Credential Manager na conta `brunolucildo`.
 6. **`bun run lint` cobre só os workspaces:** `scripts/` e `e2e/` na raiz não são linted por esse comando.
 7. **Imagens LGTM em `:latest`** e Grafana com `admin/admin`: aceitável só para uso local; fixe versões e troque credenciais antes de qualquer ambiente compartilhado.

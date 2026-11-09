@@ -115,4 +115,4 @@ Estas decisões afetam diretamente o modelo de dados e a arquitetura. Não as as
 - Nenhum expert acessa fonte fora do escopo autorizado.
 - Nenhuma resposta deve inventar dado ausente; quando faltar contexto, o expert deve declarar a lacuna.
 - Histórico e citações precisam sobreviver à revogação de acesso de forma compatível com a política de retenção.
-- Textos de interface em **pt-BR**, salvo decisão explícita de internacionalização.
+- Textos de interface, mensagens da API e e-mails em **en-US** (decisão de 2026-11-09; ver `DEVELOPMENT.md` §13). Esta documentação, as specs e os ADRs continuam em pt-BR. Internacionalização (vários idiomas) exige decisão explícita.
