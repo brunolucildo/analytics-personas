@@ -38,7 +38,7 @@ Dependências apontam para dentro: `interface → application → domain`; `infr
 
 ### 2.3 Frontend
 
-`apps/app` é uma SPA React + Vite (ADR 0001). Estrutura-alvo, a criar quando a primeira feature existir:
+`apps/app` é uma SPA React + Vite (ADR 0001). Estrutura (criada com a spec `0004`):
 
 ```text
 apps/app/src/
@@ -50,6 +50,8 @@ apps/app/src/
 - `App.tsx` e rotas compõem; não concentram regra de negócio.
 - Primitivos visuais em `packages/ui`; composições na feature.
 - Não crie uma camada `services/` genérica; use clients explícitos em `lib/`.
+- Chamadas HTTP à API passam por `lib/api-client.ts` (`apiClient.post`): base `${VITE_API_URL}/api/v1`, JSON, erro tipado `ApiError { status, code, message, details }` (`status` 0 e `NETWORK_ERROR` quando a rede falha). A feature expõe um hook de mutation/query e traduz o `ApiError` em mensagens (exemplo: `features/auth/describe-sign-up-failure.ts`).
+- Formulários: validação por função pura na feature, só como feedback antes do envio (a API é a fonte da regra); erros em texto junto ao campo, ligados por `aria-describedby`; não mostre erro no `blur` quando ele puder deslocar o botão de envio e engolir o clique.
 - `apps/docs` segue o App Router do Next.js (Server Components por padrão; `"use client"` só na folha interativa).
 
 ## 3. TypeScript
@@ -97,6 +99,9 @@ apps/app/src/
 - Nomes de tabela/coluna em `snake_case`; tipos explícitos; FKs e índices justificados.
 - Multi-tenant exige isolamento no banco (RLS) e teste cobrindo acesso cruzado.
 - Service role key só no servidor.
+- Acesso a dados na API: repositórios em `infrastructure` usam `@supabase/supabase-js` com a service role. O que exige transação vive em função SQL chamada por RPC (migration), com `revoke all on function ... from public, anon, authenticated` e `grant execute ... to service_role`. Tabelas com dado sensível: RLS ligada, **sem policies** e `revoke all` de `anon`/`authenticated`.
+- Erro do banco vira `DataAccessError` (mensagem fixa, só operação e código): a mensagem do Postgres pode repetir valores como o e-mail. Concorrência se resolve no banco (índice único + `on conflict`), nunca com "consulta e depois insere".
+- Migration nova: nome `<timestamp>_<descricao>.sql`, comentário de rollback no topo e `bun run db:migrate` para aplicar no Supabase local.
 - Storage com URLs assinadas e validação de tipo/tamanho de arquivo.
 - Dados pessoais: minimize coleta, não logue PII, defina retenção.
 
@@ -137,6 +142,8 @@ Regras:
 - Ao adicionar um novo tipo de teste ou workspace, crie o script real, adicione a task no `turbo.json` e atualize `QA.md`. Não invente comandos.
 - Testes da API definem env fictícia em `apps/api/test/setup-env.ts`; não use chave real nem a service role.
 - Teste que envolve e-mail roda com `EMAIL_PROVIDER=capture` (já definido em `setup-env.ts`) e lê as mensagens com `getCapturedEmails({ to })`; um processo separado (E2E) usa `GET /api/v1/test-support/emails?to=<endereço>` e `DELETE` no mesmo caminho para limpar. Nenhum teste envia e-mail real nem chama Mailtrap ou Resend.
+- Teste de integração roda contra o **Supabase local** (`bun run infra:up` e `bun run db:migrate` antes): a `globalSetup` (`apps/api/test/support/global-setup.ts`) lê as chaves de `supabase status -o env` quando não estão no ambiente e falha com a instrução se o banco não estiver no ar. Use e-mails únicos (`uniqueEmail` de `test/support/supabase.ts`) e apague o que criou (`deleteUsersByEmail`); o banco é compartilhado. Teste unitário usa os fakes de `test/support/in-memory-auth.ts`.
+- Testes de `AppModule` que sobrescrevem o `ConfigService` com um objeto fake precisam incluir `email`, `supabaseUrl` e `supabaseServiceRoleKey` (exemplo em `apps/api/test/rate-limit.int-spec.ts`).
 
 ## 10. Dependências
 

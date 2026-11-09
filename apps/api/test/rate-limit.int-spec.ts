@@ -60,6 +60,8 @@ describe("Rate limiting", () => {
   async function buildApp({ trustProxy = false, store }: BuildOptions = {}) {
     const environment: Record<string, unknown> = {
       appUrl: "http://localhost:5173",
+      supabaseUrl: "http://127.0.0.1:54321",
+      supabaseServiceRoleKey: "test-service-role-key",
       trustProxy,
       email: { provider: "capture", from: { name: "Test", address: "no-reply@test.local" } },
     };

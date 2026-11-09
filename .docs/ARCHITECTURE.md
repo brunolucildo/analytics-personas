@@ -6,33 +6,33 @@
 
 ## 1. Visão em uma frase
 
-Monorepo que entrega uma SPA (`apps/app`) para operar experts de futebol, apoiada por uma API Nest.js (`apps/api`), Supabase local e observabilidade Grafana LGTM. A fundação técnica (spec `0000-foundation`) está implementada; **nenhuma feature de produto existe ainda**.
+Monorepo que entrega uma SPA (`apps/app`) para operar experts de futebol, apoiada por uma API Nest.js (`apps/api`), Supabase local e observabilidade Grafana LGTM. A fundação técnica (spec `0000-foundation`) está implementada; a única feature de produto é o cadastro de conta (spec `0004`).
 
 ## 2. Estado atual (implementado)
 
 | Caminho                        | O que é                                                 | Estado                                                                                                     |
 | ------------------------------ | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `apps/app`                     | Cliente de produto em React + Vite (porta 5173)         | TanStack Router: `/` → `/app` (home placeholder), grupos `/auth/*` e `/app/*`, 404; `QueryClientProvider`  |
-| `apps/api`                     | API Nest.js (porta 3002)                                | Prefixo `/api/v1`, `GET /api/v1/health`, envelope de erro, CORS (`APP_URL`); env validada; OTel; logs JSON |
+| `apps/app`                     | Cliente de produto em React + Vite (porta 5173)         | TanStack Router: `/` → `/app` (home placeholder), grupos `/auth/*` e `/app/*`, 404; `QueryClientProvider`; página `/auth/sign-up` (`features/auth/`) e `lib/api-client.ts` |
+| `apps/api`                     | API Nest.js (porta 3002)                                | Prefixo `/api/v1`, `GET /api/v1/health`, envelope de erro, CORS (`APP_URL`); env validada; OTel; logs JSON; `POST /api/v1/auth/sign-up` (`modules/auth`) |
 | `apps/docs`                    | Site de documentação em Next.js (porta 3001)            | Página mínima                                                                                              |
-| `packages/ui`                  | `@repo/ui`: Tailwind v4 + shadcn, tokens de `DESIGN.md` | Apenas `Button`; exports `./button`, `./styles.css`, `./lib/utils`                                         |
+| `packages/ui`                  | `@repo/ui`: Tailwind v4 + shadcn, tokens de `DESIGN.md` | `Button`, `Input` e `Label`; exports `./button`, `./input`, `./label`, `./styles.css`, `./lib/utils`                                         |
 | `packages/typescript-config`   | tsconfig base (`strict`, `noUncheckedIndexedAccess`)    | `base`, `nestjs`, `nextjs`, `vite`, `react-library`                                                        |
-| `supabase/`                    | Supabase local via CLI (`config.toml`, `migrations/`)   | Sem migrations de domínio                                                                                  |
+| `supabase/`                    | Supabase local via CLI (`config.toml`, `migrations/`)   | Migration `users` e `auth_tokens` (RLS sem policies) e a função `auth_sign_up`                                                                                  |
 | `docker-compose.yml`, `infra/` | Grafana, Loki, Tempo, Mimir e OTel Collector            | Datasources e dashboard mínimo provisionados                                                               |
 | `scripts/`                     | `infra:up`, `infra:down`, `db:migrate` (Bun)            | Funcionais                                                                                                 |
-| `e2e/`, `playwright.config.ts` | Testes E2E                                              | 1 teste da rota `/`                                                                                        |
+| `e2e/`, `playwright.config.ts` | Testes E2E                                              | Rotas `/`, 404 e `/auth/sign-up` (app e API reais, e-mail em `capture`)                                                                                        |
 
 ```text
 apps/
-  app/    src/ (App.tsx, main.tsx, router.tsx, routes/, lib/supabase.ts, test/)
-  api/    src/ (main.ts, bootstrap.ts, app.module.ts, common/, config/, health/, modules/rate-limit/, observability/) + test/
+  app/    src/ (App.tsx, main.tsx, router.tsx, routes/, features/auth/, lib/api-client.ts, lib/supabase.ts, test/)
+  api/    src/ (main.ts, bootstrap.ts, app.module.ts, common/, config/, health/, modules/{auth,email,rate-limit}/, observability/) + test/
   docs/   app/ (rotas, layout, CSS Modules)
 packages/
-  ui/                 src/button.tsx, src/styles.css, src/lib/utils.ts, components.json
+  ui/                 src/{button,input,label}.tsx, src/styles.css, src/lib/utils.ts, components.json
   typescript-config/  base.json, nestjs.json, nextjs.json, vite.json, react-library.json
 ```
 
-**Não existem hoje:** modelo de domínio, tabelas e RLS, autenticação, upload/storage, conectores, orquestração de agentes, CI/CD e deploy.
+**Não existem hoje:** modelo de domínio além de `users` e `auth_tokens`, sessão e proteção de rotas, upload/storage, conectores, orquestração de agentes, CI/CD e deploy.
 
 ### 2.1 Portas
 
@@ -62,7 +62,7 @@ packages/
 | Estilo           | TailwindCSS (CSS-first) + shadcn/ui              | 4.3.5                   | Tokens em `packages/ui/src/styles.css`                         |
 | Dados no cliente | TanStack Query / Table / Charts                  | 5.107.1 / 9.3.1 / 1.4.0 | Só Query tem uso (provider); `date-fns` 4.4.0 instalado        |
 | Roteamento       | TanStack Router                                  | 1.170.46                | `apps/app`; rotas em código (`router.tsx`); ADR 0003           |
-| Backend de dados | Supabase (`@supabase/supabase-js`)               | 2.119.0                 | Cliente em `apps/app/src/lib/supabase.ts`; sem fluxos          |
+| Backend de dados | Supabase (`@supabase/supabase-js`)               | 2.119.0                 | Cliente em `apps/app/src/lib/supabase.ts` (sem fluxos); a API o usa com a service role em `modules/auth` (§4.6)          |
 | Testes           | Vitest 5.1.0, Supertest 7.3.1, Playwright 1.65.0 | —                       | Ver `QA.md`                                                    |
 | Lint / format    | OXLint 1.92.0, OXFmt 0.77.0                      | —                       | ADR 0002                                                       |
 | Hooks            | lefthook 2.2.2 + lint-staged 17.6.0              | —                       | Instalar com `bun run hooks:install`; validados no commit raiz |
@@ -116,7 +116,7 @@ Cada domínio é uma fatia vertical em `apps/api/src/modules/<dominio>/`, com as
 | `infrastructure` | Implementações concretas dos ports                   | Repositórios Supabase, clients de conectores, LLM, filas |
 | `interface`      | Entrada/saída HTTP                                   | Controllers, DTOs, presenters, guards                    |
 
-Hoje `apps/api/src` tem só `bootstrap.ts`, `common/` (envelope de erro, filtro e validação), `config/`, `health/`, `modules/email/` (spec `0002`) e `observability/`. Código compartilhado entre fatias vive em `apps/api/src/modules/shared` **somente** quando for estável e usado por dois ou mais módulos. Não crie `shared` preventivamente.
+Hoje `apps/api/src` tem só `bootstrap.ts`, `common/` (envelope de erro, filtro e validação), `config/`, `health/`, `modules/email/` (spec `0002`), `modules/rate-limit/` (spec `0003`), `modules/auth/` (spec `0004`) e `observability/`. Código compartilhado entre fatias vive em `apps/api/src/modules/shared` **somente** quando for estável e usado por dois ou mais módulos. Não crie `shared` preventivamente.
 
 ### 4.3 Frontend: composição
 
@@ -161,6 +161,28 @@ Regras já aplicadas e que devem ser mantidas:
 - Sem fila nem outbox: e-mail em andamento se perde se o processo cair (reenvio nas specs 0006 e 0009). `drain()` roda no desligamento gracioso.
 - Decisão registrada no ADR `0006-email-transacional-via-api-http`.
 
+### 4.6 Autenticação e acesso a dados (`apps/api/src/modules/auth`, spec `0004`)
+
+Primeira fatia de produto e referência das próximas specs de auth (`0005` a `0010`). Identidade própria da API, sem Supabase Auth (ADR do auth próprio na API); acesso ao banco por `supabase-js` com a service role e funções SQL por RPC (ADR do acesso a dados).
+
+| Camada           | Conteúdo                                                                                                                                                                              |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `domain`         | `auth-rules` (limites, `normalizeEmail`, `normalizeName`, TTL de 24 h), `EmailAlreadyRegisteredError`, ports (`UserRepository`, `PasswordHasher`, `TokenGenerator`, `ConfirmationMailer`) |
+| `application`    | `SignUp`: hash Argon2id, token, `createWithConfirmationToken`, depois o e-mail (`dispatch`, depois do commit)                                                                         |
+| `infrastructure` | `SupabaseUserRepository` (RPC `auth_sign_up`), `Argon2PasswordHasher`, `CryptoTokenGenerator` (256 bits, SHA-256 em hex), `EmailServiceConfirmationMailer`, `DataAccessError`            |
+| `interface`      | `AuthController` (`POST /api/v1/auth/sign-up`, `@RateLimit('sign-up')`), `SignUpDto` (`class-validator`; `@SameAs`), mapeamento do erro de domínio para `409 EMAIL_ALREADY_REGISTERED`    |
+
+**Banco** (migration `supabase/migrations/20261109200000_create_users_and_auth_tokens.sql`):
+
+- `users` (`id`, `first_name`, `last_name`, `email` único e já normalizado, `password_hash`, `email_confirmed_at` nulo = não confirmada, `created_at`, `updated_at` com gatilho) e `auth_tokens` (`id`, `user_id` com `on delete cascade`, `type` `email_confirmation` | `password_reset`, `token_hash` único, `expires_at`, `used_at`, `created_at`). Índices: `users_email_key`, `auth_tokens_token_hash_key`, `auth_tokens_user_id_type_idx`.
+- RLS **ligada e sem policies**; `revoke all` de `anon` e `authenticated`. Só a API (service role) lê e escreve.
+- `auth_sign_up(...)` cria usuário e token numa transação com `on conflict (email) do nothing`: devolve o `uuid` ou `null` (e-mail repetido); cadastros simultâneos do mesmo e-mail resolvem no índice único, sem 500. `execute` revogado de `public`, `anon` e `authenticated`; concedido só a `service_role`. Funções novas seguem a mesma regra.
+- Rollback: SQL no comentário da migration (apaga todas as contas).
+
+**Regras que as specs seguintes mantêm:** senha só como hash Argon2id; tokens de link só como hash SHA-256; `DataAccessError` tem mensagem fixa (mensagens do Postgres podem repetir o e-mail); nada de senha, token, link, e-mail ou IP em log; o controller não acessa o banco.
+
+**SPA:** `lib/api-client.ts` (base `${VITE_API_URL}/api/v1`, JSON, erro tipado `ApiError { status, code, message, details }`, `status` 0 e `NETWORK_ERROR` quando a rede falha) e `features/auth/` (página, validação por função pura, `useMutation` do TanStack Query).
+
 ## 5. Decisões já tomadas
 
 | Decisão                                         | Motivo                                                            | Consequência                                             |
@@ -175,13 +197,15 @@ Regras já aplicadas e que devem ser mantidas:
 | API em `/api/v1`, rotas `/auth` e `/app`, en-US | Espaço de URLs e idioma estáveis antes da autenticação — ADR 0004 | Ver `DEVELOPMENT.md` §13; `APP_URL` é obrigatória na API |
 | TanStack Router, rotas em código                | Combina com o stack TanStack — ADR 0003                           | Sem plugin de geração de rotas                           |
 | Limite de requisições próprio, em memória       | Chave por rota + IP + e-mail e envelope próprio — ADR 0005   | Sem `@nestjs/throttler`; instância única; ver §6 item 10 |
+| Auth própria na API (Nest + Postgres), Argon2id  | Sessão única, e-mails próprios e identidade no domínio — ADR do auth próprio | Sem Supabase Auth; segurança de credenciais é nossa (§4.6) |
+| `supabase-js` (service role) + funções RPC      | Decisão do solicitante; transação no banco — ADR do acesso a dados | RLS sem policies; `execute` revogado de `anon`/`authenticated` |
 
-ADRs vivem em `./.adrs/` (`0001` a `0004`). Crie `./.adrs/NNNN-titulo.md` ao tomar decisões estruturais (template em `RULES.md`).
+ADRs vivem em `./.adrs/` (`0001` a `0006`; os dois da spec `0004` entram com o número definido na integração). Crie `./.adrs/NNNN-titulo.md` ao tomar decisões estruturais (template em `RULES.md`).
 
 ## 6. Dívidas e lacunas conhecidas
 
-1. **Sem modelo de dados:** não há migrations, schema ou RLS; `supabase/migrations/` só tem `.gitkeep`.
-2. **Sem autenticação:** nenhuma rota protegida ou sessão; `/app/*` e toda a API são públicas até a spec `0005` (`.plans/auth-breakdown.md`).
+1. **Modelo de dados mínimo:** só `users` e `auth_tokens` (spec `0004`); sem tabelas de clube, expert ou conector. Não há rollback automático: o SQL fica no comentário da migration.
+2. **Autenticação parcial:** só o cadastro existe (spec `0004`); nenhuma rota protegida ou sessão; `/app/*` e toda a API são públicas até a spec `0005` (`.plans/auth-breakdown.md`).
 3. **Sem CI:** nenhum workflow de lint, tipos, build ou testes.
 4. **Sem páginas de produto:** o roteador e os grupos `/auth/*` e `/app/*` existem, mas só há a home placeholder e a 404.
 5. **Hooks e push sem automação em CI:** o repositório existe desde 2026-11-07 (`main`, `origin` = `https://github.com/brunolucildo/analytics-personas.git`, commit raiz `227e0ad`). Os hooks do `lefthook` só rodam depois de `bun run hooks:install` em cada clone e não há pipeline que repita os gates. O push exige login do Git Credential Manager na conta `brunolucildo`.
@@ -190,6 +214,8 @@ ADRs vivem em `./.adrs/` (`0001` a `0004`). Crie `./.adrs/NNNN-titulo.md` ao tom
 8. **`supabase migration up --local`:** a CLI 3.x avisa que `--local` será removido na v4.
 9. **TanStack Table/Charts e `date-fns`** estão instalados sem uso; a primeira tela com dados deve consumi-los ou removê-los.
 10. **Limite de requisições em memória (spec `0003`):** os contadores são de instância única e zeram ao reiniciar a API; com mais de uma instância o limite não é compartilhado. A interface `RateLimitStore` permite trocar por Redis (backlog). `TRUST_PROXY` precisa ser definido antes do deploy atrás de proxy (ver `DEVELOPMENT.md` §13.4).
+11. **`argon2` é um módulo nativo** (prebuilds do `node-gyp-build`; o script de instalação fica bloqueado pelo Bun sem `trustedDependencies`, mas os prebuilds carregam). Uma plataforma sem prebuild exige toolchain de compilação.
+12. **`test:integration` e `test:e2e` exigem Supabase local** (`infra:up` e `db:migrate`); os dados de teste ficam no banco local compartilhado e são removidos pelos próprios testes (`example.test`).
 
 ## 7. Regras ao evoluir a arquitetura
 

@@ -7,6 +7,7 @@ import {
   redirect,
   type RouterHistory,
 } from "@tanstack/react-router";
+import { SignUpPage } from "./features/auth/sign-up-page";
 import { AppLayout } from "./routes/app-layout";
 import { AuthLayout } from "./routes/auth-layout";
 import { HomePage } from "./routes/home-page";
@@ -48,6 +49,12 @@ export function createAppRouter({ history, extraRoutes }: CreateAppRouterOptions
     component: AppLayout,
   });
 
+  const signUpRoute = createRoute({
+    getParentRoute: () => authRoute,
+    path: "sign-up",
+    component: SignUpPage,
+  });
+
   const homeRoute = createRoute({
     getParentRoute: () => appRoute,
     path: "/",
@@ -56,7 +63,10 @@ export function createAppRouter({ history, extraRoutes }: CreateAppRouterOptions
 
   const routeTree = rootRoute.addChildren([
     indexRoute,
-    authRoute.addChildren(extraRoutes?.auth?.map((create) => create(authRoute)) ?? []),
+    authRoute.addChildren([
+      signUpRoute,
+      ...(extraRoutes?.auth?.map((create) => create(authRoute)) ?? []),
+    ]),
     appRoute.addChildren([
       homeRoute,
       ...(extraRoutes?.app?.map((create) => create(appRoute)) ?? []),
