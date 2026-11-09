@@ -56,8 +56,8 @@ Rota pública. Papel único (usuário). Isolamento por usuário. `users` e `auth
 
 ## Decisões e premissas
 
-- **Decisão (solicitante):** `supabase-js` + RPC para o que exige transação; ADR provisório `XXXX-0004-acesso-a-dados-com-supabase-js-e-rpc`.
-- **Decisão:** auth próprio na API; ADR provisório `XXXX-0004-auth-proprio-na-api`.
+- **Decisão (solicitante):** `supabase-js` + RPC para o que exige transação; ADR `0008-acesso-a-dados-com-supabase-js-e-rpc`.
+- **Decisão:** auth próprio na API; ADR `0007-auth-proprio-na-api`.
 - **Decisão:** a criação do usuário e do token é uma única função SQL (`auth_sign_up`), com `insert ... on conflict (email) do nothing`: a corrida é resolvida pelo índice único, sem exceção e sem 500.
 - **Decisão:** `argon2` (node-argon2, prebuilds) em `apps/api`; parâmetros padrão da biblioteca com Argon2id.
 - **Decisão:** validação na borda com DTO (`class-validator`); constantes e normalização no `domain`; o caso de uso recebe valores já normalizados.
@@ -80,7 +80,7 @@ Rota pública. Papel único (usuário). Isolamento por usuário. `users` e `auth
 - `apps/app/src/lib/api-client.ts`, `apps/app/src/features/auth/**`, `apps/app/src/router.tsx` (rota aditiva)
 - `packages/ui/src/input.tsx`, `packages/ui/src/label.tsx`
 - `e2e/sign-up.spec.ts`, `playwright.config.ts`
-- `.adrs/XXXX-0004-*.md`, `.docs/QA.md`, `.docs/ARCHITECTURE.md`, `.docs/DEVELOPMENT.md`
+- `.adrs/0007-*, .adrs/0008-*.md`, `.docs/QA.md`, `.docs/ARCHITECTURE.md`, `.docs/DEVELOPMENT.md`
 
 ## Testes
 

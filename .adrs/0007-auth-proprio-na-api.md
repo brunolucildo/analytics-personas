@@ -1,9 +1,7 @@
-# XXXX — Autenticação própria na API (Nest + Postgres)
+# 0007 — Autenticação própria na API (Nest + Postgres)
 
 - **Status:** aceito
 - **Data:** 2026-11-09
-
-> Número provisório: o orquestrador renumera ao integrar (spec `0004`).
 
 ## Contexto
 

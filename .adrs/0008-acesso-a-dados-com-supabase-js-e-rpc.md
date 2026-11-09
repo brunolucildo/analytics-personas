@@ -1,9 +1,7 @@
-# XXXX — Acesso a dados com `supabase-js` (service role) e funções SQL por RPC
+# 0008 — Acesso a dados com `supabase-js` (service role) e funções SQL por RPC
 
 - **Status:** aceito
 - **Data:** 2026-11-09
-
-> Número provisório: o orquestrador renumera ao integrar (spec `0004`).
 
 ## Contexto
 

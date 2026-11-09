@@ -3,8 +3,6 @@
 - **Status:** aceito
 - **Data:** 2026-11-09
 
-> O prefixo `XXXX` é provisório (spec `0002`); o orquestrador renumera ao integrar.
-
 ## Contexto
 
 Cinco fluxos de autenticação (specs 0004, 0006, 0007, 0009 e 0010) enviam e-mail. O solicitante decidiu: Mailtrap fora de produção, Resend em produção, e a escolha escondida atrás de uma abstração. `DEVELOPMENT.md` §5 e §9 exigem timeout, retry limitado e erro tipado em toda integração externa e proíbem teste que dependa de rede externa. A spec deixou em aberto como falar com cada provedor (SMTP, API ou SDK).

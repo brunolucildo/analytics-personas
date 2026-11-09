@@ -163,7 +163,7 @@ Regras já aplicadas e que devem ser mantidas:
 
 ### 4.6 Autenticação e acesso a dados (`apps/api/src/modules/auth`, spec `0004`)
 
-Primeira fatia de produto e referência das próximas specs de auth (`0005` a `0010`). Identidade própria da API, sem Supabase Auth (ADR do auth próprio na API); acesso ao banco por `supabase-js` com a service role e funções SQL por RPC (ADR do acesso a dados).
+Primeira fatia de produto e referência das próximas specs de auth (`0005` a `0010`). Identidade própria da API, sem Supabase Auth (ADR 0007); acesso ao banco por `supabase-js` com a service role e funções SQL por RPC (ADR do acesso a dados).
 
 | Camada           | Conteúdo                                                                                                                                                                              |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -197,8 +197,8 @@ Primeira fatia de produto e referência das próximas specs de auth (`0005` a `0
 | API em `/api/v1`, rotas `/auth` e `/app`, en-US | Espaço de URLs e idioma estáveis antes da autenticação — ADR 0004 | Ver `DEVELOPMENT.md` §13; `APP_URL` é obrigatória na API |
 | TanStack Router, rotas em código                | Combina com o stack TanStack — ADR 0003                           | Sem plugin de geração de rotas                           |
 | Limite de requisições próprio, em memória       | Chave por rota + IP + e-mail e envelope próprio — ADR 0005   | Sem `@nestjs/throttler`; instância única; ver §6 item 10 |
-| Auth própria na API (Nest + Postgres), Argon2id  | Sessão única, e-mails próprios e identidade no domínio — ADR do auth próprio | Sem Supabase Auth; segurança de credenciais é nossa (§4.6) |
-| `supabase-js` (service role) + funções RPC      | Decisão do solicitante; transação no banco — ADR do acesso a dados | RLS sem policies; `execute` revogado de `anon`/`authenticated` |
+| Auth própria na API (Nest + Postgres), Argon2id  | Sessão única, e-mails próprios e identidade no domínio — ADR 0007 | Sem Supabase Auth; segurança de credenciais é nossa (§4.6) |
+| `supabase-js` (service role) + funções RPC      | Decisão do solicitante; transação no banco — ADR 0008 | RLS sem policies; `execute` revogado de `anon`/`authenticated` |
 
 ADRs vivem em `./.adrs/` (`0001` a `0006`; os dois da spec `0004` entram com o número definido na integração). Crie `./.adrs/NNNN-titulo.md` ao tomar decisões estruturais (template em `RULES.md`).
 
