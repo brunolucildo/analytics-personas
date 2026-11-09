@@ -75,6 +75,12 @@ Observabilidade (R9), com `bun run infra:up` (5 containers `healthy`) e a API co
 
 **Pré-requisito novo:** a API exige `APP_URL` (ver `.env.example`); `.env` antigos precisam dela para a API subir. Os testes usam `http://localhost:5173` em `apps/api/test/setup-env.ts`.
 
+### 1.4 Verificação da spec 0002 em 2026-11-09
+
+Executado no worktree da spec (código de saída 0): `bun run lint`, `bun run check-types`, `bun run build`, `bun run test` (`api`: 78 testes, `app`: 8) e `bun run test:integration` (16 testes, incluindo captura de e-mail, rota de teste 404 fora do `capture` e recusa de `capture` em produção). Nenhum teste usa rede externa. **Não verificado:** entrega real no Mailtrap e no Resend (sem credenciais); ver o checklist abaixo.
+
+**Pré-requisito novo:** a API exige `EMAIL_PROVIDER`, `EMAIL_FROM` e a credencial do provedor escolhido (ver `.env.example`); `.env` antigos precisam delas para a API subir. Os testes usam `EMAIL_PROVIDER=capture` em `apps/api/test/setup-env.ts`.
+
 ## 2. Pré-requisitos
 
 | Item                   | Como obter                                                                  |
@@ -180,6 +186,7 @@ Aplique apenas o que a mudança afeta, mas registre o que foi verificado.
 ### 5.4 Dados, integrações e observabilidade
 
 - [ ] Estado vazio, carregando e erro implementados.
+- [ ] E-mail (Mailtrap), quando a mudança envia mensagem: no `.env` local, `EMAIL_PROVIDER=mailtrap`, `MAILTRAP_API_TOKEN` e `MAILTRAP_INBOX_ID` (Mailtrap > Email Sandbox > Inboxes > a caixa > API); suba a API (`bun run dev --filter=api`), dispare o fluxo (ou, para o teste isolado, um script que chame `EmailService.send`) e confirme que a mensagem aparece na caixa do Mailtrap com remetente igual a `EMAIL_FROM`, HTML e texto corretos. Com um token inválido o log deve trazer `email_delivery_failed` com `errorCode` `PROVIDER_UNAUTHORIZED`, sem a chave. O plano gratuito do Mailtrap tem limite de envios: prefira `capture` no dia a dia.
 - [ ] Timeout e falha de integração tratados.
 - [ ] Nenhuma chamada externa em loop ou sem limite.
 - [ ] Permissões verificadas (um usuário não acessa dado de outro clube).
