@@ -16,6 +16,10 @@ const API_URL = `http://localhost:${API_PORT}`;
 process.env.E2E_APP_URL = APP_URL;
 process.env.E2E_API_URL = API_URL;
 
+// Secret the API under test signs session tokens with; the specs sign matching tokens for seeded users.
+// A fixed test-only value (never a real secret), unless the environment already provides one.
+process.env.AUTH_JWT_SECRET ??= "e2e-only-jwt-secret-0123456789-abcdefghijk";
+
 export default defineConfig({
   testDir: "./e2e",
   globalTeardown: "./e2e/support/global-teardown.ts",
@@ -54,6 +58,7 @@ export default defineConfig({
       env: {
         API_PORT: String(API_PORT),
         APP_URL,
+        AUTH_JWT_SECRET: process.env.AUTH_JWT_SECRET as string,
         EMAIL_PROVIDER: "capture",
         EMAIL_FROM: "Analytics Personas <no-reply@analytics-personas.local>",
         TRUST_PROXY: "false",

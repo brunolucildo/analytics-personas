@@ -1,3 +1,5 @@
+import { clearAccessToken, getAccessToken } from "./access-token";
+
 export interface ApiErrorDetail {
   field?: string;
   message?: string;
@@ -17,13 +19,23 @@ export class ApiError extends Error {
   }
 }
 
+/** The API says the session is gone: missing, expired, revoked or invalid token. */
+export function isUnauthenticated(error: unknown): error is ApiError {
+  return error instanceof ApiError && error.status === 401 && error.code === "UNAUTHENTICATED";
+}
+
 export interface ApiClientOptions {
   /** Includes the version prefix, for example `http://localhost:3002/api/v1`. */
   baseUrl: string;
   fetch?: typeof globalThis.fetch;
+  /** Read on every call; when it returns a token the request carries `Authorization: Bearer`. */
+  getToken?: () => string | null;
+  /** Runs when a response is 401 `UNAUTHENTICATED`, before the error is thrown. */
+  onUnauthenticated?: () => void;
 }
 
 export interface ApiClient {
+  get<TResponse>(path: string): Promise<TResponse>;
   post<TResponse>(path: string, body: unknown): Promise<TResponse>;
 }
 
@@ -47,23 +59,39 @@ function toApiError(status: number, payload: unknown): ApiError {
   return new ApiError(status, "UNKNOWN_ERROR", "The server returned an unexpected response.");
 }
 
-export function createApiClient({ baseUrl, fetch: fetcher }: ApiClientOptions): ApiClient {
+export function createApiClient({
+  baseUrl,
+  fetch: fetcher,
+  getToken,
+  onUnauthenticated,
+}: ApiClientOptions): ApiClient {
   const root = baseUrl.replace(/\/+$/, "");
 
   async function request<TResponse>(
-    method: "POST",
+    method: "GET" | "POST",
     path: string,
-    body: unknown,
+    body?: unknown,
   ): Promise<TResponse> {
     // Resolved on each call so tests (and polyfills) can replace the global fetch.
     const send = fetcher ?? globalThis.fetch;
     let response: Response;
 
     try {
+      const token = getToken?.() ?? null;
+      const headers: Record<string, string> = { accept: "application/json" };
+
+      if (body !== undefined) {
+        headers["content-type"] = "application/json";
+      }
+
+      if (token !== null) {
+        headers.authorization = `Bearer ${token}`;
+      }
+
       response = await send(`${root}${path}`, {
         method,
-        headers: { "content-type": "application/json", accept: "application/json" },
-        body: JSON.stringify(body),
+        headers,
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       });
     } catch {
       throw new ApiError(0, "NETWORK_ERROR", "Could not reach the server.");
@@ -72,13 +100,20 @@ export function createApiClient({ baseUrl, fetch: fetcher }: ApiClientOptions): 
     const payload: unknown = await response.json().catch(() => undefined);
 
     if (!response.ok) {
-      throw toApiError(response.status, payload);
+      const failure = toApiError(response.status, payload);
+
+      if (isUnauthenticated(failure)) {
+        onUnauthenticated?.();
+      }
+
+      throw failure;
     }
 
     return payload as TResponse;
   }
 
   return {
+    get: (path) => request("GET", path),
     post: (path, body) => request("POST", path, body),
   };
 }
@@ -86,4 +121,6 @@ export function createApiClient({ baseUrl, fetch: fetcher }: ApiClientOptions): 
 /** Default client: `VITE_API_URL` (public, no secrets) plus the `/api/v1` prefix. */
 export const apiClient = createApiClient({
   baseUrl: `${import.meta.env.VITE_API_URL ?? "http://localhost:3002"}/api/v1`,
+  getToken: getAccessToken,
+  onUnauthenticated: clearAccessToken,
 });

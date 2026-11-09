@@ -19,6 +19,7 @@ const baseEnv = {
   SUPABASE_ANON_KEY: "test-anon-key",
   SUPABASE_SERVICE_ROLE_KEY: "test-service-role-key",
   APP_URL: "http://localhost:5173",
+  AUTH_JWT_SECRET: "test-only-jwt-secret-0123456789-abcdefghij",
 };
 
 describe("capture provider and the test-support route", () => {

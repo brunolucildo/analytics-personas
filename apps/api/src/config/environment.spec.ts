@@ -8,6 +8,7 @@ const validEnv = {
   APP_URL: "http://localhost:5173",
   EMAIL_PROVIDER: "capture",
   EMAIL_FROM: "Analytics Personas <no-reply@analytics-personas.local>",
+  AUTH_JWT_SECRET: "unit-test-jwt-secret-0123456789-abcdefghij",
 };
 
 describe("validateEnvironment", () => {
@@ -68,6 +69,34 @@ describe("validateEnvironment", () => {
   it.each(["yes", "1", "maybe"])("fails naming TRUST_PROXY when the value is %s", (value) => {
     expect(() => validateEnvironment({ ...validEnv, TRUST_PROXY: value })).toThrowError(
       /TRUST_PROXY/,
+    );
+  });
+
+  it("exposes the JWT secret", () => {
+    expect(validateEnvironment(validEnv).authJwtSecret).toBe(validEnv.AUTH_JWT_SECRET);
+  });
+
+  it("accepts a secret of exactly 32 characters", () => {
+    expect(() =>
+      validateEnvironment({ ...validEnv, AUTH_JWT_SECRET: "x".repeat(32) }),
+    ).not.toThrow();
+  });
+
+  it("fails naming AUTH_JWT_SECRET when it is missing", () => {
+    const { AUTH_JWT_SECRET: _removed, ...withoutSecret } = validEnv;
+
+    expect(() => validateEnvironment(withoutSecret)).toThrowError(/AUTH_JWT_SECRET/);
+  });
+
+  it("fails naming AUTH_JWT_SECRET, without echoing it, when it is shorter than 32 characters", () => {
+    const short = "short-secret-31-characters-long";
+
+    expect(short).toHaveLength(31);
+    expect(() => validateEnvironment({ ...validEnv, AUTH_JWT_SECRET: short })).toThrowError(
+      /AUTH_JWT_SECRET/,
+    );
+    expect(() => validateEnvironment({ ...validEnv, AUTH_JWT_SECRET: short })).not.toThrowError(
+      new RegExp(short),
     );
   });
 });

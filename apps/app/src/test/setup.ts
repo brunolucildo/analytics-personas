@@ -7,4 +7,5 @@ vi.stubGlobal("scrollTo", vi.fn());
 
 afterEach(() => {
   cleanup();
+  window.localStorage.clear();
 });
