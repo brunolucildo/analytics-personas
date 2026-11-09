@@ -7,6 +7,7 @@ import {
   redirect,
   type RouterHistory,
 } from "@tanstack/react-router";
+import { ForgotPasswordPage } from "./features/auth/forgot-password-page";
 import { SignUpPage } from "./features/auth/sign-up-page";
 import { AppLayout } from "./routes/app-layout";
 import { AuthLayout } from "./routes/auth-layout";
@@ -55,6 +56,12 @@ export function createAppRouter({ history, extraRoutes }: CreateAppRouterOptions
     component: SignUpPage,
   });
 
+  const forgotPasswordRoute = createRoute({
+    getParentRoute: () => authRoute,
+    path: "forgot-password",
+    component: ForgotPasswordPage,
+  });
+
   const homeRoute = createRoute({
     getParentRoute: () => appRoute,
     path: "/",
@@ -65,6 +72,7 @@ export function createAppRouter({ history, extraRoutes }: CreateAppRouterOptions
     indexRoute,
     authRoute.addChildren([
       signUpRoute,
+      forgotPasswordRoute,
       ...(extraRoutes?.auth?.map((create) => create(authRoute)) ?? []),
     ]),
     appRoute.addChildren([

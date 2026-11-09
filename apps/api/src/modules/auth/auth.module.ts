@@ -3,6 +3,7 @@ import { Module } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type { Environment } from "../../config/environment";
 import { EmailModule, EmailService } from "../email";
+import { RequestPasswordReset } from "./application/request-password-reset";
 import { SignUp } from "./application/sign-up";
 import type {
   ConfirmationMailer,
@@ -10,9 +11,12 @@ import type {
   TokenGenerator,
   UserRepository,
 } from "./domain/auth-ports";
+import type { PasswordResetMailer, PasswordResetRepository } from "./domain/password-reset-ports";
 import {
   CONFIRMATION_MAILER,
   PASSWORD_HASHER,
+  PASSWORD_RESET_MAILER,
+  PASSWORD_RESET_REPOSITORY,
   SUPABASE_ADMIN_CLIENT,
   TOKEN_GENERATOR,
   USER_REPOSITORY,
@@ -20,6 +24,8 @@ import {
 import { Argon2PasswordHasher } from "./infrastructure/argon2-password-hasher";
 import { CryptoTokenGenerator } from "./infrastructure/crypto-token-generator";
 import { EmailServiceConfirmationMailer } from "./infrastructure/email-service-confirmation-mailer";
+import { EmailServicePasswordResetMailer } from "./infrastructure/email-service-password-reset-mailer";
+import { SupabasePasswordResetRepository } from "./infrastructure/supabase-password-reset.repository";
 import { SupabaseUserRepository } from "./infrastructure/supabase-user.repository";
 import { AuthController } from "./interface/auth.controller";
 
@@ -61,6 +67,27 @@ import { AuthController } from "./interface/auth.controller";
         tokens: TokenGenerator,
         mailer: ConfirmationMailer,
       ) => new SignUp(users, hasher, tokens, mailer),
+    },
+    {
+      provide: PASSWORD_RESET_REPOSITORY,
+      inject: [SUPABASE_ADMIN_CLIENT],
+      useFactory: (client: ConstructorParameters<typeof SupabasePasswordResetRepository>[0]) =>
+        new SupabasePasswordResetRepository(client),
+    },
+    {
+      provide: PASSWORD_RESET_MAILER,
+      inject: [EmailService, ConfigService],
+      useFactory: (emails: EmailService, config: ConfigService<Environment, true>) =>
+        new EmailServicePasswordResetMailer(emails, config.get("appUrl", { infer: true })),
+    },
+    {
+      provide: RequestPasswordReset,
+      inject: [PASSWORD_RESET_REPOSITORY, TOKEN_GENERATOR, PASSWORD_RESET_MAILER],
+      useFactory: (
+        resets: PasswordResetRepository,
+        tokens: TokenGenerator,
+        mailer: PasswordResetMailer,
+      ) => new RequestPasswordReset(resets, tokens, mailer),
     },
   ],
 })
