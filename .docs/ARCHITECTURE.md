@@ -158,7 +158,7 @@ Regras já aplicadas e que devem ser mantidas:
 | Supabase local via CLI; Compose só para LGTM    | Evitar conflito entre Compose e o fluxo da CLI                    | `infra:up` orquestra os dois                             |
 | API em `/api/v1`, rotas `/auth` e `/app`, en-US | Espaço de URLs e idioma estáveis antes da autenticação — ADR 0004 | Ver `DEVELOPMENT.md` §13; `APP_URL` é obrigatória na API |
 | TanStack Router, rotas em código                | Combina com o stack TanStack — ADR 0003                           | Sem plugin de geração de rotas                           |
-| Limite de requisições próprio, em memória       | Chave por rota + IP + e-mail e envelope próprio — ADR XXXX-0003   | Sem `@nestjs/throttler`; instância única; ver §6 item 10 |
+| Limite de requisições próprio, em memória       | Chave por rota + IP + e-mail e envelope próprio — ADR 0005   | Sem `@nestjs/throttler`; instância única; ver §6 item 10 |
 
 ADRs vivem em `./.adrs/` (`0001` a `0004`). Crie `./.adrs/NNNN-titulo.md` ao tomar decisões estruturais (template em `RULES.md`).
 

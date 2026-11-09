@@ -1,6 +1,6 @@
-# XXXX — Limite de requisições em memória com guard próprio
+# 0005 — Limite de requisições em memória com guard próprio
 
-- **Status:** aceito (número provisório; o orquestrador renumera)
+- **Status:** aceito
 - **Data:** 2026-11-09
 
 ## Contexto

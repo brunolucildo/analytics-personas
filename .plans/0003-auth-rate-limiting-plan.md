@@ -77,7 +77,7 @@ Nenhuma externa. O armazenamento fica atrás da interface `RateLimitStore` (port
 - `apps/api/src/config/environment.ts` (+ spec) — `TRUST_PROXY`.
 - `apps/api/test/setup-env.ts`, `apps/api/test/support/rate-limit.ts`, `apps/api/test/rate-limit.int-spec.ts`.
 - `.env.example`, `.docs/DEVELOPMENT.md`, `.docs/ARCHITECTURE.md`, `.docs/QA.md`.
-- `.adrs/XXXX-0003-rate-limit-em-memoria-com-guard-proprio.md`.
+- `.adrs/0005-rate-limit-em-memoria-com-guard-proprio.md`.
 
 ## Testes
 

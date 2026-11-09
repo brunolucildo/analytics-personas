@@ -225,7 +225,7 @@ Definidas pela spec `0001-platform-routing-conventions` (ADRs `0003` e `0004`). 
 
 ### 13.4 Limite de requisições
 
-Módulo `apps/api/src/modules/rate-limit/` (spec `0003`, ADR `XXXX-0003`). O limite é **opt-in por rota**: o guard é global, mas só age em rota com `@RateLimit('<policy>')`; rota sem o decorator nunca é limitada (inclusive `GET /api/v1/health`).
+Módulo `apps/api/src/modules/rate-limit/` (spec `0003`, ADR `0005`). O limite é **opt-in por rota**: o guard é global, mas só age em rota com `@RateLimit('<policy>')`; rota sem o decorator nunca é limitada (inclusive `GET /api/v1/health`).
 
 Aplicar uma política a uma rota:
 
