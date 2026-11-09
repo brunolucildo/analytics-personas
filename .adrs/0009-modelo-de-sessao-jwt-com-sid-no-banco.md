@@ -1,9 +1,7 @@
-# XXXX — Modelo de sessão: bearer JWT com `sid` validado no banco
+# 0009 — Modelo de sessão: bearer JWT com `sid` validado no banco
 
 - **Status:** aceito
 - **Data:** 2026-11-09
-
-> O prefixo `XXXX` é provisório (spec `0005`); o número definitivo é atribuído na integração.
 
 ## Contexto
 

@@ -261,7 +261,7 @@ signIn(@Body() body: SignInDto) { /* ... */ }
 
 ### 13.5 Sessão e proteção de rotas
 
-Módulo `apps/api/src/modules/auth/` (spec `0005`; modelo no ADR `XXXX-0005`, resumo em `ARCHITECTURE.md` §4.7).
+Módulo `apps/api/src/modules/auth/` (spec `0005`; modelo no ADR 0009, resumo em `ARCHITECTURE.md` §4.7).
 
 - **Header:** `Authorization: Bearer <jwt>`. O JWT só carrega `sub`, `sid`, `iat` e `exp`; a validade vem da linha em `sessions` (a API a lê a cada request). Emitir uma sessão revoga a anterior do mesmo usuário (uma ativa por usuário, garantido pelo banco).
 - **Resposta de sessão** (para os endpoints que emitem sessão): `presentSession(await sessions.issue(userId))` devolve `{accessToken, expiresAt, user:{id, firstName, lastName, email}}`. `GET /api/v1/auth/session` devolve só `{user}`.

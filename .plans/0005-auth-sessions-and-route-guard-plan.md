@@ -54,7 +54,7 @@ Postgres por `supabase-js` (service role) e RPC (ADR 0008). JWT HS256 com `jose`
 
 ## Decisões e premissas
 
-- Decisão: JWT HS256 (`jose`), segredo único `AUTH_JWT_SECRET`; ADR `XXXX-0005-modelo-de-sessao-jwt-com-sid-no-banco`.
+- Decisão: JWT HS256 (`jose`), segredo único `AUTH_JWT_SECRET`; ADR `0009-modelo-de-sessao-jwt-com-sid-no-banco`.
 - Decisão: `auth_issue_session` (RPC) trava a linha do usuário (`for no key update`), revoga as ativas e insere a nova numa transação; o índice único parcial é a garantia final. Devolve os dados do usuário para montar a resposta sem segunda consulta.
 - Decisão: `validate` lê `sessions` junto com o usuário (uma leitura por request) e o guard anexa a sessão ao request; `GET /auth/session` não consulta o banco de novo.
 - Decisão: `@Public()` vive em `src/common/public.decorator.ts` (usado por `health`, `email` e `auth`; módulos não se importam).
@@ -79,7 +79,7 @@ Postgres por `supabase-js` (service role) e RPC (ADR 0008). JWT HS256 com `jose`
 - `apps/api/test/**` (sessões, setup-env, probes)
 - `apps/app/src/lib/{access-token,api-client,query-client}.ts`, `apps/app/src/features/auth/**`, `apps/app/src/routes/**`, `apps/app/src/router.tsx`, `apps/app/src/main.tsx`
 - `e2e/**`, `playwright.config.ts`
-- `.adrs/XXXX-0005-*.md`, `.docs/*`, `.env.example`
+- `.adrs/0009-*.md`, `.docs/*`, `.env.example`
 
 ## Testes
 

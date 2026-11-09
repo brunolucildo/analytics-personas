@@ -189,7 +189,7 @@ Primeira fatia de produto e referência das próximas specs de auth (`0005` a `0
 
 ### 4.7 Sessão e proteção de rotas (spec `0005`)
 
-Bearer JWT cujo `sid` é conferido no banco a cada request; **sessão única por usuário**; **API fechada por padrão** (ADR `XXXX-0005-modelo-de-sessao-jwt-com-sid-no-banco`). Mesmo módulo `modules/auth`.
+Bearer JWT cujo `sid` é conferido no banco a cada request; **sessão única por usuário**; **API fechada por padrão** (ADR `0009-modelo-de-sessao-jwt-com-sid-no-banco`). Mesmo módulo `modules/auth`.
 
 | Camada           | Conteúdo                                                                                                                                                                                                  |
 | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -220,14 +220,14 @@ Bearer JWT cujo `sid` é conferido no banco a cada request; **sessão única por
 | Limite de requisições próprio, em memória       | Chave por rota + IP + e-mail e envelope próprio — ADR 0005   | Sem `@nestjs/throttler`; instância única; ver §6 item 10 |
 | Auth própria na API (Nest + Postgres), Argon2id  | Sessão única, e-mails próprios e identidade no domínio — ADR 0007 | Sem Supabase Auth; segurança de credenciais é nossa (§4.6) |
 | `supabase-js` (service role) + funções RPC      | Decisão do solicitante; transação no banco — ADR 0008 | RLS sem policies; `execute` revogado de `anon`/`authenticated` |
-| Sessão: bearer JWT com `sid` conferido no banco | Sessão única e revogação imediata — ADR `XXXX-0005`               | API fechada por padrão; uma leitura por request; token em `localStorage` (§4.7) |
+| Sessão: bearer JWT com `sid` conferido no banco | Sessão única e revogação imediata — ADR 0009               | API fechada por padrão; uma leitura por request; token em `localStorage` (§4.7) |
 
 ADRs vivem em `./.adrs/` (`0001` a `0006`; os dois da spec `0004` entram com o número definido na integração). Crie `./.adrs/NNNN-titulo.md` ao tomar decisões estruturais (template em `RULES.md`).
 
 ## 6. Dívidas e lacunas conhecidas
 
 1. **Modelo de dados mínimo:** só `users` e `auth_tokens` (spec `0004`); sem tabelas de clube, expert ou conector. Não há rollback automático: o SQL fica no comentário da migration.
-2. **Autenticação parcial:** existem o cadastro (spec `0004`) e a sessão com a proteção de rotas (spec `0005`: API e `/app/*` fechadas); ainda não há fluxo que emita sessão para uma pessoa (confirmação e sign-in, specs `0006` e `0007`) nem sign-out (`0008`). O token no `localStorage` é legível por XSS (risco aceito, ADR `XXXX-0005`); sessões expiradas ou revogadas não são apagadas (backlog) (`.plans/auth-breakdown.md`).
+2. **Autenticação parcial:** existem o cadastro (spec `0004`) e a sessão com a proteção de rotas (spec `0005`: API e `/app/*` fechadas); ainda não há fluxo que emita sessão para uma pessoa (confirmação e sign-in, specs `0006` e `0007`) nem sign-out (`0008`). O token no `localStorage` é legível por XSS (risco aceito, ADR 0009); sessões expiradas ou revogadas não são apagadas (backlog) (`.plans/auth-breakdown.md`).
 3. **Sem CI:** nenhum workflow de lint, tipos, build ou testes.
 4. **Sem páginas de produto:** o roteador e os grupos `/auth/*` e `/app/*` existem, mas só há a home placeholder e a 404.
 5. **Hooks e push sem automação em CI:** o repositório existe desde 2026-11-07 (`main`, `origin` = `https://github.com/brunolucildo/analytics-personas.git`, commit raiz `227e0ad`). Os hooks do `lefthook` só rodam depois de `bun run hooks:install` em cada clone e não há pipeline que repita os gates. O push exige login do Git Credential Manager na conta `brunolucildo`.
