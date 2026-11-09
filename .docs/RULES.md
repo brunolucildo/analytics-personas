@@ -16,7 +16,7 @@ Se o código divergir da documentação, o código vence. Atualize o `.docs` na 
 Toda tarefa de desenvolvimento segue esta ordem:
 
 1. **Entender:** leia os documentos relevantes (`AGENTS.md` → `BUSINESS.md`/`ARCHITECTURE.md` → `DEVELOPMENT.md`/`QA.md`).
-2. **Especificar:** use `create-spec` para transformar o pedido em `.specs/<slug>.md`; use `refine-spec` para auditar uma spec existente; use `feature-concept` quando também for necessário planejar.
+2. **Especificar:** use `breakdown-specs` quando o pedido juntar várias capacidades (ela quebra em várias specs e chama `create-spec` para cada uma); use `create-spec` para transformar um pedido de uma só capacidade em `.specs/<slug>.md`; use `refine-spec` para auditar uma spec existente; use `feature-concept` quando também for necessário planejar.
 3. **Planejar:** com `feature-concept`, gere `.plans/<slug>-plan.md` a partir da spec.
 4. **Implementar:** use `implement-me <slug>` para executar a spec em fatias pequenas e verificáveis, respeitando o escopo do plano.
 5. **Validar:** execute os gates de `QA.md` e a verificação manual aplicável.
@@ -28,7 +28,7 @@ Tarefas triviais (typo, formatação, ajuste de texto) podem usar um plano de 3 
 
 ## 3. Antes de planejar
 
-Use `create-spec` para escrever a spec a partir de um prompt ou `refine-spec` para corrigir uma spec existente. Use `feature-concept` quando a ideia ainda estiver vaga e for necessário um interrogatório profundo seguido de plano.
+Se o pedido tiver mais de uma capacidade, use `breakdown-specs` para cortá-lo em specs pequenas (uma feature por spec, em ordem de dependência) antes de especificar cada uma. Use `create-spec` para escrever a spec a partir de um prompt ou `refine-spec` para corrigir uma spec existente. Use `feature-concept` quando a ideia ainda estiver vaga e for necessário um interrogatório profundo seguido de plano.
 
 A spec segue `.specs/_template.md`. Ela só está pronta quando:
 
@@ -249,22 +249,23 @@ Ao parar, explique o bloqueio, apresente opções e recomende uma.
 
 Consulte o catálogo antes de começar. Skills de referência:
 
-| Contexto                          | Skill                                        |
-| --------------------------------- | -------------------------------------------- |
-| Criar spec a partir de prompt     | `create-spec` (obrigatória no fluxo)         |
-| Refinar/auditar spec existente    | `refine-spec` (obrigatória no fluxo)         |
-| Interrogatório profundo + plano   | `feature-concept`                            |
-| Executar uma spec                 | `implement-me <slug>` (obrigatória no fluxo) |
-| Commitar e subir ao fim da spec   | `commit-and-push` (obrigatória no fluxo)     |
-| UI/design                         | `frontend-design`, `web-design-guidelines`   |
-| Next.js (`apps/docs`)             | `next-best-practices`                        |
-| Performance React/Next            | `vercel-react-best-practices`                |
-| Testes orientados a comportamento | `tdd`                                        |
-| Postgres/Supabase                 | `supabase-postgres-best-practices`           |
-| E2E no browser                    | `playwright`                                 |
-| shadcn/ui e design system         | `shadcn`                                     |
-| Documentos                        | skills de `.docx`, `.pdf`, `.xlsx`, `pptx`   |
+| Contexto                          | Skill                                            |
+| --------------------------------- | ------------------------------------------------ |
+| Quebrar prompt grande em specs    | `breakdown-specs` (quando houver 2+ capacidades) |
+| Criar spec a partir de prompt     | `create-spec` (obrigatória no fluxo)             |
+| Refinar/auditar spec existente    | `refine-spec` (obrigatória no fluxo)             |
+| Interrogatório profundo + plano   | `feature-concept`                                |
+| Executar uma spec                 | `implement-me <slug>` (obrigatória no fluxo)     |
+| Commitar e subir ao fim da spec   | `commit-and-push` (obrigatória no fluxo)         |
+| UI/design                         | `frontend-design`, `web-design-guidelines`       |
+| Next.js (`apps/docs`)             | `next-best-practices`                            |
+| Performance React/Next            | `vercel-react-best-practices`                    |
+| Testes orientados a comportamento | `tdd`                                            |
+| Postgres/Supabase                 | `supabase-postgres-best-practices`               |
+| E2E no browser                    | `playwright`                                     |
+| shadcn/ui e design system         | `shadcn`                                         |
+| Documentos                        | skills de `.docx`, `.pdf`, `.xlsx`, `pptx`       |
 
-As skills próprias do projeto vivem em `.claude/skills/` (carregadas pelo Claude Code, invocáveis por `/<nome>`): `create-spec/`, `refine-spec/`, `feature-concept/`, `implement-me/` e `commit-and-push/`. É o único local de skills; a antiga `.agents/skills/` (OpenCode) foi removida. Ao alterar uma skill, atualize este documento e `AGENTS.md` na mesma mudança.
+As skills próprias do projeto vivem em `.claude/skills/` (carregadas pelo Claude Code, invocáveis por `/<nome>`): `breakdown-specs/`, `create-spec/`, `refine-spec/`, `feature-concept/`, `implement-me/` e `commit-and-push/`. É o único local de skills; a antiga `.agents/skills/` (OpenCode) foi removida. Ao alterar uma skill, atualize este documento e `AGENTS.md` na mesma mudança.
 
 Se uma skill de terceiro não estiver instalada, **não invente** e **não bloqueie**: siga estes documentos, aplique o checklist equivalente e registre a ausência no relatório.

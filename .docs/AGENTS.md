@@ -62,17 +62,18 @@ Portas: `apps/app` → **5173**; `apps/docs` → **3001**; `apps/api` → **3002
 
 ## 5. Skills
 
-Consulte o catálogo disponível antes de começar. O projeto tem cinco skills próprias que definem o fluxo de trabalho:
+Consulte o catálogo disponível antes de começar. O projeto tem seis skills próprias que definem o fluxo de trabalho:
 
 | Skill             | Quando usar                                                         | O que produz                                       |
 | ----------------- | ------------------------------------------------------------------- | -------------------------------------------------- |
+| `breakdown-specs` | prompt grande que junta várias capacidades (auth, CRUD, conectores) | mapa em `.plans/<epic>-breakdown.md` + N specs     |
 | `create-spec`     | prompt, ideia ou ticket que precisa virar spec                      | `.specs/<slug>.md` executável                      |
 | `refine-spec`     | spec existente vaga, incompleta ou contraditória                    | a mesma spec refinada + histórico de mudanças      |
 | `feature-concept` | ideia que exige interrogatório profundo **e** plano de execução     | `.specs/<slug>.md` + `.plans/<slug>-plan.md`       |
 | `implement-me`    | spec/plano pronto para virar código (`implement-me <slug>`)         | implementação + QA + ADR + commit/push + relatório |
 | `commit-and-push` | fim de cada spec (chamada pelo `implement-me`) ou pedido do usuário | commit Conventional Commits com co-author + push   |
 
-Fluxo padrão: `create-spec` (ou `feature-concept`) → `refine-spec` quando precisar de auditoria → `implement-me <slug>`, que **termina sempre com `commit-and-push`**. Use `create-spec` quando o objetivo for apenas a spec; use `feature-concept` quando também for necessário planejar a implementação.
+Fluxo padrão: `create-spec` (ou `feature-concept`) → `refine-spec` quando precisar de auditoria → `implement-me <slug>`, que **termina sempre com `commit-and-push`**. Use `create-spec` quando o objetivo for apenas a spec; use `feature-concept` quando também for necessário planejar a implementação. Quando o pedido junta mais de uma capacidade (ex.: sign-in, sign-up, confirm-account e forgot-password; ou um CRUD completo), comece por `breakdown-specs`: ela quebra o pedido em várias specs pequenas, cria cada uma com `create-spec` e entrega o mapa de ordem e dependências; depois rode `implement-me` em cada spec, uma por vez.
 
 `commit-and-push` analisa todas as mudanças pendentes, escreve a mensagem em Conventional Commits (descrição em pt-BR; `type` e `scope` em inglês), adiciona `Co-Authored-By: Claude Code <noreply@anthropic.com>`, faz `git add -A`, commita e dá push. Só roda a pedido do usuário ou no último passo do `implement-me`; nunca faz force push, `--amend`, `--no-verify` nem `git init`. Sem `.git` ela para e registra a pendência. **Destino fixo:** o push só vai para `https://github.com/brunolucildo/<repositorio>` via `origin`; qualquer outra URL a faz parar, e sem `origin` o commit fica local e o push vira pendência. Identidade dos commits: configurada só neste repositório (`.git/config`) como `Bruno Lucildo da Silva <49033432+brunolucildo@users.noreply.github.com>`; a skill não altera `user.name`/`user.email`. Estado atual: `main` publicada em `origin` = `https://github.com/brunolucildo/analytics-personas.git` (commit raiz `227e0ad`), com hooks do lefthook instalados neste clone. O push exige login do Git Credential Manager na conta `brunolucildo`; em outro clone, rode `bun run hooks:install`.
 
