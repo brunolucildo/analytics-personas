@@ -13,7 +13,7 @@
 | Build                       | `apps/app/dist`, `apps/api/dist` e `apps/docs/.next`; passa        |
 | Testes unitários            | Vitest em `app` e `api`; passam                                    |
 | Testes de integração        | Vitest + Supertest em `api`, contra o Supabase local (exige `infra:up` e `db:migrate`); passa |
-| Testes E2E                  | Playwright (`home`, `routing`, `sign-up`); sobe app e API (`capture`) e exige o Supabase local; passa |
+| Testes E2E                  | Playwright (`home`, `routing`, `sign-up`, `forgot-password`); sobe app e API (`capture`) e exige o Supabase local; passa |
 | Cobertura                   | `bun run test:coverage` gera `coverage/`; sem threshold            |
 | Hooks de pre-commit         | Configurados (`lefthook.yml`); validados no commit raiz `227e0ad`  |
 | CI                          | Não configurado                                                    |
@@ -112,6 +112,21 @@ Banco (`psql` no container): RLS ligada em `users` e `auth_tokens`, 0 policies e
 Verificação manual de UI (`/auth/sign-up`, Chromium via Playwright, vite em dev): 375 / 768 / 1280 px sem scroll horizontal (`scrollWidth` = largura da viewport, inclusive com os erros de validação abertos); um único `h1` (30px); `lang="en-US"`; ordem de Tab: nome, sobrenome, e-mail, senha, confirmação, botão, link `Sign in`; foco com anel de 2px + 4px `#5C8001`; alvos de toque: campos 44px, botão 48px, link `Sign in` 52×44px; console sem erro nem warning (o 409 aparece só como log de rede do browser). Contraste calculado: erro `#B91C1C` sobre `#FFFDF5` 6,35:1; texto secundário `#6B6B6B` 5,23:1; texto do botão 6,42:1; anel de foco 4,54:1. **Achado e corrigido:** o erro de campo mostrado no `blur` deslocava o botão e engolia o clique (o `click` caía no `form`); os erros de validação agora aparecem no envio. **Não verificado:** leitor de tela; hover/active; `prefers-reduced-motion` (o spinner tem `motion-reduce:animate-none`, sem teste); `vite preview`.
 
 **Pré-requisitos novos:** `test:integration` e `test:e2e` exigem Docker, `bun run infra:up` e `bun run db:migrate` (sem o banco a `globalSetup` falha com a instrução). As chaves do Supabase vêm do ambiente ou de `supabase status -o env`. O E2E sobe uma API própria com `EMAIL_PROVIDER=capture` na 3002 e o app na 5173 (`E2E_APP_PORT` e `E2E_API_PORT` mudam as portas).
+
+### 1.9 Verificação da spec 0009 em 2026-11-09
+
+Executado no worktree da spec, em paralelo com a spec 0005 (outro worktree, mesmo Supabase local), com o lock de infraestrutura da orquestração. `test:e2e` rodou com `E2E_APP_PORT=5193 E2E_API_PORT=3022` porque a 5173 estava ocupada por outro processo. **`bun run db:migrate` falhou neste worktree** com `MigrationMissingLocalError` (o banco compartilhado já tinha a migration `20261109210000` da 0005, que não existe aqui); a migration `20261109220000` foi aplicada com `psql` no container (`docker exec ... psql -f`) e registrada em `supabase_migrations.schema_migrations`. Depois da integração das branches, `db:migrate` volta a funcionar.
+
+| Gate                       | Resultado | Observação                                                                                                                                                                         |
+| -------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bun run lint`             | Passa     | 4 tasks, 0 warnings, 0 erros                                                                                                                                                       |
+| `bun run check-types`      | Passa     | 4 tasks                                                                                                                                                                            |
+| `bun run build`            | Passa     | `app`, `api` e `docs`; `service_role` e `auth_request_password_reset` não aparecem em `apps/app/dist`                                                                         |
+| `bun run test`             | Passa     | `api`: 174 testes (24 arquivos); `app`: 62 testes (8 arquivos)                                                                                                                    |
+| `bun run test:integration` | Passa     | 79 testes; `auth-forgot-password` (21): R1 (status, corpo e cabeçalhos idênticos para conta confirmada, não confirmada e inexistente), R2 a R6, tempo de resposta com provedor lento, permissões da função |
+| `bun run test:e2e`         | Passa     | 11 testes (Chromium): home, 404, `sign-up` e `forgot-password` (formulário, e-mail inválido sem chamar a API, mensagem igual para os três casos e e-mail capturado só da conta confirmada) |
+
+Verificação manual de UI (`/auth/forgot-password`, Chromium via Playwright, vite em dev, `POST` interceptado com 202): 375 / 768 / 1280 px sem scroll horizontal (`scrollWidth` = largura da viewport, também com o erro de validação e com a mensagem de sucesso); um único `h1` (30px); `lang="en-US"`; ordem de Tab: e-mail, botão, link `Back to sign in`, todos com `:focus-visible` verdadeiro; alvos de toque: campo 44px, botão 48px, link 110×44px; console sem erro nem warning. O anel de foco usa as mesmas classes de `Input`, `Button` e do link da página de sign-up (medido na 0004); não foi medido de novo. **Não verificado:** leitor de tela (o `role="status"` é renderizado junto com a mensagem, não antes); contraste (mesmos tokens da 0004); Mailtrap real (só o provider `capture`).
 
 ## 2. Pré-requisitos
 

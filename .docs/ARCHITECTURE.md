@@ -12,15 +12,15 @@ Monorepo que entrega uma SPA (`apps/app`) para operar experts de futebol, apoiad
 
 | Caminho                        | O que é                                                 | Estado                                                                                                     |
 | ------------------------------ | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `apps/app`                     | Cliente de produto em React + Vite (porta 5173)         | TanStack Router: `/` → `/app` (home placeholder), grupos `/auth/*` e `/app/*`, 404; `QueryClientProvider`; página `/auth/sign-up` (`features/auth/`) e `lib/api-client.ts` |
-| `apps/api`                     | API Nest.js (porta 3002)                                | Prefixo `/api/v1`, `GET /api/v1/health`, envelope de erro, CORS (`APP_URL`); env validada; OTel; logs JSON; `POST /api/v1/auth/sign-up` (`modules/auth`) |
+| `apps/app`                     | Cliente de produto em React + Vite (porta 5173)         | TanStack Router: `/` → `/app` (home placeholder), grupos `/auth/*` e `/app/*`, 404; `QueryClientProvider`; páginas `/auth/sign-up` e `/auth/forgot-password` (`features/auth/`) e `lib/api-client.ts` |
+| `apps/api`                     | API Nest.js (porta 3002)                                | Prefixo `/api/v1`, `GET /api/v1/health`, envelope de erro, CORS (`APP_URL`); env validada; OTel; logs JSON; `POST /api/v1/auth/sign-up` e `POST /api/v1/auth/forgot-password` (`modules/auth`) |
 | `apps/docs`                    | Site de documentação em Next.js (porta 3001)            | Página mínima                                                                                              |
 | `packages/ui`                  | `@repo/ui`: Tailwind v4 + shadcn, tokens de `DESIGN.md` | `Button`, `Input` e `Label`; exports `./button`, `./input`, `./label`, `./styles.css`, `./lib/utils`                                         |
 | `packages/typescript-config`   | tsconfig base (`strict`, `noUncheckedIndexedAccess`)    | `base`, `nestjs`, `nextjs`, `vite`, `react-library`                                                        |
-| `supabase/`                    | Supabase local via CLI (`config.toml`, `migrations/`)   | Migration `users` e `auth_tokens` (RLS sem policies) e a função `auth_sign_up`                                                                                  |
+| `supabase/`                    | Supabase local via CLI (`config.toml`, `migrations/`)   | Migrations `users` e `auth_tokens` (RLS sem policies) e as funções `auth_sign_up` e `auth_request_password_reset`                                                                                  |
 | `docker-compose.yml`, `infra/` | Grafana, Loki, Tempo, Mimir e OTel Collector            | Datasources e dashboard mínimo provisionados                                                               |
 | `scripts/`                     | `infra:up`, `infra:down`, `db:migrate` (Bun)            | Funcionais                                                                                                 |
-| `e2e/`, `playwright.config.ts` | Testes E2E                                              | Rotas `/`, 404 e `/auth/sign-up` (app e API reais, e-mail em `capture`)                                                                                        |
+| `e2e/`, `playwright.config.ts` | Testes E2E                                              | Rotas `/`, 404, `/auth/sign-up` e `/auth/forgot-password` (app e API reais, e-mail em `capture`)                                                                                        |
 
 ```text
 apps/
@@ -178,6 +178,9 @@ Primeira fatia de produto e referência das próximas specs de auth (`0005` a `0
 - RLS **ligada e sem policies**; `revoke all` de `anon` e `authenticated`. Só a API (service role) lê e escreve.
 - `auth_sign_up(...)` cria usuário e token numa transação com `on conflict (email) do nothing`: devolve o `uuid` ou `null` (e-mail repetido); cadastros simultâneos do mesmo e-mail resolvem no índice único, sem 500. `execute` revogado de `public`, `anon` e `authenticated`; concedido só a `service_role`. Funções novas seguem a mesma regra.
 - Rollback: SQL no comentário da migration (apaga todas as contas).
+- `auth_request_password_reset(p_email, p_token_hash, p_token_expires_at)` (migration `20261109220000_add_auth_request_password_reset.sql`, spec `0009`): para conta **confirmada**, trava a linha do usuário (`for update`), marca como usadas todas as `password_reset` ainda não usadas e insere a nova; devolve o primeiro nome, ou `null` quando não há ação (e-mail inexistente ou conta não confirmada). A trava serializa pedidos simultâneos: o usuário nunca tem dois tokens de reset válidos. Mesma regra de `execute` (só `service_role`).
+
+**Esqueci a senha (spec `0009`):** `RequestPasswordReset` (`application`) usa as ports `PasswordResetRepository` e `PasswordResetMailer` (`domain/password-reset-ports.ts`), `SupabasePasswordResetRepository` (RPC) e `EmailServicePasswordResetMailer` (`dispatch`, em segundo plano, depois do commit; TTL de 1 h em `PASSWORD_RESET_TOKEN_TTL_MS`). `POST /api/v1/auth/forgot-password` (`@RateLimit('forgot-password')`) responde sempre `202 {}`: o caso de uso não devolve nada, então o controller não consegue distinguir conta confirmada, não confirmada e inexistente. A falha do provedor de e-mail só aparece no log e não muda a resposta nem o tempo.
 
 **Regras que as specs seguintes mantêm:** senha só como hash Argon2id; tokens de link só como hash SHA-256; `DataAccessError` tem mensagem fixa (mensagens do Postgres podem repetir o e-mail); nada de senha, token, link, e-mail ou IP em log; o controller não acessa o banco.
 

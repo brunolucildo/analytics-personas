@@ -27,3 +27,6 @@ export function isNameLengthValid(value: string): boolean {
 export function isPasswordLengthValid(value: string): boolean {
   return value.length >= AUTH_LIMITS.passwordMin && value.length <= AUTH_LIMITS.passwordMax;
 }
+
+/** The password reset link stays valid for 1 hour. */
+export const PASSWORD_RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
