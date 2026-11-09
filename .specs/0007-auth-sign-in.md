@@ -3,7 +3,7 @@
 > Spec executável. Preencha todas as seções; `TODO` é lacuna, não requisito.
 > Use `create-spec` para criar, `refine-spec` para auditar e `implement-me` para executar.
 
-- **Status:** rascunho
+- **Status:** concluída (R1–R9 atendidos; gates verdes em 2026-11-09)
 - **Slug:** 0007-auth-sign-in
 - **Data:** 2026-11-09
 - **Atualizado em:** 2026-11-09
@@ -79,16 +79,16 @@ Com a conta confirmada (0006), a pessoa entra com e-mail e senha. Pelo pedido: c
 
 ## 6. Acceptance Criteria
 
-- [ ] Given usuário confirmado, When `POST /api/v1/auth/sign-in` (com e-mail em caixa diferente), Then 200 com sessão ativa. (R1)
-- [ ] Given e-mail inexistente e senha errada, When `POST`, Then respostas idênticas 401 `INVALID_CREDENTIALS`. (R2)
-- [ ] Given conta não confirmada, When senha correta, Then 403 `EMAIL_NOT_CONFIRMED`; When senha errada, Then 401. (R3)
-- [ ] Given dois logins, When usar o primeiro token, Then 401; o segundo, 200. (R4)
-- [ ] Given login válido, When ler a mensagem capturada, Then e-mail "New sign-in to Analytics Personas" sem PII extra; login falho não envia. (R5)
-- [ ] Given o provedor de e-mail indisponível, When login válido, Then 200. (R6)
-- [ ] Given 11 tentativas em 10 min (mesmo IP + e-mail), When a 11ª, Then 429. (R7)
-- [ ] Given a página, When credenciais válidas / inválidas / conta não confirmada, Then `/app` / mensagem geral / mensagem com link de reenvio. (R8)
-- [ ] Given o E2E completo e o segundo contexto de browser, When o segundo loga, Then o primeiro é redirecionado a `/auth/sign-in`. (R9)
-- [ ] Given `bun run lint`, `check-types`, `build`, `test`, `test:integration` e `test:e2e`, Then passam.
+- [x] Given usuário confirmado, When `POST /api/v1/auth/sign-in` (com e-mail em caixa diferente), Then 200 com sessão ativa. (R1)
+- [x] Given e-mail inexistente e senha errada, When `POST`, Then respostas idênticas 401 `INVALID_CREDENTIALS`. (R2)
+- [x] Given conta não confirmada, When senha correta, Then 403 `EMAIL_NOT_CONFIRMED`; When senha errada, Then 401. (R3)
+- [x] Given dois logins, When usar o primeiro token, Then 401; o segundo, 200. (R4)
+- [x] Given login válido, When ler a mensagem capturada, Then e-mail "New sign-in to Analytics Personas" sem PII extra; login falho não envia. (R5)
+- [x] Given o provedor de e-mail indisponível, When login válido, Then 200. (R6)
+- [x] Given 11 tentativas em 10 min (mesmo IP + e-mail), When a 11ª, Then 429. (R7)
+- [x] Given a página, When credenciais válidas / inválidas / conta não confirmada, Then `/app` / mensagem geral / mensagem com link de reenvio. (R8)
+- [x] Given o E2E completo e o segundo contexto de browser, When o segundo loga, Then o primeiro é redirecionado a `/auth/sign-in`. (R9)
+- [x] Given `bun run lint`, `check-types`, `build`, `test`, `test:integration` e `test:e2e`, Then passam.
 
 ## 7. O que fazer
 
@@ -137,7 +137,8 @@ Como validar que a spec foi atendida:
 
 ## 12. Refinamento
 
-| Data       | O que mudou                                                                                                                 | Motivo                                                           |
-| ---------- | --------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| 2026-11-09 | Spec criada pela skill `breakdown-specs` (épico de autenticação).                                                           | Capacidade "sign-in" com sessão única e e-mail de nova sessão.   |
-| 2026-11-09 | Verificação do e-mail passa a usar o provider `capture` (testes) e Mailtrap (manual), no lugar do servidor local de e-mail. | Decisão sobre provedores de e-mail no quiz de perguntas abertas. |
+| Data       | O que mudou                                                                                                                                                                                                                       | Motivo                                                                                                                                                    |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-11-09 | Spec criada pela skill `breakdown-specs` (épico de autenticação).                                                                                                                                                                 | Capacidade "sign-in" com sessão única e e-mail de nova sessão.                                                                                            |
+| 2026-11-09 | Verificação do e-mail passa a usar o provider `capture` (testes) e Mailtrap (manual), no lugar do servidor local de e-mail.                                                                                                       | Decisão sobre provedores de e-mail no quiz de perguntas abertas.                                                                                          |
+| 2026-11-09 | Implementação: o E2E do fluxo completo (R9) semeia a conta com hash real e obtém o link de confirmação pela página de reenvio (não pelo `POST /auth/sign-up`), e o logout usa o botão `Sign out` (0008) em vez de limpar o token. | A cota de `sign-up` (5/hora por IP) é consumida pelos outros specs E2E da mesma execução; o botão do 0008 já existe e também revoga a sessão no servidor. |
