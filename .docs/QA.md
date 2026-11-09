@@ -12,8 +12,8 @@
 | Tipos                       | Configurado em `app`, `api`, `docs` e `@repo/ui`; passa            |
 | Build                       | `apps/app/dist`, `apps/api/dist` e `apps/docs/.next`; passa        |
 | Testes unitários            | Vitest em `app` e `api`; passam                                    |
-| Testes de integração        | Vitest + Supertest em `api` (`/api/v1/health` e convenções); passa |
-| Testes E2E                  | Playwright (`e2e/home.spec.ts`, `e2e/routing.spec.ts`); passa      |
+| Testes de integração        | Vitest + Supertest em `api`, contra o Supabase local (exige `infra:up` e `db:migrate`); passa |
+| Testes E2E                  | Playwright (`home`, `routing`, `sign-up`); sobe app e API (`capture`) e exige o Supabase local; passa |
 | Cobertura                   | `bun run test:coverage` gera `coverage/`; sem threshold            |
 | Hooks de pre-commit         | Configurados (`lefthook.yml`); validados no commit raiz `227e0ad`  |
 | CI                          | Não configurado                                                    |
@@ -94,12 +94,31 @@ Executado no worktree da spec (código de saída 0): `bun run lint`, `bun run ch
 
 **Pré-requisito novo:** a API exige `EMAIL_PROVIDER`, `EMAIL_FROM` e a credencial do provedor escolhido (ver `.env.example`); `.env` antigos precisam delas para a API subir. Os testes usam `EMAIL_PROVIDER=capture` em `apps/api/test/setup-env.ts`.
 
+### 1.6 Verificação da spec 0004 em 2026-11-09
+
+Executado no worktree da spec, na ordem abaixo (código de saída 0). Supabase local no ar com a migration aplicada; `test:e2e` rodou com `E2E_APP_PORT=5183 E2E_API_PORT=3012` porque a 5173 já havia um `vite` de outro processo (a configuração agora nunca reaproveita um servidor existente).
+
+| Gate                       | Resultado | Observação                                                                                                                                                                    |
+| -------------------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bun run lint`             | Passa     | 4 tasks, 0 warnings, 0 erros                                                                                                                                                  |
+| `bun run check-types`      | Passa     | 4 tasks                                                                                                                                                                       |
+| `bun run build`            | Passa     | `app`, `api` e `docs`; `service_role`, `auth_sign_up` e `argon2` não aparecem em `apps/app/dist`                                                                            |
+| `bun run test`             | Passa     | `api`: 155 testes (19 arquivos); `app`: 36 testes (5 arquivos)                                                                                                              |
+| `bun run test:integration` | Passa     | 58 testes: `auth-database` (12: RLS e RPC com `anon` e `authenticated`, concorrência, restrições), `auth-sign-up` (17: R2 a R7), mais os anteriores                              |
+| `bun run test:e2e`         | Passa     | 8 testes (Chromium): home, 404, e `sign-up` (formulário, senhas diferentes sem chamar a API, cadastro com e-mail capturado, 409 no campo)                                     |
+
+Banco (`psql` no container): RLS ligada em `users` e `auth_tokens`, 0 policies em `public`, índices `users_email_key`, `auth_tokens_token_hash_key` e `auth_tokens_user_id_type_idx`, `auth_sign_up` com `execute` só para `service_role`, sem grants de tabela para `anon`/`authenticated`. Os testes apagam o que criam; ao final, `select count(*) from public.users` = 0.
+
+Verificação manual de UI (`/auth/sign-up`, Chromium via Playwright, vite em dev): 375 / 768 / 1280 px sem scroll horizontal (`scrollWidth` = largura da viewport, inclusive com os erros de validação abertos); um único `h1` (30px); `lang="en-US"`; ordem de Tab: nome, sobrenome, e-mail, senha, confirmação, botão, link `Sign in`; foco com anel de 2px + 4px `#5C8001`; alvos de toque: campos 44px, botão 48px, link `Sign in` 52×44px; console sem erro nem warning (o 409 aparece só como log de rede do browser). Contraste calculado: erro `#B91C1C` sobre `#FFFDF5` 6,35:1; texto secundário `#6B6B6B` 5,23:1; texto do botão 6,42:1; anel de foco 4,54:1. **Achado e corrigido:** o erro de campo mostrado no `blur` deslocava o botão e engolia o clique (o `click` caía no `form`); os erros de validação agora aparecem no envio. **Não verificado:** leitor de tela; hover/active; `prefers-reduced-motion` (o spinner tem `motion-reduce:animate-none`, sem teste); `vite preview`.
+
+**Pré-requisitos novos:** `test:integration` e `test:e2e` exigem Docker, `bun run infra:up` e `bun run db:migrate` (sem o banco a `globalSetup` falha com a instrução). As chaves do Supabase vêm do ambiente ou de `supabase status -o env`. O E2E sobe uma API própria com `EMAIL_PROVIDER=capture` na 3002 e o app na 5173 (`E2E_APP_PORT` e `E2E_API_PORT` mudam as portas).
+
 ## 2. Pré-requisitos
 
 | Item                   | Como obter                                                                  |
 | ---------------------- | --------------------------------------------------------------------------- |
 | Bun 1.4.4 e Node >= 24 | Instalação local                                                            |
-| Docker em execução     | Necessário para `infra:up`, `db:migrate`; os demais gates não dependem dele |
+| Docker em execução     | Necessário para `infra:up`, `db:migrate`, `test:integration` e `test:e2e`; lint, tipos, build e `test` não dependem dele |
 | Supabase CLI           | `devDependency` (`supabase`); roda via `bunx supabase`                      |
 | Browsers do Playwright | `bunx playwright install` (uma vez)                                         |
 | `.env` na raiz         | Copie `.env.example` e preencha as chaves com `bunx supabase status -o env` |
@@ -117,8 +136,8 @@ Execute na raiz do repositório, na ordem abaixo:
 | 3   | `bun run check-types`      | `tsc --noEmit` (e `next typegen` em `docs`) | Zero erro de tipo (`types:check` é alias)                       |
 | 4   | `bun run build`            | Build de produção dos três apps             | Concluído; dispensa justificada só para docs/config sem impacto |
 | 5   | `bun run test`             | Vitest (unitário) em `app` e `api`          | Todos passam; sem modo watch                                    |
-| 6   | `bun run test:integration` | Supertest contra a API                      | Todos passam                                                    |
-| 7   | `bun run test:e2e`         | Playwright contra `http://localhost:5173`   | Todos passam                                                    |
+| 6   | `bun run test:integration` | Supertest contra a API e o Supabase local   | Todos passam                                                    |
+| 7   | `bun run test:e2e`         | Playwright (app 5173 + API 3002 em `capture`) | Todos passam                                                    |
 | 8   | Verificação manual         | Ver seção 5                                 | Checklist aplicável à mudança                                   |
 
 Outros comandos:

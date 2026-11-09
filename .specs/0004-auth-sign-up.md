@@ -3,7 +3,7 @@
 > Spec executável. Preencha todas as seções; `TODO` é lacuna, não requisito.
 > Use `create-spec` para criar, `refine-spec` para auditar e `implement-me` para executar.
 
-- **Status:** rascunho
+- **Status:** concluída (R1–R9 atendidos; gates verdes em 2026-11-09)
 - **Slug:** 0004-auth-sign-up
 - **Data:** 2026-11-09
 - **Atualizado em:** 2026-11-09
@@ -90,15 +90,15 @@ Atenção de segurança: tabelas do schema `public` do Supabase são alcançáve
 
 ## 6. Acceptance Criteria
 
-- [ ] Given `db:migrate`, When consultar `users`/`auth_tokens` com a chave `anon`, Then nada é lido nem escrito; os índices únicos existem. (R1)
-- [ ] Given payload válido, When `POST /api/v1/auth/sign-up`, Then 201 e usuário não confirmado com hash Argon2id. (R2)
-- [ ] Given payloads inválidos (um por regra), When `POST`, Then 400 `VALIDATION_FAILED` com o campo correto e sem linha criada. (R3)
-- [ ] Given e-mail repetido (com caixa/espaços diferentes) e requisições concorrentes, When `POST`, Then 409 `EMAIL_ALREADY_REGISTERED` e nunca 500. (R4)
-- [ ] Given um cadastro válido, When ler a mensagem capturada para o destinatário, Then o e-mail traz o link com o token cujo hash está em `auth_tokens` (24 h). (R5)
-- [ ] Given o provedor de e-mail indisponível, When cadastro válido, Then 201 e erro registrado sem PII. (R6)
-- [ ] Given 6 requisições seguidas do mesmo IP, When a 6ª, Then 429. (R7)
-- [ ] Given o formulário (E2E com a API em `EMAIL_PROVIDER=capture`), When preencher com senhas diferentes, Then o erro aparece sem chamar a API; When preencher corretamente, Then a tela "Check your email" e a mensagem capturada. (R8)
-- [ ] Given `bun run lint`, `check-types`, `build`, `test`, `test:integration` e `test:e2e`, Then passam. (R9)
+- [x] Given `db:migrate`, When consultar `users`/`auth_tokens` com a chave `anon`, Then nada é lido nem escrito; os índices únicos existem. (R1)
+- [x] Given payload válido, When `POST /api/v1/auth/sign-up`, Then 201 e usuário não confirmado com hash Argon2id. (R2)
+- [x] Given payloads inválidos (um por regra), When `POST`, Then 400 `VALIDATION_FAILED` com o campo correto e sem linha criada. (R3)
+- [x] Given e-mail repetido (com caixa/espaços diferentes) e requisições concorrentes, When `POST`, Then 409 `EMAIL_ALREADY_REGISTERED` e nunca 500. (R4)
+- [x] Given um cadastro válido, When ler a mensagem capturada para o destinatário, Then o e-mail traz o link com o token cujo hash está em `auth_tokens` (24 h). (R5)
+- [x] Given o provedor de e-mail indisponível, When cadastro válido, Then 201 e erro registrado sem PII. (R6)
+- [x] Given 6 requisições seguidas do mesmo IP, When a 6ª, Then 429. (R7)
+- [x] Given o formulário (E2E com a API em `EMAIL_PROVIDER=capture`), When preencher com senhas diferentes, Then o erro aparece sem chamar a API; When preencher corretamente, Then a tela "Check your email" e a mensagem capturada. (R8)
+- [x] Given `bun run lint`, `check-types`, `build`, `test`, `test:integration` e `test:e2e`, Then passam. (R9)
 
 ## 7. O que fazer
 
@@ -149,6 +149,8 @@ Como validar que a spec foi atendida:
 | **Decisão (2026-11-09, solicitante):** a API acessa o Postgres por `supabase-js` com a service role (só no servidor) e **funções SQL chamadas por RPC** para o que exige transação. A recomendação do assistente era conexão direta; o solicitante escolheu RPC. | Vale para todo o épico: repositórios em `infrastructure` chamam tabelas e RPC; as migrations trazem as funções; `execute` revogado para `anon`/`authenticated`. | Não (resolvida) | Solicitante        |
 | Premissa: `email` é guardado já normalizado (trim + minúsculas) com índice único; não usa `citext`.                                                                                                                                                              | Schema da migration.                                                                                                                                            | Não             | Time de engenharia |
 | Premissa: o 409 vale também para conta existente não confirmada.                                                                                                                                                                                                 | Pessoa presa sem link precisa do reenvio do 0006.                                                                                                               | Não             | Produto            |
+| Premissa (implementação): erros de validação do formulário aparecem no envio, não no `blur` (um erro que surge ao mover o ponteiro para o botão o desloca e engole o clique); depois do primeiro envio eles acompanham a digitação. | UX do formulário. | Não | Time de engenharia |
+| Premissa (implementação): o E2E sobe app e API próprios (API sempre nova, em `capture`) e aceita `E2E_APP_PORT`/`E2E_API_PORT`; as chaves do Supabase vêm do ambiente ou de `supabase status -o env`. | `test:e2e` passa a exigir o Supabase local. | Não | Time de engenharia |
 | Premissa: não há captcha; a proteção é o limite do 0003.                                                                                                                                                                                                         | Spam de cadastro possível em escala.                                                                                                                            | Não             | Produto            |
 | Premissa: resposta 201 só com `{email}` (não devolve `id`).                                                                                                                                                                                                      | Contrato do SPA.                                                                                                                                                | Não             | Time de engenharia |
 | **Decisão (2026-11-09):** a integração roda contra o Supabase local (`infra:up`); repositórios têm fake em memória para teste unitário; `QA.md` registra o pré-requisito de Docker.                                                                              | Gate de integração passa a exigir infra.                                                                                                                        | Não (resolvida) | Solicitante        |
@@ -158,4 +160,5 @@ Como validar que a spec foi atendida:
 | Data       | O que mudou                                                                                                                                                                                            | Motivo                                  |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------- |
 | 2026-11-09 | Spec criada pela skill `breakdown-specs` (épico de autenticação).                                                                                                                                      | Esqueleto ambulante do épico.           |
+| 2026-11-09 | Implementada: migration, módulo `auth`, página e testes; status `concluída`; dois ADRs provisórios (`XXXX-0004-*`); premissas de validação no envio e de E2E com portas configuráveis. | Execução da spec (`implement-me`). |
 | 2026-11-09 | Acesso a dados definido como `supabase-js` + funções RPC (antes pergunta bloqueante); e-mail passa a usar `EmailService`/provider `capture` nos testes; RPC sem `execute` para `anon`/`authenticated`. | Respostas do quiz de perguntas abertas. |

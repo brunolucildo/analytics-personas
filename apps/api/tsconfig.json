@@ -2,6 +2,7 @@
   "extends": "@repo/typescript-config/nestjs.json",
   "compilerOptions": {
     "outDir": "dist",
+    "rootDir": "../..",
     "types": ["node"]
   },
   "include": ["src/**/*.ts", "test/**/*.ts", "vitest.config.mts", "vitest.integration.config.mts"],
