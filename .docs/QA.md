@@ -75,6 +75,19 @@ Observabilidade (R9), com `bun run infra:up` (5 containers `healthy`) e a API co
 
 **Pré-requisito novo:** a API exige `APP_URL` (ver `.env.example`); `.env` antigos precisam dela para a API subir. Os testes usam `http://localhost:5173` em `apps/api/test/setup-env.ts`.
 
+### 1.4 Verificação da spec 0003 em 2026-11-09
+
+Executado na raiz, no worktree da spec (sem UI, sem Supabase e sem portas fixas: os testes de integração usam o servidor em processo do Supertest):
+
+| Gate                       | Resultado | Observação                                                                                        |
+| -------------------------- | --------- | ------------------------------------------------------------------------------------------------- |
+| `bun run lint`             | Passa     | 4 tasks, 0 warnings, 0 erros                                                                      |
+| `bun run check-types`      | Passa     | 4 tasks                                                                                           |
+| `bun run build`            | Passa     | `app`, `api` e `docs`                                                                             |
+| `bun run test`             | Passa     | `app`: 8 testes; `api`: 37 testes (armazenamento, políticas, chave, `TRUST_PROXY`)                |
+| `bun run test:integration` | Passa     | 24 testes; `test/rate-limit.int-spec.ts` cobre 429, `Retry-After`, e-mail/IP, janela, proxy, logs |
+| `bun run test:e2e`         | Não rodou | Sem UI nesta spec                                                                                 |
+
 ## 2. Pré-requisitos
 
 | Item                   | Como obter                                                                  |

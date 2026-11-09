@@ -4,3 +4,4 @@ process.env.SUPABASE_SERVICE_ROLE_KEY ??= "test-service-role-key";
 process.env.APP_URL ??= "http://localhost:5173";
 process.env.OTEL_SDK_DISABLED ??= "true";
 process.env.LOG_LEVEL ??= "silent";
+process.env.TRUST_PROXY ??= "false";

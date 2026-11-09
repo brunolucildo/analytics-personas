@@ -34,4 +34,22 @@ describe("validateEnvironment", () => {
   it("still requires the Supabase variables", () => {
     expect(() => validateEnvironment({ APP_URL: validEnv.APP_URL })).toThrowError(/SUPABASE_URL/);
   });
+
+  it("defaults TRUST_PROXY to false", () => {
+    expect(validateEnvironment(validEnv).trustProxy).toBe(false);
+  });
+
+  it.each([
+    ["true", true],
+    ["TRUE", true],
+    ["false", false],
+  ])("reads TRUST_PROXY=%s as %s", (value, expected) => {
+    expect(validateEnvironment({ ...validEnv, TRUST_PROXY: value }).trustProxy).toBe(expected);
+  });
+
+  it.each(["yes", "1", "maybe"])("fails naming TRUST_PROXY when the value is %s", (value) => {
+    expect(() => validateEnvironment({ ...validEnv, TRUST_PROXY: value })).toThrowError(
+      /TRUST_PROXY/,
+    );
+  });
 });

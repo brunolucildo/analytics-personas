@@ -3,7 +3,7 @@
 > Spec executável. Preencha todas as seções; `TODO` é lacuna, não requisito.
 > Use `create-spec` para criar, `refine-spec` para auditar e `implement-me` para executar.
 
-- **Status:** rascunho
+- **Status:** concluída (R1–R8 atendidos; gates verdes em 2026-11-09)
 - **Slug:** 0003-auth-rate-limiting
 - **Data:** 2026-11-09
 - **Atualizado em:** 2026-11-09
@@ -76,12 +76,12 @@ Sem limite, sign-in aceita força bruta, e sign-up, forgot-password e reenvio de
 
 ## 6. Acceptance Criteria
 
-- [ ] Given a política de teste 3/60 s, When 4 requisições, Then as três primeiras 200 e a quarta 429 com `Retry-After`. (R1, R2)
-- [ ] Given a política por IP + e-mail, When e-mails e IPs variam, Then as cotas são independentes e e-mails equivalentes compartilham a chave. (R3)
-- [ ] Given o relógio avançado além da janela, When nova requisição, Then 200. (R4)
-- [ ] Given o registro, When inspecionar, Then as seis políticas existem com os valores do R5. (R5)
-- [ ] Given bloqueios, When inspecionar os logs, Then só `rate_limited` com o nome da política; Given muitas chaves, Then o número de entradas não passa do teto. (R6)
-- [ ] Given `TRUST_PROXY` falso/verdadeiro, When `X-Forwarded-For`, Then ignorado/usado. (R7)
+- [x] Given a política de teste 3/60 s, When 4 requisições, Then as três primeiras 200 e a quarta 429 com `Retry-After`. (R1, R2)
+- [x] Given a política por IP + e-mail, When e-mails e IPs variam, Then as cotas são independentes e e-mails equivalentes compartilham a chave. (R3)
+- [x] Given o relógio avançado além da janela, When nova requisição, Then 200. (R4)
+- [x] Given o registro, When inspecionar, Then as seis políticas existem com os valores do R5. (R5)
+- [x] Given bloqueios, When inspecionar os logs, Then só `rate_limited` com o nome da política; Given muitas chaves, Then o número de entradas não passa do teto. (R6)
+- [x] Given `TRUST_PROXY` falso/verdadeiro, When `X-Forwarded-For`, Then ignorado/usado. (R7)
 
 ## 7. O que fazer
 
@@ -129,8 +129,9 @@ Como validar que a spec foi atendida:
 
 ## 12. Refinamento
 
-| Data       | O que mudou                                                       | Motivo                                                                                                                |
-| ---------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| 2026-11-09 | Spec criada pela skill `breakdown-specs` (épico de autenticação). | Habilitadora usada por 0004, 0006, 0007, 0009 e 0010; o pedido de "limite de tentativas" foi aceito pelo solicitante. |
-| 2026-11-09 | Dependência de 0001 declarada (antes "nenhuma").                  | Verificação de consistência do `breakdown-specs`: a spec usa o envelope de erro do 0001.                              |
-| 2026-11-09 | Valores padrão das políticas passaram de premissa a decisão.      | Resposta do quiz de perguntas abertas.                                                                                |
+| Data       | O que mudou                                                                                   | Motivo                                                                                                                                 |
+| ---------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-11-09 | Spec criada pela skill `breakdown-specs` (épico de autenticação).                             | Habilitadora usada por 0004, 0006, 0007, 0009 e 0010; o pedido de "limite de tentativas" foi aceito pelo solicitante.                  |
+| 2026-11-09 | Dependência de 0001 declarada (antes "nenhuma").                                              | Verificação de consistência do `breakdown-specs`: a spec usa o envelope de erro do 0001.                                               |
+| 2026-11-09 | Valores padrão das políticas passaram de premissa a decisão.                                  | Resposta do quiz de perguntas abertas.                                                                                                 |
+| 2026-11-09 | Implementada (`implement-me`): biblioteca própria mínima, guard global opt-in, `TRUST_PROXY`. | Decisão do plano `.plans/0003-auth-rate-limiting-plan.md` e ADR `XXXX-0003`; política desconhecida no decorator lança erro (premissa). |
