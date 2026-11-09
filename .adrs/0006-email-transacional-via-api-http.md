@@ -1,4 +1,4 @@
-# XXXX — E-mail transacional atrás de `EmailService`, com provedores por API HTTP
+# 0006 — E-mail transacional atrás de `EmailService`, com provedores por API HTTP
 
 - **Status:** aceito
 - **Data:** 2026-11-09

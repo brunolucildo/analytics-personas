@@ -59,7 +59,7 @@ R1 a R9 da spec (critérios de aceite na spec §4 e §6).
 
 ## Arquivos previstos
 
-`apps/api/src/modules/email/**`, `apps/api/src/config/environment.ts` (+ spec), `apps/api/src/app.module.ts`, `apps/api/test/setup-env.ts`, `apps/api/test/email.int-spec.ts`, `.env.example`, `.docs/{ARCHITECTURE,DEVELOPMENT,QA}.md`, `.adrs/XXXX-0002-*.md`, spec e plano.
+`apps/api/src/modules/email/**`, `apps/api/src/config/environment.ts` (+ spec), `apps/api/src/app.module.ts`, `apps/api/test/setup-env.ts`, `apps/api/test/email.int-spec.ts`, `.env.example`, `.docs/{ARCHITECTURE,DEVELOPMENT,QA}.md`, `.adrs/0006-*.md`, spec e plano.
 
 ## Testes
 
