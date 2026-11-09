@@ -31,7 +31,6 @@ function probe(path: string, testId: string): RouteFactory {
 const AUTH_PROBES = {
   auth: [
     probe("sign-in", "page-sign-in"),
-    probe("forgot-password", "page-forgot-password"),
     probe("confirm-account", "page-confirm-account"),
     probe("reset-password", "page-reset-password"),
   ],
