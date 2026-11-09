@@ -163,7 +163,7 @@ Regras já aplicadas e que devem ser mantidas:
 
 ### 4.6 Autenticação e acesso a dados (`apps/api/src/modules/auth`, spec `0004`)
 
-Primeira fatia de produto e referência das próximas specs de auth (`0005` a `0010`). Identidade própria da API, sem Supabase Auth (ADR 0007); acesso ao banco por `supabase-js` com a service role e funções SQL por RPC (ADR do acesso a dados).
+Primeira fatia de produto e referência das próximas specs de auth (`0005` a `0010`). Identidade própria da API, sem Supabase Auth (ADR 0007); acesso ao banco por `supabase-js` com a service role e funções SQL por RPC (ADR 0008).
 
 | Camada           | Conteúdo                                                                                                                                                                              |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
