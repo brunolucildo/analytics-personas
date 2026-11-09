@@ -1,3 +1,4 @@
+import { SignOutButton } from "../features/auth/sign-out-button";
 import { useSession } from "../features/auth/use-session";
 
 /** Home of the signed-in area. `AppLayout` only renders it once the session is known. */
@@ -10,6 +11,7 @@ export function HomePage() {
         Welcome, {session.data?.user.firstName}
       </h1>
       <p className="text-lg text-muted-foreground">You are signed in.</p>
+      <SignOutButton />
     </main>
   );
 }

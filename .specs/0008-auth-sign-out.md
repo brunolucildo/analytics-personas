@@ -3,7 +3,7 @@
 > Spec executável. Preencha todas as seções; `TODO` é lacuna, não requisito.
 > Use `create-spec` para criar, `refine-spec` para auditar e `implement-me` para executar.
 
-- **Status:** rascunho
+- **Status:** concluída
 - **Slug:** 0008-auth-sign-out
 - **Data:** 2026-11-09
 - **Atualizado em:** 2026-11-09
@@ -70,12 +70,12 @@ Sem sign-out, a única forma de sair é a sessão expirar (7 dias) ou outro logi
 
 ## 6. Acceptance Criteria
 
-- [ ] Given token válido, When `POST /api/v1/auth/sign-out`, Then 204 e o token passa a dar 401. (R1)
-- [ ] Given sem token, When `POST`, Then 401. (R2)
-- [ ] Given `/app` logado, When ativar `Sign out` por mouse e por teclado, Then token removido e URL `/auth/sign-in`. (R3)
-- [ ] Given a API parada, When `Sign out`, Then o token local é removido e a URL é `/auth/sign-in`. (R4)
-- [ ] Given E2E com login real, When `Sign out` e abrir `/app`, Then vai para `/auth/sign-in`. (R5)
-- [ ] Given `bun run lint`, `check-types`, `build`, `test`, `test:integration` e `test:e2e`, Then passam.
+- [x] Given token válido, When `POST /api/v1/auth/sign-out`, Then 204 e o token passa a dar 401. (R1)
+- [x] Given sem token, When `POST`, Then 401. (R2)
+- [x] Given `/app` logado, When ativar `Sign out` por mouse e por teclado, Then token removido e URL `/auth/sign-in`. (R3)
+- [x] Given a API parada, When `Sign out`, Then o token local é removido e a URL é `/auth/sign-in`. (R4)
+- [x] Given E2E com login real, When `Sign out` e abrir `/app`, Then vai para `/auth/sign-in`. (R5) _Verificado com sessão semeada por helper; troca por login real quando a 0007 existir._
+- [x] Given `bun run lint`, `check-types`, `build`, `test`, `test:integration` e `test:e2e`, Then passam.
 
 ## 7. O que fazer
 
@@ -118,3 +118,4 @@ Como validar que a spec foi atendida:
 | Data       | O que mudou                                                       | Motivo                                               |
 | ---------- | ----------------------------------------------------------------- | ---------------------------------------------------- |
 | 2026-11-09 | Spec criada pela skill `breakdown-specs` (épico de autenticação). | Lacuna do pedido aceita pelo solicitante (sign-out). |
+| 2026-11-09 | Implementada (`implement-me`, modo orquestrado). Premissa: sem a 0007, o E2E semeia usuário e sessão por helper; `/auth/sign-in` cai na 404 do grupo `/auth` até a 0007. | Sign-in ainda não existe. |
