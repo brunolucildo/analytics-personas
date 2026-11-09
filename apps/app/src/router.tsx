@@ -7,7 +7,9 @@ import {
   redirect,
   type RouterHistory,
 } from "@tanstack/react-router";
+import { ConfirmAccountPage } from "./features/auth/confirm-account-page";
 import { ForgotPasswordPage } from "./features/auth/forgot-password-page";
+import { ResendConfirmationPage } from "./features/auth/resend-confirmation-page";
 import { SignUpPage } from "./features/auth/sign-up-page";
 import { getAccessToken } from "./lib/access-token";
 import { AppLayout } from "./routes/app-layout";
@@ -69,6 +71,18 @@ export function createAppRouter({ history, extraRoutes }: CreateAppRouterOptions
     component: ForgotPasswordPage,
   });
 
+  const confirmAccountRoute = createRoute({
+    getParentRoute: () => authRoute,
+    path: "confirm-account",
+    component: ConfirmAccountPage,
+  });
+
+  const resendConfirmationRoute = createRoute({
+    getParentRoute: () => authRoute,
+    path: "resend-confirmation",
+    component: ResendConfirmationPage,
+  });
+
   const homeRoute = createRoute({
     getParentRoute: () => appRoute,
     path: "/",
@@ -80,6 +94,8 @@ export function createAppRouter({ history, extraRoutes }: CreateAppRouterOptions
     authRoute.addChildren([
       signUpRoute,
       forgotPasswordRoute,
+      confirmAccountRoute,
+      resendConfirmationRoute,
       ...(extraRoutes?.auth?.map((create) => create(authRoute)) ?? []),
     ]),
     appRoute.addChildren([

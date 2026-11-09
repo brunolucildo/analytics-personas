@@ -13,7 +13,7 @@
 | Build                       | `apps/app/dist`, `apps/api/dist` e `apps/docs/.next`; passa        |
 | Testes unitários            | Vitest em `app` e `api`; passam                                    |
 | Testes de integração        | Vitest + Supertest em `api`, contra o Supabase local (exige `infra:up` e `db:migrate`); passa |
-| Testes E2E                  | Playwright (`home`, `routing`, `sign-up`, `forgot-password`, `session`, `sign-out`); sobe app e API (`capture`) e exige o Supabase local; passa |
+| Testes E2E                  | Playwright (`home`, `routing`, `sign-up`, `forgot-password`, `confirm-account`, `session`, `sign-out`); sobe app e API (`capture`) e exige o Supabase local; passa |
 | Cobertura                   | `bun run test:coverage` gera `coverage/`; sem threshold            |
 | Hooks de pre-commit         | Configurados (`lefthook.yml`); validados no commit raiz `227e0ad`  |
 | CI                          | Não configurado                                                    |
@@ -146,6 +146,22 @@ Executado no worktree da spec, em paralelo com a spec 0005 (outro worktree, mesm
 | `bun run test:e2e`         | Passa     | 11 testes (Chromium): home, 404, `sign-up` e `forgot-password` (formulário, e-mail inválido sem chamar a API, mensagem igual para os três casos e e-mail capturado só da conta confirmada) |
 
 Verificação manual de UI (`/auth/forgot-password`, Chromium via Playwright, vite em dev, `POST` interceptado com 202): 375 / 768 / 1280 px sem scroll horizontal (`scrollWidth` = largura da viewport, também com o erro de validação e com a mensagem de sucesso); um único `h1` (30px); `lang="en-US"`; ordem de Tab: e-mail, botão, link `Back to sign in`, todos com `:focus-visible` verdadeiro; alvos de toque: campo 44px, botão 48px, link 110×44px; console sem erro nem warning. O anel de foco usa as mesmas classes de `Input`, `Button` e do link da página de sign-up (medido na 0004); não foi medido de novo. **Não verificado:** leitor de tela (o `role="status"` é renderizado junto com a mensagem, não antes); contraste (mesmos tokens da 0004); Mailtrap real (só o provider `capture`).
+
+### 1.2 Spec `0006` (confirmar conta e reenviar confirmação), 2026-11-09
+
+| Gate                       | Resultado | Observação                                                                                                                                                                      |
+| -------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bun run lint`             | Passa     | 4 tasks, 0 warnings, 0 erros                                                                                                                                                    |
+| `bun run check-types`      | Passa     | 4 tasks                                                                                                                                                                         |
+| `bun run build`            | Passa     | `app`, `api` e `docs`                                                                                                                                                           |
+| `bun run test`             | Passa     | `api`: 263 testes (32 arquivos); `app`: 149 testes (15 arquivos), incluindo a chamada única sob StrictMode                                                                      |
+| `bun run test:integration` | Passa     | 153 testes; `auth-confirm-account` (36): R1 a R6 (token ruim de quatro tipos com o mesmo corpo e sem alterar linhas, concorrência 1x200 e 1x400, sessão A derrubada, 429, permissões) |
+| `bun run test:e2e`         | Passa     | 30 testes (Chromium), 5 novos em `confirm-account`: link de e-mail leva a `/app` e o mesmo link depois é inválido, link do cadastro, link sem token ou falso, reenvio invalida o link antigo |
+
+Os E2E de `confirm-account` semeiam a conta não confirmada pela API do Supabase (`e2e/support/confirmation.ts`) em vez de chamar `POST /auth/sign-up`: a política `sign-up` (5 por hora por IP) já é consumida pelos outros specs. O e-mail do link vem do reenvio, lido no provider `capture`.
+
+Verificação manual de UI (`/auth/confirm-account` e `/auth/resend-confirmation`, Chromium via Playwright, vite em dev, API interceptada): 375 / 768 / 1280 px sem scroll horizontal (`scrollWidth` = largura da viewport, também com o erro de validação e com a mensagem de sucesso); um único `h1` (30px); `lang="en-US"`; sem erro de console; ordem de Tab do reenvio: e-mail, botão, link `Back to sign in`, todos com `:focus-visible`; na página de link inválido o primeiro Tab cai em `Request a new confirmation email` (alvo de 256x44 px).
+
 
 ## 2. Pré-requisitos
 

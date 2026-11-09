@@ -3,7 +3,7 @@
 > Spec executável. Preencha todas as seções; `TODO` é lacuna, não requisito.
 > Use `create-spec` para criar, `refine-spec` para auditar e `implement-me` para executar.
 
-- **Status:** rascunho
+- **Status:** concluída (R1–R8 atendidos; gates verdes em 2026-11-09)
 - **Slug:** 0006-auth-confirm-account
 - **Data:** 2026-11-09
 - **Atualizado em:** 2026-11-09
@@ -77,15 +77,15 @@ O link do e-mail de cadastro (0004) aponta para `/auth/confirm-account?token=...
 
 ## 6. Acceptance Criteria
 
-- [ ] Given token válido, When `POST /api/v1/auth/confirm-account`, Then 200 com sessão, usuário confirmado e token usado. (R1)
-- [ ] Given token desconhecido, expirado, usado ou do tipo errado, When `POST`, Then 400 `TOKEN_INVALID_OR_EXPIRED` sem mudar dados. (R2)
-- [ ] Given duas requisições simultâneas, When mesmo token, Then uma 200 e outra 400. (R3)
-- [ ] Given sessão anterior A, When confirmar (sessão B), Then A → 401 e B → 200. (R4)
-- [ ] Given e-mails de conta não confirmada, confirmada e inexistente, When `POST resend-confirmation`, Then 202 `{}` idêntico nos três; e-mail enviado só no primeiro caso, com o link antigo invalidado. (R5)
-- [ ] Given excesso de requisições, When as políticas estouram, Then 429. (R6)
-- [ ] Given o E2E completo (sign-up → ler o e-mail capturado → abrir o link), When confirmar, Then a URL final é `/app` e a home mostra o nome; Given o mesmo link de novo, Then a tela de link inválido. (R7)
-- [ ] Given a página de reenvio, When enviar e-mails diferentes, Then a mensagem é idêntica. (R8)
-- [ ] Given `bun run lint`, `check-types`, `build`, `test`, `test:integration` e `test:e2e`, Then passam.
+- [x] Given token válido, When `POST /api/v1/auth/confirm-account`, Then 200 com sessão, usuário confirmado e token usado. (R1)
+- [x] Given token desconhecido, expirado, usado ou do tipo errado, When `POST`, Then 400 `TOKEN_INVALID_OR_EXPIRED` sem mudar dados. (R2)
+- [x] Given duas requisições simultâneas, When mesmo token, Then uma 200 e outra 400. (R3)
+- [x] Given sessão anterior A, When confirmar (sessão B), Then A → 401 e B → 200. (R4)
+- [x] Given e-mails de conta não confirmada, confirmada e inexistente, When `POST resend-confirmation`, Then 202 `{}` idêntico nos três; e-mail enviado só no primeiro caso, com o link antigo invalidado. (R5)
+- [x] Given excesso de requisições, When as políticas estouram, Then 429. (R6)
+- [x] Given o E2E completo (sign-up → ler o e-mail capturado → abrir o link), When confirmar, Then a URL final é `/app` e a home mostra o nome; Given o mesmo link de novo, Then a tela de link inválido. (R7) _(E2E: a conta não confirmada é semeada no banco e o e-mail vem do reenvio; ver §11)_
+- [x] Given a página de reenvio, When enviar e-mails diferentes, Then a mensagem é idêntica. (R8)
+- [x] Given `bun run lint`, `check-types`, `build`, `test`, `test:integration` e `test:e2e`, Then passam.
 
 ## 7. O que fazer
 
@@ -130,6 +130,9 @@ Como validar que a spec foi atendida:
 | Premissa: resposta de reenvio é a mesma para conta confirmada, não confirmada e inexistente.                        | Evita enumeração (o 409 do sign-up já revela existência: aceito). | Não             | Produto            |
 | Premissa: o tempo de resposta do reenvio não é equalizado, porque o e-mail é despachado em segundo plano.           | Diferença de tempo mínima.                                        | Não             | Time de engenharia |
 | Pergunta: o reenvio tem texto próprio ou usa o e-mail do 0004? Premissa: o mesmo template.                          | Conteúdo do e-mail.                                               | Não             | Produto            |
+| Premissa (implementação): a função SQL consome o token e confirma o e-mail numa transação; a sessão é aberta logo depois por `SessionService.issue`. Se isso falhar (banco fora do ar), a conta já está confirmada e a pessoa entra pelo sign-in (0007). | Nunca existe sessão sem token consumido; o inverso é possível e inofensivo. | Não | Time de engenharia |
+| Premissa (implementação): token de link ausente, vazio ou que não seja texto na URL cai no estado de link inválido, sem chamar a API. | Evita requisição inútil.                      | Não             | Time de engenharia |
+| Premissa (implementação): os E2E semeiam a conta não confirmada direto no banco, porque a política `sign-up` (5/hora por IP) já é consumida pelos outros specs; o e-mail do link vem do reenvio. | Cobertura de sign-up fica no E2E do 0004. | Não | Time de engenharia |
 
 ## 12. Refinamento
 
@@ -137,3 +140,4 @@ Como validar que a spec foi atendida:
 | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
 | 2026-11-09 | Spec criada pela skill `breakdown-specs` (épico de autenticação).                                                                                          | Capacidade "confirmar conta"; reenvio incluído por escolha do solicitante. |
 | 2026-11-09 | Transação do R1/R3 passa a ser função SQL chamada por RPC; e-mail do E2E lido pelo provider `capture`; ausência de e-mail de nova sessão passou a decisão. | Respostas do quiz de perguntas abertas.                                    |
+| 2026-11-09 | Implementada (`implement-me`): migration `20261109230000`, casos de uso, endpoints, páginas, testes e docs; premissas de implementação registradas em §11. | Execução da spec. |

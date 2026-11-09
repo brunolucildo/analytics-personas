@@ -6,3 +6,14 @@ export class EmailAlreadyRegisteredError extends Error {
     this.name = "EmailAlreadyRegisteredError";
   }
 }
+
+/**
+ * Raised when a link token is unknown, expired, already used or of another type. One error
+ * for every reason, so nothing downstream can tell them apart.
+ */
+export class InvalidConfirmationTokenError extends Error {
+  constructor() {
+    super("Invalid or expired confirmation token.");
+    this.name = "InvalidConfirmationTokenError";
+  }
+}
