@@ -67,6 +67,7 @@ apps/app/src/
 **`apps/app` (React + Vite):**
 
 - **TanStack Query** é o caminho para dados remotos (cache, mutations, estados de carregando/erro). O `QueryClientProvider` já envolve a árvore em `main.tsx`.
+- Rotas vivem em `src/router.tsx` (TanStack Router, rotas em código): páginas públicas são filhas do grupo `/auth`, páginas privadas do grupo `/app` (ver §13.1). Layouts e páginas de composição ficam em `src/routes/`.
 - Não use `useEffect` para carregar dado inicial; use query.
 - Componentes só apresentam; regra de negócio fica na API ou em funções puras testáveis.
 - Nunca coloque segredo, service role key ou token em código de cliente.
@@ -77,7 +78,7 @@ apps/app/src/
 
 - Server-first; `page.tsx` fina (composição e metadata).
 - Use `next/font` para fontes e `next/image` para imagens.
-- Defina `metadata` por rota e `lang="pt-BR"`.
+- Defina `metadata` por rota e `lang="en-US"` (ver §13).
 - Crie `loading.tsx` e `error.tsx` quando a rota tiver operação assíncrona relevante.
 
 ## 5. API (Nest.js)
@@ -170,3 +171,54 @@ Uma mudança só está pronta quando:
 - Copiar componente para "mudar só uma coisinha".
 - Deixar `console.log`, código morto ou template demo em produção.
 - Afirmar que um teste passou sem executá-lo.
+
+## 13. Convenções de API e idioma
+
+Definidas pela spec `0001-platform-routing-conventions` (ADRs `0003` e `0004`). Valem para todo código novo.
+
+### 13.1 Espaço de URLs
+
+| Zona                    | Prefixo     | Acesso                                                                   | Onde vive                                                               |
+| ----------------------- | ----------- | ------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
+| Páginas de autenticação | `/auth/*`   | Públicas                                                                 | Grupo `/auth` em `apps/app/src/router.tsx` (`AuthLayout`)               |
+| Páginas do produto      | `/app/*`    | Privadas (o guard chega com a spec `0005`; até lá `/app` está acessível) | Grupo `/app` em `apps/app/src/router.tsx` (`AppLayout`)                 |
+| API                     | `/api/v1/*` | Autenticação explícita, exceto `GET /api/v1/health`                      | `apps/api`; o prefixo é aplicado em `configureApp` (`src/bootstrap.ts`) |
+
+- `/` redireciona para `/app`; qualquer caminho sem rota mostra a página "Page not found".
+- Página nova entra como filha de `authRoute` ou de `appRoute`; nunca direto na raiz.
+- A API só serve `/api/v1/*`; fora dele responde 404 no envelope de erro. Uma `v2` exige ADR.
+
+### 13.2 Contratos da API
+
+- JSON em `camelCase`; colunas SQL em `snake_case`; datas em ISO 8601 UTC.
+- Todo erro segue o envelope abaixo, sem stack trace (a stack vai só para o log estruturado):
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_FAILED",
+    "message": "The request is invalid.",
+    "details": [{ "field": "email", "message": "email must be an email" }]
+  }
+}
+```
+
+| `code`              | HTTP | Quando                                                                    |
+| ------------------- | ---- | ------------------------------------------------------------------------- |
+| `VALIDATION_FAILED` | 400  | Payload inválido (DTO, campo extra, JSON malformado); `details` por campo |
+| `UNAUTHENTICATED`   | 401  | Sem sessão válida                                                         |
+| `FORBIDDEN`         | 403  | Sem permissão                                                             |
+| `NOT_FOUND`         | 404  | Rota ou recurso inexistente                                               |
+| `RATE_LIMITED`      | 429  | Limite de requisições excedido                                            |
+| `REQUEST_FAILED`    | 4xx  | Outro erro de cliente sem código próprio                                  |
+| `INTERNAL_ERROR`    | 500  | Falha inesperada                                                          |
+
+- Erros de domínio lançam `ApiException(status, code, message, details)` (`src/common/api-exception.ts`); o `AllExceptionsFilter` global os serializa. Cada spec acrescenta seus códigos (ex.: `EMAIL_ALREADY_REGISTERED`) em `UPPER_SNAKE_CASE`.
+- CORS: só a origem de `APP_URL` (obrigatória; a API não sobe sem uma URL `http(s)` válida). Métodos `GET/POST/PUT/PATCH/DELETE/OPTIONS`, headers `Authorization`, `Content-Type` e `X-Request-Id`; `X-Request-Id` e `Retry-After` são expostos ao browser. Origem diferente não recebe nenhum header CORS.
+
+### 13.3 Idioma
+
+- **en-US:** textos de interface, mensagens e códigos de erro da API, e-mails, rotas, identificadores, comentários e mensagens de log e de erro no código novo.
+- **pt-BR:** `.docs/`, specs, planos, ADRs e mensagens de commit.
+- Strings em pt-BR de código antigo migram quando o arquivo for alterado (hoje: `apps/app/src/lib/supabase.ts` e `apps/api/src/observability/telemetry.ts`).
+- Não há biblioteca de i18n; adotar uma (vários idiomas) exige decisão e ADR.

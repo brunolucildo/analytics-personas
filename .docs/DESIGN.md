@@ -106,13 +106,13 @@ Evite:
 - Todo input tem label associado; erros são anunciados e descritos em texto.
 - Imagens com `alt` significativo; decorativas com `alt=""`.
 - Não dependa de cor, posição ou forma isolada para comunicar estado.
-- `lang="pt-BR"` quando a interface do produto for implementada.
+- `lang="en-US"` em `apps/app` e `apps/docs` (decisão de 2026-11-09).
 
 ## 8. Conteúdo e tom
 
-- Idioma: **pt-BR**.
+- Idioma: **en-US** para interface, mensagens da API e e-mails; esta documentação segue em pt-BR.
 - Tom direto, técnico e futebolístico; evite jargão de marketing.
-- Datas no formato `dd/mm/aaaa`; números e moeda no padrão brasileiro.
+- Datas e números no padrão `en-US` na interface (ISO 8601 UTC nos contratos de API).
 - Não entregue `lorem ipsum`, placeholder ou texto de template em tela final.
 - Microcopy de erro deve dizer o que aconteceu e o que fazer em seguida.
 
@@ -133,7 +133,7 @@ Evite:
 | Paleta aplicada em tokens        | Sim (`packages/ui/src/styles.css`; `apps/docs/app/globals.css` repete uma parte em variáveis próprias) |
 | Fonte display                    | Não                                                                                                    |
 | Componentes no estilo 8-bit      | Parcial (`Button` com borda de 2px e sombra dura; demais primitivos não existem)                       |
-| `lang="pt-BR"`                   | Sim (`apps/app` e `apps/docs`)                                                                         |
+| `lang="en-US"`                   | Sim (`apps/app` e `apps/docs`)                                                                         |
 | Revisão de contraste             | Não                                                                                                    |
 | Testes de teclado/leitor de tela | Não                                                                                                    |
 

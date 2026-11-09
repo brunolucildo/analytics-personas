@@ -1,14 +1,38 @@
 import { randomUUID } from "node:crypto";
-import { ValidationPipe } from "@nestjs/common";
+import { type INestApplication, NotFoundException, ValidationPipe } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { NestFactory } from "@nestjs/core";
 import pinoHttp from "pino-http";
 import { AppModule } from "./app.module";
+import { AllExceptionsFilter, toErrorResponse } from "./common/all-exceptions.filter";
+import { createValidationException } from "./common/validation-exception";
+import type { Environment } from "./config/environment";
 import { baseLogger, StructuredLogger } from "./observability/logger";
 
-export async function createNestApp() {
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+export const API_PREFIX = "api/v1";
+
+/**
+ * Applies every HTTP-level convention (prefix, CORS, logging, validation and the
+ * error envelope). Shared by the real bootstrap and by integration tests.
+ */
+export function configureApp(app: INestApplication): INestApplication {
+  const appOrigin = app.get<ConfigService<Environment, true>>(ConfigService).get("appUrl", {
+    infer: true,
+  });
 
   app.useLogger(new StructuredLogger());
+  app.setGlobalPrefix(API_PREFIX);
+  app.enableCors({
+    // Callback form: any origin other than the app gets no CORS headers at all.
+    origin: (
+      requestOrigin: string | undefined,
+      callback: (error: Error | null, allow?: boolean) => void,
+    ) => callback(null, requestOrigin === appOrigin),
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Authorization", "Content-Type", "X-Request-Id"],
+    exposedHeaders: ["X-Request-Id", "Retry-After"],
+    maxAge: 600,
+  });
   app.use(
     pinoHttp({
       logger: baseLogger,
@@ -33,14 +57,40 @@ export async function createNestApp() {
       },
     }),
   );
+  // Nest only answers 404 under the global prefix; everything else would fall
+  // through to Express's HTML 404. Nothing is served outside the prefix.
+  app.use(
+    (
+      request: { path: string },
+      response: { status(code: number): { json(body: unknown): void } },
+      next: () => void,
+    ) => {
+      if (request.path === `/${API_PREFIX}` || request.path.startsWith(`/${API_PREFIX}/`)) {
+        next();
+        return;
+      }
+
+      const { status, body } = toErrorResponse(new NotFoundException());
+
+      response.status(status).json(body);
+    },
+  );
+  app.useGlobalFilters(new AllExceptionsFilter());
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
+      exceptionFactory: createValidationException,
     }),
   );
   app.enableShutdownHooks();
 
   return app;
+}
+
+export async function createNestApp() {
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+
+  return configureApp(app);
 }

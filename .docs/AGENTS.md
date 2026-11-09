@@ -8,7 +8,7 @@
 
 **Analytics Personas** é uma plataforma para criar, configurar e operar _experts_: agentes de IA especializados em funções de um clube de futebol (Head Coach, Analista de Desempenho, Jurídico Esportivo, Fisiologista etc.). Os experts consomem dados de conectores externos (Notion, Google Drive, PDF, Markdown, Confluence, Jira, Linear, ClickUp, Google Docs, Google Sheets) para produzir análises sob demanda.
 
-**Estado atual:** fundação técnica pronta (spec `0000-foundation`). O monorepo Turborepo tem um cliente React + Vite (`apps/app`), uma API Nest.js (`apps/api`), o site de docs em Next.js (`apps/docs`) e o design system (`packages/ui`), com Supabase local, observabilidade Grafana LGTM e testes unitário, de integração e E2E. **Ainda não existem** features de produto, modelo de dados, autenticação, ingestão de conectores, agentes nem CI. Não trate a arquitetura-alvo como se já estivesse implementada.
+**Estado atual:** fundação técnica pronta (spec `0000-foundation`). O monorepo Turborepo tem um cliente React + Vite (`apps/app`), uma API Nest.js (`apps/api`), o site de docs em Next.js (`apps/docs`) e o design system (`packages/ui`), com Supabase local, observabilidade Grafana LGTM e testes unitário, de integração e E2E. O espaço de URLs (`/api/v1/*`, `/auth/*`, `/app/*`) e o idioma en-US estão definidos em `DEVELOPMENT.md` §13 (spec `0001`). **Ainda não existem** features de produto, modelo de dados, autenticação, ingestão de conectores, agentes nem CI. Não trate a arquitetura-alvo como se já estivesse implementada.
 
 ## 2. Leia antes de trabalhar
 
@@ -18,6 +18,7 @@
 | tocar em estrutura, apps, pacotes ou stack  | `ARCHITECTURE.md`                |
 | criar ou alterar UI                         | `DESIGN.md` + `DESIGN_SYSTEM.md` |
 | escrever qualquer código                    | `DEVELOPMENT.md`                 |
+| criar rota, endpoint ou texto de interface  | `DEVELOPMENT.md` §13             |
 | validar uma entrega                         | `QA.md`                          |
 | iniciar uma tarefa ou finalizar uma entrega | `RULES.md`                       |
 
@@ -112,7 +113,7 @@ e2e/                        # testes Playwright
 .docs/                      # documentação canônica do projeto
 .specs/                     # specs executáveis (_template.md + <slug>.md)
 .plans/                     # planos de implementação (<slug>-plan.md)
-.adrs/                      # Architecture Decision Records (0001, 0002)
+.adrs/                      # Architecture Decision Records (0001 a 0004)
 ```
 
 `apps/docs` (site Next.js) **não é** o mesmo que `.docs/` (Markdown canônico).

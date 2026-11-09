@@ -1,6 +1,6 @@
 ---
 name: breakdown-specs
-description: Breaks a large prompt, epic, or multi-feature request into several small, ordered, independently implementable specs in .specs/, creating each one with create-spec. Use this skill whenever the user says "breakdown-specs", "quebrar em specs", "dividir em specs", "quebrar o prompt", "quebrar essa feature", "decompor em specs", "fatiar a feature", "épico em specs", "várias specs", "roadmap de specs", or hands over a request that bundles more than one capability (e.g. authentication with sign-in, sign-up, confirm-account and forgot-password; a CRUD of products or users; a set of connectors)—even if they do not mention the skill by name. Produces a breakdown map plus N specs, one feature per spec; does not write a plan or code. For a single, small capability use create-spec directly.
+description: Breaks a large prompt, epic, or multi-feature request into several small, ordered, independently implementable specs in .specs/, creating each one with create-spec. Use this skill whenever the user says "breakdown-specs", "quebrar em specs", "dividir em specs", "quebrar o prompt", "quebrar essa feature", "decompor em specs", "fatiar a feature", "épico em specs", "várias specs", "roadmap de specs", or hands over a request that bundles more than one capability (e.g. authentication with sign-in, sign-up, confirm-account and forgot-password; a CRUD of products or users; a set of connectors)—even if they do not mention the skill by name. Produces a breakdown map plus N specs, one feature per spec; creates the map and all specs in one run by default, stopping only for blocking or irreversible decisions; does not write a plan or code. For a single, small capability use create-spec directly.
 ---
 
 # Breakdown Specs
@@ -33,7 +33,7 @@ Leia, nesta ordem, o que existir:
 
 ## 2. Entender o pedido e as decisões transversais
 
-Produza um **pré-mapa de 5–10 linhas** e peça correção:
+Produza um **pré-mapa de 5–10 linhas** e registre as premissas no mapa final:
 
 ```markdown
 Entendi que:
@@ -47,7 +47,7 @@ Entendi que:
 - Dúvida principal: ...
 ```
 
-Pergunte: “O que está errado ou faltando nesse resumo?”.
+Não pare para confirmação por padrão. Pergunte apenas o que for **bloqueante ou irreversível** (ex.: provedor de auth, modelo de dados compartilhado, permissões, retenção). Se a pessoa não estiver disponível, proponha um default conservador e marque como premissa.
 
 Depois, entreviste **uma vez, no nível do épico** (uma rodada por tema, no máximo 5 perguntas, explicando em uma frase por que a resposta muda o corte). Pergunte só o que **muda onde cortar** ou o que **vale para todas as specs**:
 
@@ -102,9 +102,9 @@ Permissões, auditoria, rate limit, e-mails transacionais, logs sem PII, i18n e 
 
 Os padrões da referência são **ponto de partida, não checklist**. Capacidade comum que o prompt não pediu (ex.: MFA, login social) vai para **Backlog / candidatas não criadas** no mapa, com uma linha de justificativa, e a pessoa decide. Não invente spec para preencher catálogo.
 
-## 4. Mapa de quebra e aprovação
+## 4. Mapa de quebra
 
-Antes de criar qualquer spec, apresente o mapa e peça aprovação:
+Antes de criar as specs, monte o mapa:
 
 ```markdown
 ## Mapa de quebra — <épico>
@@ -118,7 +118,7 @@ Backlog (não criadas): ...
 Decisões compartilhadas: ...
 ```
 
-Pergunte: “O que você quer mover, juntar, dividir ou remover?”. **Só avance com aprovação explícita.** Se o mapa passar de **~10 specs**, proponha fases (marcos) e crie só a primeira fase agora; as demais ficam como backlog no mapa.
+Por padrão, **siga direto para a criação das specs na mesma execução** — o mapa é o registro do corte, não uma parada obrigatória. Só pare para confirmação se houver **decisão bloqueante/irreversível** ou se o mapa passar de **~10 specs**; nesse caso, proponha fases (marcos), crie só a primeira fase agora e deixe as demais como backlog no mapa.
 
 ## 5. Reservar números e arquivos
 
@@ -177,7 +177,7 @@ Salve `.plans/<epic>-breakdown.md` (crie `.plans/` se não existir; `<epic>` em 
 
 - **Épico:** <epic>
 - **Data:** aaaa-mm-dd
-- **Status:** mapa aprovado | specs criadas | em implementação | concluído
+- **Status:** mapa criado | specs criadas | em implementação | concluído
 - **Prompt original:** <resumo fiel, com o texto-chave citado>
 
 ## 1. Objetivo
@@ -233,7 +233,7 @@ Próximo passo: refine-spec <slug> nas em rascunho; depois implement-me <primeir
 ## Guardrails
 
 - Não implemente código, não crie plano de implementação e não rode `commit-and-push` nesta skill.
-- Não crie specs antes de o mapa ser aprovado.
+- Crie o mapa e as specs na mesma execução; só pare em decisão bloqueante/irreversível ou quando o mapa passar de ~10 specs.
 - Não sobrescreva spec existente nem renumere specs que já existem.
 - Não corte por camada técnica; corte por capacidade.
 - Não fragmente demais: spec sem critério de aceite próprio é detalhe de outra spec.

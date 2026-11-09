@@ -145,10 +145,10 @@ Próximo passo: refine-spec <slug> para auditar, feature-concept para planejar o
 
 ## 8. Modo lote (chamada por `breakdown-specs`)
 
-Quando a entrada vier de `breakdown-specs` (começa com `create-spec — modo lote`), o épico já foi entendido, entrevistado e aprovado. Então:
+Quando a entrada vier de `breakdown-specs` (começa com `create-spec — modo lote`), o épico já foi entendido e o mapa já foi definido; as premissas estão registradas. Então:
 
 1. **Arquivo e slug:** use exatamente o `Arquivo` do brief; o número e o slug já estão reservados. Pule §1, exceto verificar que o alvo está vazio ou não existe.
-2. **Pré-spec e entrevista:** o brief é o pré-spec já confirmado (§3). Pule a confirmação e a entrevista do épico. Em §4, pergunte **apenas** o que é específico desta spec e bloqueante; o resto vira premissa.
+2. **Pré-spec e entrevista:** o brief é o pré-spec já definido (§3). Pule a confirmação e a entrevista do épico. Em §4, pergunte **apenas** o que é específico desta spec e bloqueante; o resto vira premissa.
 3. **Decisões compartilhadas:** copie-as para a spec como requisitos ou premissas. Não as reabra nem as contradiga; se achar que uma está errada, levante como pergunta ao `breakdown-specs`.
 4. **Escopo:** em “Fora do escopo”, cite pelo número as specs vizinhas que cobrem o que esta exclui. Em “Relacionados”, liste o mapa do épico e as specs de que depende.
 5. **Mudança de corte:** se descobrir que a capacidade é grande demais, pequena demais ou depende de algo fora do mapa, pare e devolva o achado em vez de resolver sozinha.

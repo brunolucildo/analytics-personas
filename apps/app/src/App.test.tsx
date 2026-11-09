@@ -1,11 +1,17 @@
+import { createMemoryHistory } from "@tanstack/react-router";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { App } from "./App";
+import { createAppRouter } from "./router";
 
 describe("App", () => {
-  it("renderiza o título Hello World", () => {
-    render(<App />);
+  it("renders the route matched by the router it receives", async () => {
+    const router = createAppRouter({
+      history: createMemoryHistory({ initialEntries: ["/app"] }),
+    });
 
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Hello World");
+    render(<App router={router} />);
+
+    expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("Hello World");
   });
 });
