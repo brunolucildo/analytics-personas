@@ -8,6 +8,7 @@ import { ConfirmAccount } from "./application/confirm-account";
 import { RequestPasswordReset } from "./application/request-password-reset";
 import { ResendConfirmation } from "./application/resend-confirmation";
 import { SessionService } from "./application/session.service";
+import { SignIn } from "./application/sign-in";
 import { SignOut } from "./application/sign-out";
 import { SignUp } from "./application/sign-up";
 import type {
@@ -19,21 +20,32 @@ import type {
 import type { ConfirmationRepository } from "./domain/confirm-account-ports";
 import type { PasswordResetMailer, PasswordResetRepository } from "./domain/password-reset-ports";
 import type { AccessTokenSigner, SessionRepository } from "./domain/session-ports";
+import type {
+  CredentialsRepository,
+  NewSessionMailer,
+  PasswordVerifier,
+} from "./domain/sign-in-ports";
 import {
   CONFIRMATION_MAILER,
   CONFIRMATION_REPOSITORY,
+  CREDENTIALS_REPOSITORY,
+  NEW_SESSION_MAILER,
   PASSWORD_HASHER,
   PASSWORD_RESET_MAILER,
   PASSWORD_RESET_REPOSITORY,
+  PASSWORD_VERIFIER,
   SUPABASE_ADMIN_CLIENT,
   TOKEN_GENERATOR,
   USER_REPOSITORY,
 } from "./auth.tokens";
 import { ACCESS_TOKEN_SIGNER, SESSION_REPOSITORY } from "./session.tokens";
 import { Argon2PasswordHasher } from "./infrastructure/argon2-password-hasher";
+import { Argon2PasswordVerifier } from "./infrastructure/argon2-password-verifier";
 import { CryptoTokenGenerator, hashToken } from "./infrastructure/crypto-token-generator";
 import { EmailServiceConfirmationMailer } from "./infrastructure/email-service-confirmation-mailer";
+import { EmailServiceNewSessionMailer } from "./infrastructure/email-service-new-session-mailer";
 import { EmailServicePasswordResetMailer } from "./infrastructure/email-service-password-reset-mailer";
+import { SupabaseCredentialsRepository } from "./infrastructure/supabase-credentials.repository";
 import { SupabaseConfirmationRepository } from "./infrastructure/supabase-confirmation.repository";
 import { SupabasePasswordResetRepository } from "./infrastructure/supabase-password-reset.repository";
 import { JoseAccessTokenSigner } from "./infrastructure/jose-access-token-signer";
@@ -145,6 +157,29 @@ import { AuthGuard } from "./interface/auth.guard";
       inject: [CONFIRMATION_REPOSITORY, SessionService],
       useFactory: (confirmations: ConfirmationRepository, sessions: SessionService) =>
         new ConfirmAccount(confirmations, sessions, hashToken),
+    },
+    {
+      provide: CREDENTIALS_REPOSITORY,
+      inject: [SUPABASE_ADMIN_CLIENT],
+      useFactory: (client: ConstructorParameters<typeof SupabaseCredentialsRepository>[0]) =>
+        new SupabaseCredentialsRepository(client),
+    },
+    { provide: PASSWORD_VERIFIER, useClass: Argon2PasswordVerifier },
+    {
+      provide: NEW_SESSION_MAILER,
+      inject: [EmailService, ConfigService],
+      useFactory: (emails: EmailService, config: ConfigService<Environment, true>) =>
+        new EmailServiceNewSessionMailer(emails, config.get("appUrl", { infer: true })),
+    },
+    {
+      provide: SignIn,
+      inject: [CREDENTIALS_REPOSITORY, PASSWORD_VERIFIER, SessionService, NEW_SESSION_MAILER],
+      useFactory: (
+        credentials: CredentialsRepository,
+        verifier: PasswordVerifier,
+        sessions: SessionService,
+        mailer: NewSessionMailer,
+      ) => new SignIn(credentials, verifier, sessions, mailer),
     },
     // Global guard: closes every route that is not `@Public()`. It is registered here, after
     // `RateLimitModule` in `AppModule`, so the rate limit still runs before authentication.

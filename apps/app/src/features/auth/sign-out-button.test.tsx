@@ -72,7 +72,13 @@ describe("the Sign out button on the home (R3)", () => {
     expect(call?.[1].method).toBe("POST");
     expect(call?.[1].headers).toMatchObject({ authorization: `Bearer ${TOKEN}` });
     expect(window.localStorage.getItem(ACCESS_TOKEN_KEY)).toBeNull();
-    expect(queryClient.getQueryCache().getAll()).toHaveLength(0);
+    // The sign-in page (spec 0007) mounts `useSession` on a disabled query: no data is what matters.
+    expect(
+      queryClient
+        .getQueryCache()
+        .getAll()
+        .filter((query) => query.state.data !== undefined),
+    ).toHaveLength(0);
     expect(screen.queryByText(/Welcome/)).not.toBeInTheDocument();
   });
 
@@ -136,7 +142,13 @@ describe("signing out when the API fails (R4)", () => {
 
     await waitFor(() => expect(router.state.location.pathname).toBe("/auth/sign-in"));
     expect(window.localStorage.getItem(ACCESS_TOKEN_KEY)).toBeNull();
-    expect(queryClient.getQueryCache().getAll()).toHaveLength(0);
+    // The sign-in page (spec 0007) mounts `useSession` on a disabled query: no data is what matters.
+    expect(
+      queryClient
+        .getQueryCache()
+        .getAll()
+        .filter((query) => query.state.data !== undefined),
+    ).toHaveLength(0);
     expect(screen.queryByText(/Welcome/)).not.toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });

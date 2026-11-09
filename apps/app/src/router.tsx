@@ -10,6 +10,7 @@ import {
 import { ConfirmAccountPage } from "./features/auth/confirm-account-page";
 import { ForgotPasswordPage } from "./features/auth/forgot-password-page";
 import { ResendConfirmationPage } from "./features/auth/resend-confirmation-page";
+import { SignInPage } from "./features/auth/sign-in-page";
 import { SignUpPage } from "./features/auth/sign-up-page";
 import { getAccessToken } from "./lib/access-token";
 import { AppLayout } from "./routes/app-layout";
@@ -59,6 +60,12 @@ export function createAppRouter({ history, extraRoutes }: CreateAppRouterOptions
     component: AppLayout,
   });
 
+  const signInRoute = createRoute({
+    getParentRoute: () => authRoute,
+    path: "sign-in",
+    component: SignInPage,
+  });
+
   const signUpRoute = createRoute({
     getParentRoute: () => authRoute,
     path: "sign-up",
@@ -92,6 +99,7 @@ export function createAppRouter({ history, extraRoutes }: CreateAppRouterOptions
   const routeTree = rootRoute.addChildren([
     indexRoute,
     authRoute.addChildren([
+      signInRoute,
       signUpRoute,
       forgotPasswordRoute,
       confirmAccountRoute,

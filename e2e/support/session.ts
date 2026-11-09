@@ -54,7 +54,7 @@ function base64Url(value: string): string {
 /**
  * Starts a session for the user the way the API does (the `auth_issue_session` function, which
  * revokes the previous one) and signs the matching HS256 token with the secret the API under
- * test runs with. There is no sign-in flow to call yet.
+ * test runs with, so the test needs no sign-in call (and no password).
  */
 export async function issueAccessToken(userId: string): Promise<string> {
   const issuedAt = Math.floor(Date.now() / 1000);

@@ -3,9 +3,8 @@ import { ACCESS_TOKEN_KEY, seedSignedInUser } from "./support/session";
 
 const API_URL = `${process.env.E2E_API_URL ?? "http://localhost:3002"}/api/v1`;
 
-// Premise: there is no sign-in flow yet (spec 0007), so these tests start from a seeded
-// user and a session issued the way the API does (`auth_issue_session`), like `session.spec.ts`.
-// Once 0007 exists, `seedSignedInUser` can be replaced by a real sign-in without changing the rest.
+// These tests start from a seeded user and a session issued the way the API does
+// (`auth_issue_session`), like `session.spec.ts`; the real sign-in is covered by `sign-in.spec.ts`.
 
 /** Puts a token in localStorage before any page script runs. */
 async function storeToken(page: Page, token: string) {

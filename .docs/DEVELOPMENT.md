@@ -90,7 +90,7 @@ apps/app/src/
 - Erros de domínio são mapeados para HTTP na camada de interface; não vaze stack trace.
 - Nenhum acesso direto ao Supabase dentro do controller.
 - Toda integração externa tem timeout, retry limitado e erro tipado.
-- **A API é fechada por padrão:** um `AuthGuard` global exige sessão em todo endpoint; só `@Public()` (`src/common/public.decorator.ts`) abre uma rota (hoje: `GET /api/v1/health`, `POST /api/v1/auth/sign-up` e `/test-support/emails`, que já é 404 fora do `capture`). Endpoint novo não precisa de nada para ser protegido; para ler a pessoa logada use `@CurrentSession()` (ver §13.5). Autorização além da sessão (papéis) fica explícita no caso de uso.
+- **A API é fechada por padrão:** um `AuthGuard` global exige sessão em todo endpoint; só `@Public()` (`src/common/public.decorator.ts`) abre uma rota (hoje: `GET /api/v1/health`, `POST /api/v1/auth/sign-up`, `POST /api/v1/auth/sign-in` e `/test-support/emails`, que já é 404 fora do `capture`). Endpoint novo não precisa de nada para ser protegido; para ler a pessoa logada use `@CurrentSession()` (ver §13.5). Autorização além da sessão (papéis) fica explícita no caso de uso.
 - E-mail sai só por `EmailService` (`apps/api/src/modules/email`): o caso de uso chama `dispatch` **depois do commit**, para que falha do provedor não mude o resultado do request; use `send` só quando precisar do erro. Monte o corpo com `renderEmailLayout` e a tag `html` (ela escapa valores dinâmicos). Nunca importe SDK ou cliente de provedor fora do módulo `email` nem logue destinatário, assunto, corpo, link ou token.
 
 ## 6. Dados (PostgreSQL/Supabase)
@@ -144,7 +144,7 @@ Regras:
 - Teste que envolve e-mail roda com `EMAIL_PROVIDER=capture` (já definido em `setup-env.ts`) e lê as mensagens com `getCapturedEmails({ to })`; um processo separado (E2E) usa `GET /api/v1/test-support/emails?to=<endereço>` e `DELETE` no mesmo caminho para limpar. Nenhum teste envia e-mail real nem chama Mailtrap ou Resend.
 - Teste de integração roda contra o **Supabase local** (`bun run infra:up` e `bun run db:migrate` antes): a `globalSetup` (`apps/api/test/support/global-setup.ts`) lê as chaves de `supabase status -o env` quando não estão no ambiente e falha com a instrução se o banco não estiver no ar. Use e-mails únicos (`uniqueEmail` de `test/support/supabase.ts`) e apague o que criou (`deleteUsersByEmail`); o banco é compartilhado. Teste unitário usa os fakes de `test/support/in-memory-auth.ts`.
 - Testes de `AppModule` que sobrescrevem o `ConfigService` com um objeto fake precisam incluir `email`, `supabaseUrl`, `supabaseServiceRoleKey` e `authJwtSecret` (exemplo em `apps/api/test/rate-limit.int-spec.ts`). `AUTH_JWT_SECRET` fictícia vem de `apps/api/test/setup-env.ts`.
-- Rota de teste declarada num módulo de teste (`controllers: [Probe]`) é fechada como qualquer outra: marque com `@Public()` quando o teste não for de autenticação, ou use um token de `SessionService.issue` (ver `apps/api/test/auth-sessions.int-spec.ts`). Para semear um usuário confirmado sem passar por sign-up/sign-in use `seedConfirmedUser` de `apps/api/test/support/sessions.ts`; no E2E, `seedSignedInUser` de `e2e/support/session.ts` (usuários `e2e-session-*`, apagados no `globalTeardown`).
+- Rota de teste declarada num módulo de teste (`controllers: [Probe]`) é fechada como qualquer outra: marque com `@Public()` quando o teste não for de autenticação, ou use um token de `SessionService.issue` (ver `apps/api/test/auth-sessions.int-spec.ts`). Para semear um usuário confirmado sem passar por sign-up/sign-in use `seedConfirmedUser` de `apps/api/test/support/sessions.ts`; no E2E, `seedSignedInUser` de `e2e/support/session.ts` (usuários `e2e-session-*`, apagados no `globalTeardown`). Quando o teste precisa **entrar de verdade** (sign-in), a senha precisa ter hash Argon2id real: no integration, `argon2.hash` no `beforeAll` (ver `apps/api/test/auth-sign-in.int-spec.ts`); no E2E, `seedUserWithPassword` de `e2e/support/credentials.ts` (hash fixo da senha de teste `SEEDED_PASSWORD`, conta confirmada ou não). Cuidado com a cota de `POST /auth/sign-up` (5 por hora por IP, compartilhada por todos os specs de uma execução do Playwright): semeie a conta em vez de cadastrar. O e-mail de teste tem de caber no limite de 64 caracteres da parte local do `IsEmail` (rótulo curto).
 - No SPA, `renderApp` de `apps/app/src/test/render-app.tsx` monta router e `QueryClient` como o `main.tsx`; use `stubSessionFetch` para responder `GET /auth/session` e grave o token em `localStorage` (`access_token`).
 
 ## 10. Dependências
@@ -189,15 +189,15 @@ Definidas pela spec `0001-platform-routing-conventions` (ADRs `0003` e `0004`). 
 
 ### 13.1 Espaço de URLs
 
-| Zona                    | Prefixo     | Acesso                                                                   | Onde vive                                                               |
-| ----------------------- | ----------- | ------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
-| Páginas de autenticação | `/auth/*`   | Públicas                                                                 | Grupo `/auth` em `apps/app/src/router.tsx` (`AuthLayout`)               |
-| Páginas do produto      | `/app/*`    | Privadas: exigem sessão (guard da spec `0005`, ver §13.5)                | Grupo `/app` em `apps/app/src/router.tsx` (`AppLayout`)                 |
-| API                     | `/api/v1/*` | Autenticação explícita, exceto `GET /api/v1/health`                      | `apps/api`; o prefixo é aplicado em `configureApp` (`src/bootstrap.ts`) |
+| Zona                    | Prefixo     | Acesso                                                    | Onde vive                                                               |
+| ----------------------- | ----------- | --------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Páginas de autenticação | `/auth/*`   | Públicas                                                  | Grupo `/auth` em `apps/app/src/router.tsx` (`AuthLayout`)               |
+| Páginas do produto      | `/app/*`    | Privadas: exigem sessão (guard da spec `0005`, ver §13.5) | Grupo `/app` em `apps/app/src/router.tsx` (`AppLayout`)                 |
+| API                     | `/api/v1/*` | Autenticação explícita, exceto `GET /api/v1/health`       | `apps/api`; o prefixo é aplicado em `configureApp` (`src/bootstrap.ts`) |
 
 - `/` redireciona para `/app` (e, sem sessão, `/app` para `/auth/sign-in`); qualquer caminho sem rota mostra a página "Page not found".
 - Página nova entra como filha de `authRoute` ou de `appRoute`; nunca direto na raiz.
-- Páginas de autenticação existentes: `/auth/sign-up` (0004), `/auth/forgot-password` (0009), `/auth/confirm-account` e `/auth/resend-confirmation` (0006). A rota `/auth/sign-in`, para a qual apontam, chega na spec `0007`. A confirmação é um `POST` disparado pela página (nunca um `GET`), uma única vez por visita.
+- Páginas de autenticação existentes: `/auth/sign-in` (0007), `/auth/sign-up` (0004), `/auth/forgot-password` (0009), `/auth/confirm-account` e `/auth/resend-confirmation` (0006). A confirmação é um `POST` disparado pela página (nunca um `GET`), uma única vez por visita.
 - A API só serve `/api/v1/*`; fora dele responde 404 no envelope de erro. Uma `v2` exige ADR.
 
 ### 13.2 Contratos da API

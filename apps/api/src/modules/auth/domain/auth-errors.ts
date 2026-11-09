@@ -17,3 +17,22 @@ export class InvalidConfirmationTokenError extends Error {
     this.name = "InvalidConfirmationTokenError";
   }
 }
+
+/**
+ * Raised when the e-mail has no account or the password is wrong. One error for both, so
+ * nothing downstream can tell them apart.
+ */
+export class InvalidCredentialsError extends Error {
+  constructor() {
+    super("Invalid email or password.");
+    this.name = "InvalidCredentialsError";
+  }
+}
+
+/** Raised when the password is right but the e-mail address was never confirmed. */
+export class EmailNotConfirmedError extends Error {
+  constructor() {
+    super("Email not confirmed.");
+    this.name = "EmailNotConfirmedError";
+  }
+}

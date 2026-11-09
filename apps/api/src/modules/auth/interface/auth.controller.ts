@@ -4,10 +4,16 @@ import { Public } from "../../../common/public.decorator";
 import { RateLimit } from "../../rate-limit";
 import { ConfirmAccount } from "../application/confirm-account";
 import { RequestPasswordReset } from "../application/request-password-reset";
+import { SignIn } from "../application/sign-in";
 import { SignOut } from "../application/sign-out";
 import { ResendConfirmation } from "../application/resend-confirmation";
 import { SignUp } from "../application/sign-up";
-import { EmailAlreadyRegisteredError, InvalidConfirmationTokenError } from "../domain/auth-errors";
+import {
+  EmailAlreadyRegisteredError,
+  EmailNotConfirmedError,
+  InvalidConfirmationTokenError,
+  InvalidCredentialsError,
+} from "../domain/auth-errors";
 import { ConfirmAccountDto } from "./confirm-account.dto";
 import { ResendConfirmationDto } from "./resend-confirmation.dto";
 import { ForgotPasswordDto } from "./forgot-password.dto";
@@ -19,6 +25,7 @@ import {
   type SessionResponse,
   type UserResponse,
 } from "./session.presenter";
+import { SignInDto } from "./sign-in.dto";
 import { SignUpDto } from "./sign-up.dto";
 
 @Controller("auth")
@@ -26,6 +33,7 @@ export class AuthController {
   constructor(
     @Inject(SignUp) private readonly signUp: SignUp,
     @Inject(RequestPasswordReset) private readonly requestPasswordReset: RequestPasswordReset,
+    @Inject(SignIn) private readonly signInUseCase: SignIn,
     @Inject(SignOut) private readonly signOut: SignOut,
     @Inject(ConfirmAccount) private readonly confirmAccountUseCase: ConfirmAccount,
     @Inject(ResendConfirmation) private readonly resendConfirmationUseCase: ResendConfirmation,
@@ -70,6 +78,41 @@ export class AuthController {
     await this.requestPasswordReset.execute({ email: body.email });
 
     return {};
+  }
+
+  /**
+   * Opens a session with e-mail and password. A missing account and a wrong password end the
+   * same way (401 `INVALID_CREDENTIALS`); the account is only said to be unconfirmed (403) to
+   * someone who proved they know the password. A new session revokes the previous one.
+   */
+  @Post("sign-in")
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @RateLimit("sign-in")
+  async signInAccount(@Body() body: SignInDto): Promise<SessionResponse> {
+    try {
+      return presentSession(
+        await this.signInUseCase.execute({ email: body.email, password: body.password }),
+      );
+    } catch (error) {
+      if (error instanceof InvalidCredentialsError) {
+        throw new ApiException(
+          HttpStatus.UNAUTHORIZED,
+          "INVALID_CREDENTIALS",
+          "Invalid email or password.",
+        );
+      }
+
+      if (error instanceof EmailNotConfirmedError) {
+        throw new ApiException(
+          HttpStatus.FORBIDDEN,
+          "EMAIL_NOT_CONFIRMED",
+          "Confirm your email to sign in.",
+        );
+      }
+
+      throw error;
+    }
   }
 
   /**
