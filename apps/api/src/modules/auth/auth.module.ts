@@ -4,7 +4,9 @@ import { ConfigService } from "@nestjs/config";
 import { APP_GUARD } from "@nestjs/core";
 import type { Environment } from "../../config/environment";
 import { EmailModule, EmailService } from "../email";
+import { ConfirmAccount } from "./application/confirm-account";
 import { RequestPasswordReset } from "./application/request-password-reset";
+import { ResendConfirmation } from "./application/resend-confirmation";
 import { SessionService } from "./application/session.service";
 import { SignUp } from "./application/sign-up";
 import type {
@@ -13,10 +15,12 @@ import type {
   TokenGenerator,
   UserRepository,
 } from "./domain/auth-ports";
+import type { ConfirmationRepository } from "./domain/confirm-account-ports";
 import type { PasswordResetMailer, PasswordResetRepository } from "./domain/password-reset-ports";
 import type { AccessTokenSigner, SessionRepository } from "./domain/session-ports";
 import {
   CONFIRMATION_MAILER,
+  CONFIRMATION_REPOSITORY,
   PASSWORD_HASHER,
   PASSWORD_RESET_MAILER,
   PASSWORD_RESET_REPOSITORY,
@@ -26,9 +30,10 @@ import {
 } from "./auth.tokens";
 import { ACCESS_TOKEN_SIGNER, SESSION_REPOSITORY } from "./session.tokens";
 import { Argon2PasswordHasher } from "./infrastructure/argon2-password-hasher";
-import { CryptoTokenGenerator } from "./infrastructure/crypto-token-generator";
+import { CryptoTokenGenerator, hashToken } from "./infrastructure/crypto-token-generator";
 import { EmailServiceConfirmationMailer } from "./infrastructure/email-service-confirmation-mailer";
 import { EmailServicePasswordResetMailer } from "./infrastructure/email-service-password-reset-mailer";
+import { SupabaseConfirmationRepository } from "./infrastructure/supabase-confirmation.repository";
 import { SupabasePasswordResetRepository } from "./infrastructure/supabase-password-reset.repository";
 import { JoseAccessTokenSigner } from "./infrastructure/jose-access-token-signer";
 import { SupabaseSessionRepository } from "./infrastructure/supabase-session.repository";
@@ -113,6 +118,27 @@ import { AuthGuard } from "./interface/auth.guard";
       inject: [SESSION_REPOSITORY, ACCESS_TOKEN_SIGNER],
       useFactory: (sessions: SessionRepository, signer: AccessTokenSigner) =>
         new SessionService(sessions, signer),
+    },
+    {
+      provide: CONFIRMATION_REPOSITORY,
+      inject: [SUPABASE_ADMIN_CLIENT],
+      useFactory: (client: ConstructorParameters<typeof SupabaseConfirmationRepository>[0]) =>
+        new SupabaseConfirmationRepository(client),
+    },
+    {
+      provide: ResendConfirmation,
+      inject: [CONFIRMATION_REPOSITORY, TOKEN_GENERATOR, CONFIRMATION_MAILER],
+      useFactory: (
+        confirmations: ConfirmationRepository,
+        tokens: TokenGenerator,
+        mailer: ConfirmationMailer,
+      ) => new ResendConfirmation(confirmations, tokens, mailer),
+    },
+    {
+      provide: ConfirmAccount,
+      inject: [CONFIRMATION_REPOSITORY, SessionService],
+      useFactory: (confirmations: ConfirmationRepository, sessions: SessionService) =>
+        new ConfirmAccount(confirmations, sessions, hashToken),
     },
     // Global guard: closes every route that is not `@Public()`. It is registered here, after
     // `RateLimitModule` in `AppModule`, so the rate limit still runs before authentication.

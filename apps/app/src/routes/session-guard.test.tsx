@@ -29,11 +29,7 @@ function probe(path: string, testId: string): RouteFactory {
 }
 
 const AUTH_PROBES = {
-  auth: [
-    probe("sign-in", "page-sign-in"),
-    probe("confirm-account", "page-confirm-account"),
-    probe("reset-password", "page-reset-password"),
-  ],
+  auth: [probe("sign-in", "page-sign-in"), probe("reset-password", "page-reset-password")],
 };
 
 afterEach(() => {
@@ -188,15 +184,24 @@ describe("/auth/* for a signed-in user (R9)", () => {
     },
   );
 
-  it.each([
-    ["/auth/confirm-account", "page-confirm-account"],
-    ["/auth/reset-password", "page-reset-password"],
-  ])("leaves %s reachable", async (path, testId) => {
+  it("leaves /auth/reset-password reachable", async () => {
     stubSessionFetch(sessionOk);
-    const { router } = renderApp(path, { extraRoutes: AUTH_PROBES });
+    const { router } = renderApp("/auth/reset-password", { extraRoutes: AUTH_PROBES });
 
-    expect(await screen.findByTestId(testId)).toBeInTheDocument();
-    expect(router.state.location.pathname).toBe(path);
+    expect(await screen.findByTestId("page-reset-password")).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/auth/reset-password");
+  });
+
+  // The real page (spec 0006): with no token in the URL it shows the invalid-link state and
+  // makes no call, so a signed-in user is neither redirected nor sent to the API.
+  it("leaves /auth/confirm-account reachable", async () => {
+    stubSessionFetch(sessionOk);
+    const { router } = renderApp("/auth/confirm-account");
+
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "This link is invalid or has expired" }),
+    ).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/auth/confirm-account");
   });
 });
 

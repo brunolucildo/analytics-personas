@@ -197,7 +197,7 @@ Definidas pela spec `0001-platform-routing-conventions` (ADRs `0003` e `0004`). 
 
 - `/` redireciona para `/app` (e, sem sessão, `/app` para `/auth/sign-in`); qualquer caminho sem rota mostra a página "Page not found".
 - Página nova entra como filha de `authRoute` ou de `appRoute`; nunca direto na raiz.
-- Páginas de autenticação existentes: `/auth/sign-up` (0004) e `/auth/forgot-password` (0009). A rota `/auth/sign-in`, para a qual ambas apontam, chega na spec `0007`.
+- Páginas de autenticação existentes: `/auth/sign-up` (0004), `/auth/forgot-password` (0009), `/auth/confirm-account` e `/auth/resend-confirmation` (0006). A rota `/auth/sign-in`, para a qual apontam, chega na spec `0007`. A confirmação é um `POST` disparado pela página (nunca um `GET`), uma única vez por visita.
 - A API só serve `/api/v1/*`; fora dele responde 404 no envelope de erro. Uma `v2` exige ADR.
 
 ### 13.2 Contratos da API
