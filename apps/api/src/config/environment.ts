@@ -1,3 +1,5 @@
+import { type EmailConfig, parseEmailConfig } from "../modules/email";
+
 export interface Environment {
   supabaseUrl: string;
   supabaseAnonKey: string;
@@ -7,6 +9,7 @@ export interface Environment {
   otelEndpoint: string;
   otelServiceName: string;
   trustProxy: boolean;
+  email: EmailConfig;
 }
 
 const REQUIRED_VARIABLES = [
@@ -67,5 +70,6 @@ export function validateEnvironment(env: Record<string, string | undefined>): En
     otelEndpoint: env.OTEL_EXPORTER_OTLP_ENDPOINT ?? "http://localhost:4318",
     otelServiceName: env.OTEL_SERVICE_NAME ?? "analytics-personas-api",
     trustProxy: parseTrustProxy(env.TRUST_PROXY),
+    email: parseEmailConfig(env),
   };
 }

@@ -89,6 +89,7 @@ apps/app/src/
 - Nenhum acesso direto ao Supabase dentro do controller.
 - Toda integração externa tem timeout, retry limitado e erro tipado.
 - Endpoints precisam de autenticação/autorização explícitas, exceto health check.
+- E-mail sai só por `EmailService` (`apps/api/src/modules/email`): o caso de uso chama `dispatch` **depois do commit**, para que falha do provedor não mude o resultado do request; use `send` só quando precisar do erro. Monte o corpo com `renderEmailLayout` e a tag `html` (ela escapa valores dinâmicos). Nunca importe SDK ou cliente de provedor fora do módulo `email` nem logue destinatário, assunto, corpo, link ou token.
 
 ## 6. Dados (PostgreSQL/Supabase)
 
@@ -135,6 +136,7 @@ Regras:
 - Bug corrigido ganha teste de regressão.
 - Ao adicionar um novo tipo de teste ou workspace, crie o script real, adicione a task no `turbo.json` e atualize `QA.md`. Não invente comandos.
 - Testes da API definem env fictícia em `apps/api/test/setup-env.ts`; não use chave real nem a service role.
+- Teste que envolve e-mail roda com `EMAIL_PROVIDER=capture` (já definido em `setup-env.ts`) e lê as mensagens com `getCapturedEmails({ to })`; um processo separado (E2E) usa `GET /api/v1/test-support/emails?to=<endereço>` e `DELETE` no mesmo caminho para limpar. Nenhum teste envia e-mail real nem chama Mailtrap ou Resend.
 
 ## 10. Dependências
 
