@@ -3,6 +3,7 @@ import { ApiException } from "../../../common/api-exception";
 import { Public } from "../../../common/public.decorator";
 import { RateLimit } from "../../rate-limit";
 import { RequestPasswordReset } from "../application/request-password-reset";
+import { SignOut } from "../application/sign-out";
 import { SignUp } from "../application/sign-up";
 import { EmailAlreadyRegisteredError } from "../domain/auth-errors";
 import { ForgotPasswordDto } from "./forgot-password.dto";
@@ -16,6 +17,7 @@ export class AuthController {
   constructor(
     @Inject(SignUp) private readonly signUp: SignUp,
     @Inject(RequestPasswordReset) private readonly requestPasswordReset: RequestPasswordReset,
+    @Inject(SignOut) private readonly signOut: SignOut,
   ) {}
 
   @Post("sign-up")
@@ -57,6 +59,16 @@ export class AuthController {
     await this.requestPasswordReset.execute({ email: body.email });
 
     return {};
+  }
+
+  /**
+   * Revokes the session of the bearer token. Closed by default (no `@Public()`): without a
+   * valid session the guard answers 401 before this runs, so it can only end its own session.
+   */
+  @Post("sign-out")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async signOutSession(@CurrentSession() session: ActiveSession): Promise<void> {
+    await this.signOut.execute(session.sessionId);
   }
 
   /** The user behind the current session (the guard already validated it). */

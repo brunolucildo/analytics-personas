@@ -6,6 +6,7 @@ import type { Environment } from "../../config/environment";
 import { EmailModule, EmailService } from "../email";
 import { RequestPasswordReset } from "./application/request-password-reset";
 import { SessionService } from "./application/session.service";
+import { SignOut } from "./application/sign-out";
 import { SignUp } from "./application/sign-up";
 import type {
   ConfirmationMailer,
@@ -113,6 +114,11 @@ import { AuthGuard } from "./interface/auth.guard";
       inject: [SESSION_REPOSITORY, ACCESS_TOKEN_SIGNER],
       useFactory: (sessions: SessionRepository, signer: AccessTokenSigner) =>
         new SessionService(sessions, signer),
+    },
+    {
+      provide: SignOut,
+      inject: [SessionService],
+      useFactory: (sessions: SessionService) => new SignOut(sessions),
     },
     // Global guard: closes every route that is not `@Public()`. It is registered here, after
     // `RateLimitModule` in `AppModule`, so the rate limit still runs before authentication.

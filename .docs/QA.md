@@ -13,7 +13,7 @@
 | Build                       | `apps/app/dist`, `apps/api/dist` e `apps/docs/.next`; passa        |
 | Testes unitários            | Vitest em `app` e `api`; passam                                    |
 | Testes de integração        | Vitest + Supertest em `api`, contra o Supabase local (exige `infra:up` e `db:migrate`); passa |
-| Testes E2E                  | Playwright (`home`, `routing`, `sign-up`, `forgot-password`, `session`); sobe app e API (`capture`) e exige o Supabase local; passa |
+| Testes E2E                  | Playwright (`home`, `routing`, `sign-up`, `forgot-password`, `session`, `sign-out`); sobe app e API (`capture`) e exige o Supabase local; passa |
 | Cobertura                   | `bun run test:coverage` gera `coverage/`; sem threshold            |
 | Hooks de pre-commit         | Configurados (`lefthook.yml`); validados no commit raiz `227e0ad`  |
 | CI                          | Não configurado                                                    |
@@ -318,3 +318,18 @@ Copie para o relatório final da tarefa:
 **Evidência:** print/log/URL
 **Impacto:** bloqueante / alto / médio / baixo
 ```
+
+### 1.10 Verificação da spec 0008 em 2026-11-09
+
+Executado no worktree da spec, em paralelo com a spec 0006 (outro worktree, mesmo Supabase local), com o lock de infraestrutura da orquestração. `test:e2e` rodou com `E2E_APP_PORT=5220 E2E_API_PORT=3050`. Sem a 0007, o E2E semeia o usuário e emite a sessão por helper (`e2e/support/session.ts`), como o `session.spec.ts`. Nenhuma migration nova.
+
+| Gate | Resultado | Observação |
+| --- | --- | --- |
+| `bun run lint` | Passa | 4 tasks, 0 warnings, 0 erros |
+| `bun run check-types` | Passa | 4 tasks |
+| `bun run build` | Passa | `app`, `api` e `docs` |
+| `bun run test` | Passa | `api`: 236 testes (29 arquivos, inclui `SignOut`); `app`: 124 testes (13 arquivos, inclui o botão: mouse, Enter, Space, desabilitado enquanto envia, rede/5xx/401) |
+| `bun run test:integration` | Passa | 123 testes (10 arquivos); `auth-sign-out` (6): 204 sem corpo, `revoked_at`, token 401 em `GET /auth/session`, segundo sign-out 401, sem token/token inválido 401, outro usuário intacto |
+| `bun run test:e2e` | Passa | 30 testes (Chromium); `sign-out` (5): botão, token removido, token 401 na API, `/app` privado, "voltar", teclado, API inalcançável, área de toque >= 44x44 |
+
+Verificação manual de UI (home em `/app`, Chromium via Playwright, vite em dev, API interceptada): 375 / 768 / 1280 px sem scroll horizontal (`scrollWidth` = largura da viewport); um único `h1`; botão `Sign out` com 112x44 px; `Tab` leva o foco ao botão (`:focus-visible` verdadeiro; o anel usa as classes do `Button` do `@repo/ui`, medidas nas specs anteriores); texto `#0A0A0A` sobre `#FFFDF5`; console sem erro nem warning. **Não verificado:** leitor de tela; hover/active; `prefers-reduced-motion` (o spinner tem `motion-reduce:animate-none`, sem teste); `vite preview`; anel de foco medido de novo nesta spec.
