@@ -7,16 +7,19 @@ import { RequestPasswordReset } from "../application/request-password-reset";
 import { SignIn } from "../application/sign-in";
 import { SignOut } from "../application/sign-out";
 import { ResendConfirmation } from "../application/resend-confirmation";
+import { ResetPassword } from "../application/reset-password";
 import { SignUp } from "../application/sign-up";
 import {
   EmailAlreadyRegisteredError,
   EmailNotConfirmedError,
   InvalidConfirmationTokenError,
   InvalidCredentialsError,
+  InvalidPasswordResetTokenError,
 } from "../domain/auth-errors";
 import { ConfirmAccountDto } from "./confirm-account.dto";
 import { ResendConfirmationDto } from "./resend-confirmation.dto";
 import { ForgotPasswordDto } from "./forgot-password.dto";
+import { ResetPasswordDto } from "./reset-password.dto";
 import type { ActiveSession } from "../domain/session-ports";
 import { CurrentSession } from "./current-session.decorator";
 import {
@@ -37,6 +40,7 @@ export class AuthController {
     @Inject(SignOut) private readonly signOut: SignOut,
     @Inject(ConfirmAccount) private readonly confirmAccountUseCase: ConfirmAccount,
     @Inject(ResendConfirmation) private readonly resendConfirmationUseCase: ResendConfirmation,
+    @Inject(ResetPassword) private readonly resetPasswordUseCase: ResetPassword,
   ) {}
 
   @Post("sign-up")
@@ -78,6 +82,32 @@ export class AuthController {
     await this.requestPasswordReset.execute({ email: body.email });
 
     return {};
+  }
+
+  /**
+   * Sets a new password with the link token: 204 and no session (the person signs in next).
+   * The DTO is validated before the token is touched, so a rejected password does not use the
+   * link up. One answer for every bad token (unknown, expired, used, wrong type). Every session
+   * of the user is revoked in the same transaction that changes the password.
+   */
+  @Post("reset-password")
+  @Public()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @RateLimit("reset-password")
+  async resetPassword(@Body() body: ResetPasswordDto): Promise<void> {
+    try {
+      await this.resetPasswordUseCase.execute({ token: body.token, password: body.password });
+    } catch (error) {
+      if (error instanceof InvalidPasswordResetTokenError) {
+        throw new ApiException(
+          HttpStatus.BAD_REQUEST,
+          "TOKEN_INVALID_OR_EXPIRED",
+          "This link is invalid or has expired.",
+        );
+      }
+
+      throw error;
+    }
   }
 
   /**

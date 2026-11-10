@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
+  PasswordResetOwner,
   PasswordResetRepository,
   PasswordResetToken,
   RequestPasswordResetResult,
@@ -38,5 +39,39 @@ export class SupabasePasswordResetRepository implements PasswordResetRepository 
     }
 
     return { status: "created", firstName: data };
+  }
+
+  async resetByTokenHash(
+    tokenHash: string,
+    passwordHash: string,
+  ): Promise<PasswordResetOwner | null> {
+    const { data, error } = await this.client.rpc("auth_reset_password", {
+      p_token_hash: tokenHash,
+      p_password_hash: passwordHash,
+    });
+
+    if (error) {
+      throw new DataAccessError("auth_reset_password", error.code);
+    }
+
+    if (!Array.isArray(data)) {
+      throw new DataAccessError("auth_reset_password", "UNEXPECTED_RESULT");
+    }
+
+    const [row] = data as Array<Record<string, unknown>>;
+
+    if (row === undefined) {
+      return null;
+    }
+
+    if (
+      typeof row.user_id !== "string" ||
+      typeof row.first_name !== "string" ||
+      typeof row.email !== "string"
+    ) {
+      throw new DataAccessError("auth_reset_password", "UNEXPECTED_RESULT");
+    }
+
+    return { userId: row.user_id, firstName: row.first_name, email: row.email };
   }
 }

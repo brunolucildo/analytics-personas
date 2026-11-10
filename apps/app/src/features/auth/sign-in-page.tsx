@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useSearch } from "@tanstack/react-router";
 import { Button } from "@repo/ui/button";
 import { Input } from "@repo/ui/input";
 import { Label } from "@repo/ui/label";
@@ -55,6 +55,8 @@ function Spinner() {
 
 export function SignInPage() {
   const signIn = useSignIn();
+  const search: { reset?: unknown } = useSearch({ strict: false });
+  const passwordWasReset = search.reset === "success";
   const [values, setValues] = useState<SignInValues>(EMPTY_SIGN_IN_VALUES);
   const [submitted, setSubmitted] = useState(false);
   const [serverErrors, setServerErrors] = useState<SignInErrors>({});
@@ -147,6 +149,15 @@ export function SignInPage() {
       <p className="mt-2 text-base text-muted-foreground">
         Use the email and password of your account.
       </p>
+
+      {passwordWasReset ? (
+        <p
+          role="status"
+          className="mt-4 border-2 border-border bg-background p-3 text-base font-bold"
+        >
+          Your password was updated. Sign in with your new password.
+        </p>
+      ) : null}
 
       <form noValidate onSubmit={handleSubmit} className="mt-6 space-y-5">
         {generalError ? (
