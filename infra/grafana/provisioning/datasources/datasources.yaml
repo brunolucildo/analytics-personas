@@ -14,9 +14,29 @@ datasources:
     access: proxy
     url: http://loki:3100
     editable: false
+    jsonData:
+      derivedFields:
+        # Log -> trace. `trace_id` reaches Loki as structured metadata (OTLP log ingestion), so
+        # it is matched by label, not by regex over the line. `$$` keeps a literal `$` in provisioning.
+        - name: TraceID
+          datasourceUid: tempo
+          matcherType: label
+          matcherRegex: trace_id
+          url: "$${__value.raw}"
+          urlDisplayLabel: Open trace
   - name: Tempo
     uid: tempo
     type: tempo
     access: proxy
     url: http://tempo:3200
     editable: false
+    jsonData:
+      # Trace -> logs of the same trace.
+      tracesToLogsV2:
+        datasourceUid: loki
+        spanStartTimeShift: "-5m"
+        spanEndTimeShift: "5m"
+        filterByTraceID: false
+        filterBySpanID: false
+        customQuery: true
+        query: '{service_name="rondo-api"} | trace_id="$${__trace.traceId}"'

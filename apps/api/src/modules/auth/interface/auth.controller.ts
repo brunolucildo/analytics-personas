@@ -1,6 +1,7 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Inject, Post } from "@nestjs/common";
 import { ApiException } from "../../../common/api-exception";
 import { Public } from "../../../common/public.decorator";
+import { traceAuthOperation } from "../../../observability/auth-telemetry";
 import { RateLimit } from "../../rate-limit";
 import { ConfirmAccount } from "../application/confirm-account";
 import { RequestPasswordReset } from "../application/request-password-reset";
@@ -48,25 +49,27 @@ export class AuthController {
   @HttpCode(HttpStatus.CREATED)
   @RateLimit("sign-up")
   async signUpAccount(@Body() body: SignUpDto): Promise<{ email: string }> {
-    try {
-      return await this.signUp.execute({
-        firstName: body.firstName,
-        lastName: body.lastName,
-        email: body.email,
-        password: body.password,
-      });
-    } catch (error) {
-      if (error instanceof EmailAlreadyRegisteredError) {
-        throw new ApiException(
-          HttpStatus.CONFLICT,
-          "EMAIL_ALREADY_REGISTERED",
-          "An account with this email already exists.",
-          [{ field: "email", message: "An account with this email already exists." }],
-        );
-      }
+    return traceAuthOperation("sign_up", async () => {
+      try {
+        return await this.signUp.execute({
+          firstName: body.firstName,
+          lastName: body.lastName,
+          email: body.email,
+          password: body.password,
+        });
+      } catch (error) {
+        if (error instanceof EmailAlreadyRegisteredError) {
+          throw new ApiException(
+            HttpStatus.CONFLICT,
+            "EMAIL_ALREADY_REGISTERED",
+            "An account with this email already exists.",
+            [{ field: "email", message: "An account with this email already exists." }],
+          );
+        }
 
-      throw error;
-    }
+        throw error;
+      }
+    });
   }
 
   /**
@@ -79,7 +82,9 @@ export class AuthController {
   @HttpCode(HttpStatus.ACCEPTED)
   @RateLimit("forgot-password")
   async forgotPassword(@Body() body: ForgotPasswordDto): Promise<Record<string, never>> {
-    await this.requestPasswordReset.execute({ email: body.email });
+    await traceAuthOperation("forgot_password", () =>
+      this.requestPasswordReset.execute({ email: body.email }),
+    );
 
     return {};
   }
@@ -95,19 +100,21 @@ export class AuthController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @RateLimit("reset-password")
   async resetPassword(@Body() body: ResetPasswordDto): Promise<void> {
-    try {
-      await this.resetPasswordUseCase.execute({ token: body.token, password: body.password });
-    } catch (error) {
-      if (error instanceof InvalidPasswordResetTokenError) {
-        throw new ApiException(
-          HttpStatus.BAD_REQUEST,
-          "TOKEN_INVALID_OR_EXPIRED",
-          "This link is invalid or has expired.",
-        );
-      }
+    await traceAuthOperation("reset_password", async () => {
+      try {
+        await this.resetPasswordUseCase.execute({ token: body.token, password: body.password });
+      } catch (error) {
+        if (error instanceof InvalidPasswordResetTokenError) {
+          throw new ApiException(
+            HttpStatus.BAD_REQUEST,
+            "TOKEN_INVALID_OR_EXPIRED",
+            "This link is invalid or has expired.",
+          );
+        }
 
-      throw error;
-    }
+        throw error;
+      }
+    });
   }
 
   /**
@@ -120,29 +127,31 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @RateLimit("sign-in")
   async signInAccount(@Body() body: SignInDto): Promise<SessionResponse> {
-    try {
-      return presentSession(
-        await this.signInUseCase.execute({ email: body.email, password: body.password }),
-      );
-    } catch (error) {
-      if (error instanceof InvalidCredentialsError) {
-        throw new ApiException(
-          HttpStatus.UNAUTHORIZED,
-          "INVALID_CREDENTIALS",
-          "Invalid email or password.",
+    return traceAuthOperation("sign_in", async () => {
+      try {
+        return presentSession(
+          await this.signInUseCase.execute({ email: body.email, password: body.password }),
         );
-      }
+      } catch (error) {
+        if (error instanceof InvalidCredentialsError) {
+          throw new ApiException(
+            HttpStatus.UNAUTHORIZED,
+            "INVALID_CREDENTIALS",
+            "Invalid email or password.",
+          );
+        }
 
-      if (error instanceof EmailNotConfirmedError) {
-        throw new ApiException(
-          HttpStatus.FORBIDDEN,
-          "EMAIL_NOT_CONFIRMED",
-          "Confirm your email to sign in.",
-        );
-      }
+        if (error instanceof EmailNotConfirmedError) {
+          throw new ApiException(
+            HttpStatus.FORBIDDEN,
+            "EMAIL_NOT_CONFIRMED",
+            "Confirm your email to sign in.",
+          );
+        }
 
-      throw error;
-    }
+        throw error;
+      }
+    });
   }
 
   /**
@@ -152,7 +161,7 @@ export class AuthController {
   @Post("sign-out")
   @HttpCode(HttpStatus.NO_CONTENT)
   async signOutSession(@CurrentSession() session: ActiveSession): Promise<void> {
-    await this.signOut.execute(session.sessionId);
+    await traceAuthOperation("sign_out", () => this.signOut.execute(session.sessionId));
   }
 
   /**
@@ -164,19 +173,21 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @RateLimit("confirm-account")
   async confirmAccount(@Body() body: ConfirmAccountDto): Promise<SessionResponse> {
-    try {
-      return presentSession(await this.confirmAccountUseCase.execute({ token: body.token }));
-    } catch (error) {
-      if (error instanceof InvalidConfirmationTokenError) {
-        throw new ApiException(
-          HttpStatus.BAD_REQUEST,
-          "TOKEN_INVALID_OR_EXPIRED",
-          "This link is invalid or has expired.",
-        );
-      }
+    return traceAuthOperation("confirm_account", async () => {
+      try {
+        return presentSession(await this.confirmAccountUseCase.execute({ token: body.token }));
+      } catch (error) {
+        if (error instanceof InvalidConfirmationTokenError) {
+          throw new ApiException(
+            HttpStatus.BAD_REQUEST,
+            "TOKEN_INVALID_OR_EXPIRED",
+            "This link is invalid or has expired.",
+          );
+        }
 
-      throw error;
-    }
+        throw error;
+      }
+    });
   }
 
   /**
@@ -189,7 +200,9 @@ export class AuthController {
   @HttpCode(HttpStatus.ACCEPTED)
   @RateLimit("resend-confirmation")
   async resendConfirmation(@Body() body: ResendConfirmationDto): Promise<Record<string, never>> {
-    await this.resendConfirmationUseCase.execute({ email: body.email });
+    await traceAuthOperation("resend_confirmation", () =>
+      this.resendConfirmationUseCase.execute({ email: body.email }),
+    );
 
     return {};
   }

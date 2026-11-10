@@ -113,6 +113,10 @@ apps/app/src/
 - Falha de conector não derruba a demanda inteira: registre, isole e informe a lacuna.
 - A API exporta traces, métricas e logs por OpenTelemetry para o Grafana LGTM (ver `ARCHITECTURE.md` §4.4). Exportação nunca bloqueia nem derruba o request.
 - Métricas mínimas a manter: latência, taxa de erro, throughput e, quando existirem, falhas por conector.
+- **Operação de auth nova** (endpoint em `modules/auth`): acrescente-a a `AUTH_OPERATIONS` e ao mapa de endpoints de `auth-telemetry.middleware.ts`, e embrulhe o caso de uso com `traceAuthOperation` no controller. Assim ela ganha contador, histograma, span e log `auth_operation` sem tocar na camada `application`. O catálogo de nomes e labels está em `ARCHITECTURE.md` §4.4.
+- **Labels e atributos só de conjuntos fechados:** `operation`, `outcome` e `reason` nunca recebem texto vindo do cliente. Código de erro novo precisa entrar em `AUTH_FAILURE_REASONS` (senão vira `request_failed`) e no dashboard.
+- **Telemetria sem PII e sem revelar contas:** nenhum e-mail, nome, senha, token, link, IP, `userId` ou `sid` em label, atributo ou log; o span de falha leva só o código de erro. Endpoint que responde igual com ou sem conta (`forgot-password`, `resend-confirmation`) deve registrar o mesmo resultado nos dois casos.
+- Telemetria nunca decide a resposta: erro dentro do middleware de telemetria é engolido.
 
 ## 8. Acessibilidade e responsividade
 

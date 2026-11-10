@@ -1,8 +1,10 @@
 import { type ArgumentsHost, Catch, type ExceptionFilter, HttpException } from "@nestjs/common";
 import { baseLogger } from "../observability/logger";
 import { ApiException, type ApiErrorBody } from "./api-exception";
+import { rememberErrorCode } from "./error-code";
 
 interface HttpResponse {
+  locals?: Record<string, unknown>;
   status(code: number): { json(body: unknown): void };
 }
 
@@ -83,6 +85,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       baseLogger.error({ requestId: request.id, err: exception }, "unhandled_exception");
     }
 
+    rememberErrorCode(response, body.error.code);
     response.status(status).json(body);
   }
 }
