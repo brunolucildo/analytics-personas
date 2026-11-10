@@ -1,4 +1,4 @@
-# Analytics Personas
+# Rondo
 
 Plataforma para criar e operar _experts_: agentes de IA especializados em funções de um clube de futebol, alimentados por fontes de dados conectadas e com respostas rastreáveis às fontes.
 
