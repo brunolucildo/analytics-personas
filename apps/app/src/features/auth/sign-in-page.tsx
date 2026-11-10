@@ -2,6 +2,7 @@ import { Link, useSearch } from "@tanstack/react-router";
 import { Button } from "@repo/ui/button";
 import { Input } from "@repo/ui/input";
 import { Label } from "@repo/ui/label";
+import { PasswordInput } from "@repo/ui/password-input";
 import { useState, type ChangeEvent, type FormEvent } from "react";
 import { describeSignInFailure } from "./describe-sign-in-failure";
 import {
@@ -119,21 +120,26 @@ export function SignInPage() {
     const errorId = `${inputId}-error`;
     const error = visibleError(name);
 
+    const inputProps = {
+      id: inputId,
+      name,
+      autoComplete: field.autoComplete,
+      value: values[name],
+      onChange: handleChange,
+      readOnly: pending,
+      "aria-invalid": error ? true : undefined,
+      "aria-describedby": error ? errorId : undefined,
+      required: true,
+    };
+
     return (
       <div key={name} className="space-y-2">
         <Label htmlFor={inputId}>{field.label}</Label>
-        <Input
-          id={inputId}
-          name={name}
-          type={field.type}
-          autoComplete={field.autoComplete}
-          value={values[name]}
-          onChange={handleChange}
-          readOnly={pending}
-          aria-invalid={error ? true : undefined}
-          aria-describedby={error ? errorId : undefined}
-          required
-        />
+        {field.type === "password" ? (
+          <PasswordInput {...inputProps} visibilityLabel="password" />
+        ) : (
+          <Input {...inputProps} type={field.type} />
+        )}
         {error ? (
           <p id={errorId} className="text-base font-bold text-destructive">
             {error}

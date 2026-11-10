@@ -4,9 +4,11 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./brand": "./src/brand.tsx",
     "./button": "./src/button.tsx",
     "./input": "./src/input.tsx",
     "./label": "./src/label.tsx",
+    "./password-input": "./src/password-input.tsx",
     "./styles.css": "./src/styles.css",
     "./lib/utils": "./src/lib/utils.ts"
   },

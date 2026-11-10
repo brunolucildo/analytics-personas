@@ -40,6 +40,15 @@
   --input: #0a0a0a;
   --ring: #5c8001;
   --radius: 0.25rem;
+
+  /* Brand colors (DESIGN.md §2). Fixed values: the logo never changes with a theme. */
+  --color-blaze-orange: #fb6107;
+  --color-golden-glow: #f3de2c;
+  --color-lime-moss: #7cb518;
+  --color-forest-moss: #5c8001;
+  --color-sunflower-gold: #fbb02d;
+  --color-ink: #0a0a0a;
+  --color-paper: #fffdf5;
 }
 
 @source "./";

@@ -74,6 +74,46 @@ afterEach(() => {
 });
 
 describe("sign-in page", () => {
+  it("shows and hides the password with a toggle that keeps the value and does not submit", async () => {
+    renderSignIn();
+    const user = await fillForm();
+    const field = screen.getByLabelText("Password");
+    const toggle = screen.getByRole("button", { name: "Show password" });
+
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    expect(toggle).toHaveAttribute("aria-controls", field.id);
+    expect(toggle).toHaveAttribute("type", "button");
+
+    await user.click(toggle);
+
+    expect(field).toHaveAttribute("type", "text");
+    expect(field).toHaveValue("correct horse battery");
+    expect(screen.getByRole("button", { name: "Hide password" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+
+    await user.click(screen.getByRole("button", { name: "Hide password" }));
+
+    expect(field).toHaveAttribute("type", "password");
+    expect(field).toHaveValue("correct horse battery");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("reaches the toggle with the keyboard right after the password field", async () => {
+    renderSignIn();
+    const user = await fillForm();
+
+    await user.tab();
+
+    expect(screen.getByRole("button", { name: "Show password" })).toHaveFocus();
+
+    await user.keyboard(" ");
+
+    expect(screen.getByLabelText("Password")).toHaveAttribute("type", "text");
+    expect(screen.getByRole("button", { name: "Hide password" })).toHaveFocus();
+  });
+
   it("renders the heading, the labelled fields, the button and the two links", async () => {
     renderSignIn();
 
