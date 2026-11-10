@@ -132,9 +132,41 @@ Evite:
 | -------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | Paleta aplicada em tokens        | Sim (`packages/ui/src/styles.css`; `apps/docs/app/globals.css` repete uma parte em variáveis próprias) |
 | Fonte display                    | Não                                                                                                    |
+| Marca (logos Rondo)              | Assets em `packages/ui/assets/brand/`; ainda não aplicados em `apps/app` nem `apps/docs`               |
 | Componentes no estilo 8-bit      | Parcial (`Button` com borda de 2px e sombra dura; demais primitivos não existem)                       |
 | `lang="en-US"`                   | Sim (`apps/app` e `apps/docs`)                                                                         |
 | Revisão de contraste             | Não                                                                                                    |
 | Testes de teclado/leitor de tela | Não                                                                                                    |
 
 Os tokens são definidos em `packages/ui/src/styles.css` e consumidos pelos componentes. Não espalhe hex pelo código. A duplicação de hex em `apps/docs/app/globals.css` é dívida: o `apps/docs` ainda não consome `@repo/ui`.
+
+## 11. Marca
+
+O produto se chama **Rondo** (antes "Analytics Personas"). O nome vem do rondó, o treino em que os jogadores trocam a bola em roda sem perdê-la: a metáfora de experts e fontes passando o conhecimento do clube.
+
+**Tagline:** "Club knowledge, in play." (en-US, como toda a interface).
+
+### 11.1 Logos
+
+| Versão    | Arquivo                                                   | Uso                                                                   |
+| --------- | --------------------------------------------------------- | --------------------------------------------------------------------- |
+| Compacta  | `rondo-mark.svg`, `rondo-mark-dark.svg` (28 × 28)         | Avatar, favicon, ícone de app, espaços quadrados ou menores que 140px |
+| Estendida | `rondo-wordmark.svg`, `rondo-wordmark-dark.svg` (70 × 14) | Cabeçalho, e-mails, site, documentos                                  |
+
+Todos os arquivos ficam em `packages/ui/assets/brand/`, são SVG de retângulos sem fonte embutida (nada depende de carregar a fonte display) e usam `shape-rendering="crispEdges"`.
+
+- **Compacta:** bola pixel no centro e quatro quadrados em roda: `blaze-orange` (cima), `golden-glow` (direita), `lime-moss` (baixo) e `forest-moss` (esquerda). Quatro quadrados pequenos em `sunflower-gold` marcam o passe nas diagonais. Em fundo escuro, o quadrado da esquerda vira `sunflower-gold`, porque `forest-moss` some sobre `ink`.
+- **Estendida:** "ROND" em pixel e uma bola pixel no lugar do último "O". A bola usa uma grade mais fina que as letras (1 unidade contra 2), como na versão aprovada.
+
+### 11.2 Regras de uso
+
+- **Fundos:** versão clara sobre `paper` ou branco; versão escura sobre `ink`. Não coloque o logo sobre cor de destaque nem sobre imagem.
+- **Tamanho mínimo:** compacta com 16px de lado (múltiplos de 28 ficam nítidos: 28, 56, 84, 112); estendida com 70px de largura (múltiplos de 70).
+- **Respiro:** margem livre de uma "casa" da bola (1/14 da altura do logo) para cada lado, no mínimo 4px.
+- **Não faça:** esticar, girar, recolorir, trocar a ordem das cores, adicionar sombra ou contorno, ou redesenhar a bola com gradiente.
+- **Acessibilidade:** o SVG tem `<title>Rondo</title>`. Quando o logo é decorativo ao lado do nome em texto, use `alt=""`; quando é o único nome visível, use `alt="Rondo"`.
+- **Tagline:** em texto normal (sans do corpo), nunca na fonte pixel abaixo de 16px, e em `ink` sobre `paper` ou `paper` sobre `ink`.
+
+### 11.3 Fora do escopo desta versão
+
+Aplicar os logos em `apps/app` e `apps/docs`, favicon, título das páginas e e-mails, e trocar o nome exibido no código fazem parte da mudança de renomeação do repositório. A fonte display (Press Start 2P ou Silkscreen) ainda não está adotada.
