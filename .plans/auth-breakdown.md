@@ -2,7 +2,7 @@
 
 - **Épico:** auth
 - **Data:** 2026-11-09
-- **Status:** em implementação (0001 concluída; 0002 a 0010 em rascunho)
+- **Status:** concluído (0001 a 0010 implementadas)
 - **Prompt original:** "Precisamos implementar o fluxo de autenticação completo": **sign-up** (nome, sobrenome, e-mail, senha e confirmação que devem coincidir; e-mail de confirmação com link e token que confirma a conta, cria a sessão e leva à home), **sign-in** (e-mail + senha, e-mail de nova sessão a cada sessão, ir para a home, "apenas uma sessão seja válida por pessoa… a última sessão é a válida"), **esqueci a senha** (se o e-mail existir, enviar link para a página de reset), **resetar senha** (token, nova senha e confirmação que coincidem, e-mail de sucesso, ir para o sign-in), "todas as páginas de autenticação são públicas, e as demais privadas", `/auth/*` e `/app/*`; "tudo em en-US (adicionar documentação sobre)"; API versionada em `/api/v1/*`, auth em `/api/v1/auth/*`.
 
 ## 1. Objetivo
@@ -51,7 +51,7 @@ Entregar o ciclo completo de identidade por e-mail e senha: cadastro, confirmaç
 | 0007  | [`0007-auth-sign-in`](../.specs/0007-auth-sign-in.md)                                   | Login, e-mail de nova sessão, sessão única comprovada, página `/auth/sign-in`                                                                    | 0002, 0003, 0005, 0006       | —            | M       | concluída  |
 | 0008  | [`0008-auth-sign-out`](../.specs/0008-auth-sign-out.md)                                 | Encerrar a sessão atual; botão na home                                                                                                           | 0005                         | —            | P       | concluída  |
 | 0009  | [`0009-auth-forgot-password`](../.specs/0009-auth-forgot-password.md)                   | Pedir reset com resposta genérica e link por e-mail; página `/auth/forgot-password`                                                              | 0002, 0003, 0004             | —            | M       | concluída  |
-| 0010  | [`0010-auth-reset-password`](../.specs/0010-auth-reset-password.md)                     | Nova senha com token, revogação de sessões, e-mail de sucesso, ir para o sign-in                                                                 | 0002, 0003, 0005, 0007, 0009 | —            | M       | rascunho  |
+| 0010  | [`0010-auth-reset-password`](../.specs/0010-auth-reset-password.md)                     | Nova senha com token, revogação de sessões, e-mail de sucesso, ir para o sign-in                                                                 | 0002, 0003, 0005, 0007, 0009 | —            | M       | concluída  |
 
 **Sobre paralelismo:** pelas dependências, 0001, 0002 (e depois 0003) e, mais adiante, 0008 e 0009 poderiam andar em paralelo. Todas mexem nos mesmos arquivos (`app.module.ts`, módulo `auth`, tabela `auth_tokens`, roteador), então **implemente uma por vez, na ordem acima**.
 
