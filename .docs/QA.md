@@ -45,7 +45,7 @@ Rota `/` de `apps/app` no browser embutido do app (Chromium), servidor `vite` em
 | Verificação           | Resultado                                                                                                                                                                            |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 375 / 768 / 1280 px   | Sem scroll horizontal (`scrollWidth` = largura da viewport); `h1` de 36px no mobile e 60px a partir de 768px                                                                         |
-| Estrutura             | Um único `h1` "Hello World"; `lang="pt-BR"`; título "Analytics Personas"                                                                                                             |
+| Estrutura             | Um único `h1` "Hello World"; `lang="pt-BR"`; título "Rondo"                                                                                                             |
 | Alvo de toque         | `Button` com 158×44px (mínimo 44×44)                                                                                                                                                 |
 | Teclado e foco        | `Tab` foca o botão; `:focus-visible` verdadeiro; anel de 2px (offset) + 4px `#5C8001`, visível em screenshot                                                                         |
 | Contraste (calculado) | Texto do botão sobre `#FB6107`: 6,42:1; `h1` sobre o fundo: 19,44:1; anel de foco sobre o fundo: 4,54:1; fundo do botão sobre a página: 3,03:1 (limite de 3:1 para componente de UI) |

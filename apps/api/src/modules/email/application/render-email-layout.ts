@@ -10,7 +10,7 @@ export const EMAIL_COLORS = {
 } as const;
 
 const FONT_STACK = "-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
-const PRODUCT_NAME = "Analytics Personas";
+const PRODUCT_NAME = "Rondo";
 
 export interface EmailLayoutInput {
   /** Becomes the document title and the visible heading. */

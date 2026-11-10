@@ -67,7 +67,7 @@ describe("capture provider and the test-support route", () => {
       to: "Pat@Example.test",
       subject: "Welcome",
       purpose: "integration_test",
-      from: { address: "no-reply@analytics-personas.local" },
+      from: { address: "no-reply@rondo.local" },
     });
     expect(fetchSpy).not.toHaveBeenCalled();
     fetchSpy.mockRestore();
@@ -113,7 +113,7 @@ describe("the test-support route outside capture mode", () => {
             validateEnvironment({
               ...baseEnv,
               EMAIL_PROVIDER: "mailtrap",
-              EMAIL_FROM: "no-reply@analytics-personas.local",
+              EMAIL_FROM: "no-reply@rondo.local",
               MAILTRAP_API_TOKEN: "test-token",
               MAILTRAP_INBOX_ID: "1",
             }),

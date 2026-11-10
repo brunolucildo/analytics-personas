@@ -60,7 +60,7 @@ export default defineConfig({
         APP_URL,
         AUTH_JWT_SECRET: process.env.AUTH_JWT_SECRET as string,
         EMAIL_PROVIDER: "capture",
-        EMAIL_FROM: "Analytics Personas <no-reply@analytics-personas.local>",
+        EMAIL_FROM: "Rondo <no-reply@rondo.local>",
         TRUST_PROXY: "false",
         OTEL_SDK_DISABLED: "true",
         LOG_LEVEL: "warn",

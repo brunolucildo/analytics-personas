@@ -13,7 +13,7 @@ describe("buildPasswordChangedEmail", () => {
 
   it("has the subject, the recipient and the purpose", () => {
     expect(message.to).toBe("ana@example.test");
-    expect(message.subject).toBe("Your Analytics Personas password was changed");
+    expect(message.subject).toBe("Your Rondo password was changed");
     expect(message.purpose).toBe("password_changed");
   });
 

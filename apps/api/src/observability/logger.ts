@@ -4,7 +4,7 @@ import { pino } from "pino";
 const baseLogger = pino({
   level: process.env.LOG_LEVEL ?? "info",
   base: {
-    service: process.env.OTEL_SERVICE_NAME ?? "analytics-personas-api",
+    service: process.env.OTEL_SERVICE_NAME ?? "rondo-api",
   },
   timestamp: pino.stdTimeFunctions.isoTime,
 });

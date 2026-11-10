@@ -83,7 +83,7 @@ export function validateEnvironment(env: Record<string, string | undefined>): En
     appUrl: parseAppOrigin(env.APP_URL as string),
     apiPort,
     otelEndpoint: env.OTEL_EXPORTER_OTLP_ENDPOINT ?? "http://localhost:4318",
-    otelServiceName: env.OTEL_SERVICE_NAME ?? "analytics-personas-api",
+    otelServiceName: env.OTEL_SERVICE_NAME ?? "rondo-api",
     trustProxy: parseTrustProxy(env.TRUST_PROXY),
     email: parseEmailConfig(env),
     authJwtSecret: parseAuthJwtSecret(env.AUTH_JWT_SECRET),

@@ -15,7 +15,7 @@ export function buildPasswordResetEmail({
   firstName,
   link,
 }: PasswordResetEmailInput): EmailMessage {
-  const subject = "Reset your Analytics Personas password";
+  const subject = "Reset your Rondo password";
   const { html: document, text } = renderEmailLayout({
     title: subject,
     preheader: "Use this link to choose a new password.",

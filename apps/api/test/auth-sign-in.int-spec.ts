@@ -272,7 +272,7 @@ describe("POST /api/v1/auth/sign-in", () => {
       const appUrl = process.env.APP_URL as string;
       const sentAt = /(\d{4}-\d{2}-\d{2} \d{2}:\d{2}) UTC/.exec(message?.text ?? "")?.[1];
 
-      expect(message?.subject).toBe("New sign-in to Analytics Personas");
+      expect(message?.subject).toBe("New sign-in to Rondo");
       expect(message?.text).toContain("Hi Carla,");
       expect(message?.text).toContain("earlier session was signed out");
       expect(message?.text).toContain(

@@ -20,7 +20,7 @@ describe("EmailServiceNewSessionMailer", () => {
     const message = dispatch.mock.calls[0]?.[0];
 
     expect(message.to).toBe("ana@example.test");
-    expect(message.subject).toBe("New sign-in to Analytics Personas");
+    expect(message.subject).toBe("New sign-in to Rondo");
     expect(message.text).toContain(`${APP_URL}/auth/forgot-password`);
   });
 

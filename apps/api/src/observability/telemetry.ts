@@ -19,7 +19,7 @@ const sdk = new NodeSDK({
   // Sem detectores de host/processo: evitam exportar nome da máquina e caminhos locais.
   resourceDetectors: [],
   resource: resourceFromAttributes({
-    [ATTR_SERVICE_NAME]: process.env.OTEL_SERVICE_NAME ?? "analytics-personas-api",
+    [ATTR_SERVICE_NAME]: process.env.OTEL_SERVICE_NAME ?? "rondo-api",
   }),
   traceExporter: new OTLPTraceExporter({
     url: `${endpoint}/v1/traces`,

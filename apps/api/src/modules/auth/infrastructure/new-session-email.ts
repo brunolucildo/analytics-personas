@@ -25,7 +25,7 @@ export function buildNewSessionEmail({
   signedInAt,
   forgotPasswordUrl,
 }: NewSessionEmailInput): EmailMessage {
-  const subject = "New sign-in to Analytics Personas";
+  const subject = "New sign-in to Rondo";
   const when = formatUtc(signedInAt);
   const { html: document, text } = renderEmailLayout({
     title: subject,

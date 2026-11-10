@@ -1,4 +1,4 @@
-name: analytics-personas
+name: rondo
 
 services:
   grafana:
@@ -30,7 +30,7 @@ services:
       dockerfile: Dockerfile.toolbox
       args:
         BASE_IMAGE: grafana/loki:latest
-    image: analytics-personas/loki-toolbox:local
+    image: rondo/loki-toolbox:local
     command: -config.file=/etc/loki/loki-config.yaml
     ports:
       - "3100:3100"
@@ -50,7 +50,7 @@ services:
       dockerfile: Dockerfile.toolbox
       args:
         BASE_IMAGE: grafana/tempo:latest
-    image: analytics-personas/tempo-toolbox:local
+    image: rondo/tempo-toolbox:local
     command: -config.file=/etc/tempo/tempo.yaml
     ports:
       - "3200:3200"
@@ -70,7 +70,7 @@ services:
       dockerfile: Dockerfile.toolbox
       args:
         BASE_IMAGE: grafana/mimir:latest
-    image: analytics-personas/mimir-toolbox:local
+    image: rondo/mimir-toolbox:local
     command:
       - -config.file=/etc/mimir/mimir.yaml
       - -target=all
@@ -92,7 +92,7 @@ services:
       dockerfile: Dockerfile.toolbox
       args:
         BASE_IMAGE: otel/opentelemetry-collector-contrib:latest
-    image: analytics-personas/otel-collector-toolbox:local
+    image: rondo/otel-collector-toolbox:local
     command: ["--config=/etc/otelcol-contrib/config.yaml"]
     ports:
       - "4317:4317"

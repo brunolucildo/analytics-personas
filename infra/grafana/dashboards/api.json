@@ -1,7 +1,7 @@
 {
-  "uid": "analytics-personas-api",
-  "title": "Analytics Personas — API",
-  "tags": ["analytics-personas", "api"],
+  "uid": "rondo-api",
+  "title": "Rondo — API",
+  "tags": ["rondo", "api"],
   "timezone": "browser",
   "schemaVersion": 39,
   "version": 1,

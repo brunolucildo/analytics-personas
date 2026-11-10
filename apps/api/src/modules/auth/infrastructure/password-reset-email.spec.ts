@@ -12,7 +12,7 @@ describe("buildPasswordResetEmail", () => {
     });
 
     expect(message.to).toBe("ana@example.test");
-    expect(message.subject).toBe("Reset your Analytics Personas password");
+    expect(message.subject).toBe("Reset your Rondo password");
     expect(message.purpose).toBe("password_reset");
     expect(message.html).toContain("Hi Ana,");
     expect(message.text).toContain("Hi Ana,");

@@ -7,7 +7,7 @@ const validEnv = {
   SUPABASE_SERVICE_ROLE_KEY: "service",
   APP_URL: "http://localhost:5173",
   EMAIL_PROVIDER: "capture",
-  EMAIL_FROM: "Analytics Personas <no-reply@analytics-personas.local>",
+  EMAIL_FROM: "Rondo <no-reply@rondo.local>",
   AUTH_JWT_SECRET: "unit-test-jwt-secret-0123456789-abcdefghij",
 };
 
