@@ -30,9 +30,9 @@ const sessionOk = () =>
     user: USER,
   });
 
-function renderSignIn() {
+function renderSignIn(url = "/auth/sign-in") {
   const router = createAppRouter({
-    history: createMemoryHistory({ initialEntries: ["/auth/sign-in"] }),
+    history: createMemoryHistory({ initialEntries: [url] }),
   });
   const queryClient = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
 
@@ -93,6 +93,20 @@ describe("sign-in page", () => {
     );
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(within(screen.getByTestId("auth-layout")).getByRole("main")).toBeInTheDocument();
+  });
+
+  it("shows the password-updated notice after a reset (?reset=success), and only then", async () => {
+    renderSignIn("/auth/sign-in?reset=success");
+
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Your password was updated. Sign in with your new password.",
+    );
+    expect(screen.getByLabelText("Email")).toBeInTheDocument();
+    cleanup();
+
+    renderSignIn("/auth/sign-in?reset=other");
+    await screen.findByRole("heading", { level: 1, name: "Sign in" });
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
   it("shows field errors after a submit with empty fields, focuses the e-mail and does not call the API", async () => {

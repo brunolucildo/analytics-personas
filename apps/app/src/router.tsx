@@ -10,6 +10,7 @@ import {
 import { ConfirmAccountPage } from "./features/auth/confirm-account-page";
 import { ForgotPasswordPage } from "./features/auth/forgot-password-page";
 import { ResendConfirmationPage } from "./features/auth/resend-confirmation-page";
+import { ResetPasswordPage } from "./features/auth/reset-password-page";
 import { SignInPage } from "./features/auth/sign-in-page";
 import { SignUpPage } from "./features/auth/sign-up-page";
 import { getAccessToken } from "./lib/access-token";
@@ -63,6 +64,9 @@ export function createAppRouter({ history, extraRoutes }: CreateAppRouterOptions
   const signInRoute = createRoute({
     getParentRoute: () => authRoute,
     path: "sign-in",
+    // `?reset=success` (set after a password reset) makes the page show its success notice.
+    validateSearch: (search: Record<string, unknown>): { reset?: "success" } =>
+      search.reset === "success" ? { reset: "success" } : {},
     component: SignInPage,
   });
 
@@ -90,6 +94,12 @@ export function createAppRouter({ history, extraRoutes }: CreateAppRouterOptions
     component: ResendConfirmationPage,
   });
 
+  const resetPasswordRoute = createRoute({
+    getParentRoute: () => authRoute,
+    path: "reset-password",
+    component: ResetPasswordPage,
+  });
+
   const homeRoute = createRoute({
     getParentRoute: () => appRoute,
     path: "/",
@@ -104,6 +114,7 @@ export function createAppRouter({ history, extraRoutes }: CreateAppRouterOptions
       forgotPasswordRoute,
       confirmAccountRoute,
       resendConfirmationRoute,
+      resetPasswordRoute,
       ...(extraRoutes?.auth?.map((create) => create(authRoute)) ?? []),
     ]),
     appRoute.addChildren([

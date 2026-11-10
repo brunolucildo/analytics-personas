@@ -1,9 +1,7 @@
-import { createRoute } from "@tanstack/react-router";
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ACCESS_TOKEN_KEY, setAccessToken } from "../lib/access-token";
-import type { RouteFactory } from "../router";
 import {
   jsonResponse,
   renderApp,
@@ -18,19 +16,6 @@ const TOKEN = "header.payload.signature";
 const sessionOk = () => jsonResponse(200, { user: SESSION_USER });
 const serverError = () =>
   jsonResponse(500, { error: { code: "INTERNAL_ERROR", message: "Boom.", details: [] } });
-
-function probe(path: string, testId: string): RouteFactory {
-  return (parent) =>
-    createRoute({
-      getParentRoute: () => parent,
-      path,
-      component: () => <p data-testid={testId}>probe</p>,
-    });
-}
-
-const AUTH_PROBES = {
-  auth: [probe("reset-password", "page-reset-password")],
-};
 
 afterEach(() => {
   vi.stubGlobal("fetch", originalFetch);
@@ -177,18 +162,22 @@ describe("/auth/* for a signed-in user (R9)", () => {
     "sends %s to /app",
     async (path) => {
       stubSessionFetch(sessionOk, sessionOk);
-      const { router } = renderApp(path, { extraRoutes: AUTH_PROBES });
+      const { router } = renderApp(path);
 
       expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("Welcome, Ana");
       expect(router.state.location.pathname).toBe("/app");
     },
   );
 
+  // The real page (spec 0010): with no token in the URL it shows the invalid-link state and
+  // makes no call, so a signed-in user is neither redirected nor sent to the API.
   it("leaves /auth/reset-password reachable", async () => {
     stubSessionFetch(sessionOk);
-    const { router } = renderApp("/auth/reset-password", { extraRoutes: AUTH_PROBES });
+    const { router } = renderApp("/auth/reset-password");
 
-    expect(await screen.findByTestId("page-reset-password")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "This link is invalid or has expired" }),
+    ).toBeInTheDocument();
     expect(router.state.location.pathname).toBe("/auth/reset-password");
   });
 

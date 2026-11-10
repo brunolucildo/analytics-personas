@@ -12,12 +12,40 @@ export type RequestPasswordResetResult =
   /** Unknown e-mail or unconfirmed account: nothing was stored. */
   | { status: "no_action" };
 
+/** Who the consumed reset token belonged to (spec 0010). */
+export interface PasswordResetOwner {
+  userId: string;
+  firstName: string;
+  /** Recipient of the "password changed" notice. Never logged. */
+  email: string;
+}
+
 export interface PasswordResetRepository {
   /** Atomically invalidates the earlier reset tokens and stores the new one, for a confirmed account only. */
   createForConfirmedUser(
     email: string,
     token: PasswordResetToken,
   ): Promise<RequestPasswordResetResult>;
+
+  /**
+   * Atomically consumes the `password_reset` token (by its SHA-256 hash), stores the new password
+   * hash, invalidates the user's other reset tokens and revokes every session of the user.
+   * Resolves the token owner, or `null` when the token is unknown, expired, already used or of
+   * another type: the reasons are deliberately not told apart.
+   */
+  resetByTokenHash(tokenHash: string, passwordHash: string): Promise<PasswordResetOwner | null>;
+}
+
+export interface PasswordChangedEmail {
+  to: string;
+  firstName: string;
+  /** Moment the password was changed. */
+  changedAt: Date;
+}
+
+export interface PasswordChangedMailer {
+  /** Hands the notice over for delivery. Never rejects: a mail failure must not change the response. */
+  sendPasswordChanged(email: PasswordChangedEmail): Promise<void>;
 }
 
 export interface PasswordResetEmail {

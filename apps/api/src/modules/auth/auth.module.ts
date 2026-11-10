@@ -7,6 +7,7 @@ import { EmailModule, EmailService } from "../email";
 import { ConfirmAccount } from "./application/confirm-account";
 import { RequestPasswordReset } from "./application/request-password-reset";
 import { ResendConfirmation } from "./application/resend-confirmation";
+import { ResetPassword } from "./application/reset-password";
 import { SessionService } from "./application/session.service";
 import { SignIn } from "./application/sign-in";
 import { SignOut } from "./application/sign-out";
@@ -18,7 +19,11 @@ import type {
   UserRepository,
 } from "./domain/auth-ports";
 import type { ConfirmationRepository } from "./domain/confirm-account-ports";
-import type { PasswordResetMailer, PasswordResetRepository } from "./domain/password-reset-ports";
+import type {
+  PasswordChangedMailer,
+  PasswordResetMailer,
+  PasswordResetRepository,
+} from "./domain/password-reset-ports";
 import type { AccessTokenSigner, SessionRepository } from "./domain/session-ports";
 import type {
   CredentialsRepository,
@@ -30,6 +35,7 @@ import {
   CONFIRMATION_REPOSITORY,
   CREDENTIALS_REPOSITORY,
   NEW_SESSION_MAILER,
+  PASSWORD_CHANGED_MAILER,
   PASSWORD_HASHER,
   PASSWORD_RESET_MAILER,
   PASSWORD_RESET_REPOSITORY,
@@ -44,6 +50,7 @@ import { Argon2PasswordVerifier } from "./infrastructure/argon2-password-verifie
 import { CryptoTokenGenerator, hashToken } from "./infrastructure/crypto-token-generator";
 import { EmailServiceConfirmationMailer } from "./infrastructure/email-service-confirmation-mailer";
 import { EmailServiceNewSessionMailer } from "./infrastructure/email-service-new-session-mailer";
+import { EmailServicePasswordChangedMailer } from "./infrastructure/email-service-password-changed-mailer";
 import { EmailServicePasswordResetMailer } from "./infrastructure/email-service-password-reset-mailer";
 import { SupabaseCredentialsRepository } from "./infrastructure/supabase-credentials.repository";
 import { SupabaseConfirmationRepository } from "./infrastructure/supabase-confirmation.repository";
@@ -180,6 +187,21 @@ import { AuthGuard } from "./interface/auth.guard";
         sessions: SessionService,
         mailer: NewSessionMailer,
       ) => new SignIn(credentials, verifier, sessions, mailer),
+    },
+    {
+      provide: PASSWORD_CHANGED_MAILER,
+      inject: [EmailService, ConfigService],
+      useFactory: (emails: EmailService, config: ConfigService<Environment, true>) =>
+        new EmailServicePasswordChangedMailer(emails, config.get("appUrl", { infer: true })),
+    },
+    {
+      provide: ResetPassword,
+      inject: [PASSWORD_RESET_REPOSITORY, PASSWORD_HASHER, PASSWORD_CHANGED_MAILER],
+      useFactory: (
+        resets: PasswordResetRepository,
+        hasher: PasswordHasher,
+        mailer: PasswordChangedMailer,
+      ) => new ResetPassword(resets, hasher, mailer, hashToken),
     },
     // Global guard: closes every route that is not `@Public()`. It is registered here, after
     // `RateLimitModule` in `AppModule`, so the rate limit still runs before authentication.
