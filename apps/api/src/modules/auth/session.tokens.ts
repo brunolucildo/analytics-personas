@@ -1,0 +1,2 @@
+export const SESSION_REPOSITORY = Symbol("SESSION_REPOSITORY");
+export const ACCESS_TOKEN_SIGNER = Symbol("ACCESS_TOKEN_SIGNER");

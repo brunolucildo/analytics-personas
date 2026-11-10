@@ -3,7 +3,7 @@
 > Spec executável. Preencha todas as seções; `TODO` é lacuna, não requisito.
 > Use `create-spec` para criar, `refine-spec` para auditar e `implement-me` para executar.
 
-- **Status:** rascunho
+- **Status:** concluída (pendente só a verificação manual no Mailtrap, sem credenciais)
 - **Slug:** 0002-auth-email-delivery
 - **Data:** 2026-11-09
 - **Atualizado em:** 2026-11-09
@@ -86,14 +86,14 @@ Como `DEVELOPMENT.md` §9 proíbe teste que dependa de rede externa, os testes a
 
 ## 6. Acceptance Criteria
 
-- [ ] Given cada valor de `EMAIL_PROVIDER`, When `send`, Then só o provedor escolhido é acionado e nenhum caso de uso importa provedor. (R1)
-- [ ] Given transporte falso, When `send` por `mailtrap` e por `resend`, Then o payload é o esperado; resposta de erro vira `EmailDeliveryError`. (R2)
-- [ ] Given `capture`, When `send`, Then a mensagem é lida por `getCapturedEmails` (e pela rota de teste no processo da API) e nada sai da máquina; `capture` em produção impede o boot. (R3)
-- [ ] Given variável ausente/inválida ou provedor errado para produção, When iniciar, Then falha citando a variável. (R4)
-- [ ] Given provedor indisponível, When `dispatch`, Then resolve sem erro e registra `email_delivery_failed`; When `send`, Then `EmailDeliveryError`. (R5)
-- [ ] Given timeout ou 5xx, When `send`, Then ≤ 3 tentativas e erro em ≤ 15 s; Given 4xx de requisição inválida, Then 1 tentativa. (R6)
-- [ ] Given envios com sucesso e com falha, When inspecionar os logs, Then não há destinatário, assunto, corpo, token, link ou chave. (R7)
-- [ ] Given o layout, When renderizar com `<script>` no conteúdo, Then o HTML o escapa e o texto puro está presente. (R8)
+- [x] Given cada valor de `EMAIL_PROVIDER`, When `send`, Then só o provedor escolhido é acionado e nenhum caso de uso importa provedor. (R1)
+- [x] Given transporte falso, When `send` por `mailtrap` e por `resend`, Then o payload é o esperado; resposta de erro vira `EmailDeliveryError`. (R2)
+- [x] Given `capture`, When `send`, Then a mensagem é lida por `getCapturedEmails` (e pela rota de teste no processo da API) e nada sai da máquina; `capture` em produção impede o boot. (R3)
+- [x] Given variável ausente/inválida ou provedor errado para produção, When iniciar, Then falha citando a variável. (R4)
+- [x] Given provedor indisponível, When `dispatch`, Then resolve sem erro e registra `email_delivery_failed`; When `send`, Then `EmailDeliveryError`. (R5)
+- [x] Given timeout ou 5xx, When `send`, Then ≤ 3 tentativas e erro em ≤ 15 s; Given 4xx de requisição inválida, Then 1 tentativa. (R6)
+- [x] Given envios com sucesso e com falha, When inspecionar os logs, Then não há destinatário, assunto, corpo, token, link ou chave. (R7)
+- [x] Given o layout, When renderizar com `<script>` no conteúdo, Then o HTML o escapa e o texto puro está presente. (R8)
 - [ ] Manual: Given credenciais do Mailtrap em um `.env` local, When um e-mail de teste é enviado, Then ele aparece na caixa do Mailtrap. (R2, verificação manual; registrar no relatório)
 
 ## 7. O que fazer
@@ -150,7 +150,8 @@ Como validar que a spec foi atendida:
 
 ## 12. Refinamento
 
-| Data       | O que mudou                                                                                                                                                                                                                                                                      | Motivo                                                |
-| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| 2026-11-09 | Spec criada pela skill `breakdown-specs` (épico de autenticação).                                                                                                                                                                                                                | Habilitadora usada por 0004, 0006, 0007, 0009 e 0010. |
-| 2026-11-09 | Reescrita: `MailerPort`/SMTP genérico/servidor local do Supabase substituídos por `EmailService` com Mailtrap (non-production), Resend (produção) e provider `capture` (testes); R5 (servidor local) removido; novas regras de seleção por ambiente e de teste sem rede externa. | Decisão do solicitante no quiz de perguntas abertas.  |
+| Data       | O que mudou                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Motivo                                                            |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| 2026-11-09 | Spec criada pela skill `breakdown-specs` (épico de autenticação).                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Habilitadora usada por 0004, 0006, 0007, 0009 e 0010.             |
+| 2026-11-09 | Reescrita: `MailerPort`/SMTP genérico/servidor local do Supabase substituídos por `EmailService` com Mailtrap (non-production), Resend (produção) e provider `capture` (testes); R5 (servidor local) removido; novas regras de seleção por ambiente e de teste sem rede externa.                                                                                                                                                                                                                                  | Decisão do solicitante no quiz de perguntas abertas.              |
+| 2026-11-09 | Implementada (`implement-me`). Premissas registradas: Mailtrap (Email Sandbox) e Resend por **API HTTP com `fetch` nativo**, sem SDK e sem SMTP (ADR `0006`); a rota de apoio a testes é declarada no módulo e um guard responde 404 fora do `capture` (o `ConfigModule` carrega o env de forma assíncrona, então o provedor só é conhecido após o boot dos módulos); `purpose` opcional na mensagem (padrão `unspecified`) para o log; `bodyHtml` do layout é `SafeHtml` (tag `html` escapa interpolações). | Decisões de plano sem pergunta ao solicitante (modo orquestrado). |

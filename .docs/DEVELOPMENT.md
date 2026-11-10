@@ -38,7 +38,7 @@ Dependências apontam para dentro: `interface → application → domain`; `infr
 
 ### 2.3 Frontend
 
-`apps/app` é uma SPA React + Vite (ADR 0001). Estrutura-alvo, a criar quando a primeira feature existir:
+`apps/app` é uma SPA React + Vite (ADR 0001). Estrutura (criada com a spec `0004`):
 
 ```text
 apps/app/src/
@@ -50,6 +50,8 @@ apps/app/src/
 - `App.tsx` e rotas compõem; não concentram regra de negócio.
 - Primitivos visuais em `packages/ui`; composições na feature.
 - Não crie uma camada `services/` genérica; use clients explícitos em `lib/`.
+- Chamadas HTTP à API passam por `lib/api-client.ts` (`apiClient.post`): base `${VITE_API_URL}/api/v1`, JSON, erro tipado `ApiError { status, code, message, details }` (`status` 0 e `NETWORK_ERROR` quando a rede falha). A feature expõe um hook de mutation/query e traduz o `ApiError` em mensagens (exemplo: `features/auth/describe-sign-up-failure.ts`).
+- Formulários: validação por função pura na feature, só como feedback antes do envio (a API é a fonte da regra); erros em texto junto ao campo, ligados por `aria-describedby`; não mostre erro no `blur` quando ele puder deslocar o botão de envio e engolir o clique.
 - `apps/docs` segue o App Router do Next.js (Server Components por padrão; `"use client"` só na folha interativa).
 
 ## 3. TypeScript
@@ -88,7 +90,8 @@ apps/app/src/
 - Erros de domínio são mapeados para HTTP na camada de interface; não vaze stack trace.
 - Nenhum acesso direto ao Supabase dentro do controller.
 - Toda integração externa tem timeout, retry limitado e erro tipado.
-- Endpoints precisam de autenticação/autorização explícitas, exceto health check.
+- **A API é fechada por padrão:** um `AuthGuard` global exige sessão em todo endpoint; só `@Public()` (`src/common/public.decorator.ts`) abre uma rota (hoje: `GET /api/v1/health`, `POST /api/v1/auth/sign-up`, `POST /api/v1/auth/sign-in` e `/test-support/emails`, que já é 404 fora do `capture`). Endpoint novo não precisa de nada para ser protegido; para ler a pessoa logada use `@CurrentSession()` (ver §13.5). Autorização além da sessão (papéis) fica explícita no caso de uso.
+- E-mail sai só por `EmailService` (`apps/api/src/modules/email`): o caso de uso chama `dispatch` **depois do commit**, para que falha do provedor não mude o resultado do request; use `send` só quando precisar do erro. Monte o corpo com `renderEmailLayout` e a tag `html` (ela escapa valores dinâmicos). Nunca importe SDK ou cliente de provedor fora do módulo `email` nem logue destinatário, assunto, corpo, link ou token.
 
 ## 6. Dados (PostgreSQL/Supabase)
 
@@ -96,6 +99,9 @@ apps/app/src/
 - Nomes de tabela/coluna em `snake_case`; tipos explícitos; FKs e índices justificados.
 - Multi-tenant exige isolamento no banco (RLS) e teste cobrindo acesso cruzado.
 - Service role key só no servidor.
+- Acesso a dados na API: repositórios em `infrastructure` usam `@supabase/supabase-js` com a service role. O que exige transação vive em função SQL chamada por RPC (migration), com `revoke all on function ... from public, anon, authenticated` e `grant execute ... to service_role`. Tabelas com dado sensível: RLS ligada, **sem policies** e `revoke all` de `anon`/`authenticated`.
+- Erro do banco vira `DataAccessError` (mensagem fixa, só operação e código): a mensagem do Postgres pode repetir valores como o e-mail. Concorrência se resolve no banco (índice único + `on conflict`), nunca com "consulta e depois insere".
+- Migration nova: nome `<timestamp>_<descricao>.sql`, comentário de rollback no topo e `bun run db:migrate` para aplicar no Supabase local.
 - Storage com URLs assinadas e validação de tipo/tamanho de arquivo.
 - Dados pessoais: minimize coleta, não logue PII, defina retenção.
 
@@ -135,6 +141,11 @@ Regras:
 - Bug corrigido ganha teste de regressão.
 - Ao adicionar um novo tipo de teste ou workspace, crie o script real, adicione a task no `turbo.json` e atualize `QA.md`. Não invente comandos.
 - Testes da API definem env fictícia em `apps/api/test/setup-env.ts`; não use chave real nem a service role.
+- Teste que envolve e-mail roda com `EMAIL_PROVIDER=capture` (já definido em `setup-env.ts`) e lê as mensagens com `getCapturedEmails({ to })`; um processo separado (E2E) usa `GET /api/v1/test-support/emails?to=<endereço>` e `DELETE` no mesmo caminho para limpar. Nenhum teste envia e-mail real nem chama Mailtrap ou Resend.
+- Teste de integração roda contra o **Supabase local** (`bun run infra:up` e `bun run db:migrate` antes): a `globalSetup` (`apps/api/test/support/global-setup.ts`) lê as chaves de `supabase status -o env` quando não estão no ambiente e falha com a instrução se o banco não estiver no ar. Use e-mails únicos (`uniqueEmail` de `test/support/supabase.ts`) e apague o que criou (`deleteUsersByEmail`); o banco é compartilhado. Teste unitário usa os fakes de `test/support/in-memory-auth.ts`.
+- Testes de `AppModule` que sobrescrevem o `ConfigService` com um objeto fake precisam incluir `email`, `supabaseUrl`, `supabaseServiceRoleKey` e `authJwtSecret` (exemplo em `apps/api/test/rate-limit.int-spec.ts`). `AUTH_JWT_SECRET` fictícia vem de `apps/api/test/setup-env.ts`.
+- Rota de teste declarada num módulo de teste (`controllers: [Probe]`) é fechada como qualquer outra: marque com `@Public()` quando o teste não for de autenticação, ou use um token de `SessionService.issue` (ver `apps/api/test/auth-sessions.int-spec.ts`). Para semear um usuário confirmado sem passar por sign-up/sign-in use `seedConfirmedUser` de `apps/api/test/support/sessions.ts`; no E2E, `seedSignedInUser` de `e2e/support/session.ts` (usuários `e2e-session-*`, apagados no `globalTeardown`). Quando o teste precisa **entrar de verdade** (sign-in), a senha precisa ter hash Argon2id real: no integration, `argon2.hash` no `beforeAll` (ver `apps/api/test/auth-sign-in.int-spec.ts`); no E2E, `seedUserWithPassword` de `e2e/support/credentials.ts` (hash fixo da senha de teste `SEEDED_PASSWORD`, conta confirmada ou não). Cuidado com a cota de `POST /auth/sign-up` (5 por hora por IP, compartilhada por todos os specs de uma execução do Playwright): semeie a conta em vez de cadastrar. O e-mail de teste tem de caber no limite de 64 caracteres da parte local do `IsEmail` (rótulo curto).
+- No SPA, `renderApp` de `apps/app/src/test/render-app.tsx` monta router e `QueryClient` como o `main.tsx`; use `stubSessionFetch` para responder `GET /auth/session` e grave o token em `localStorage` (`access_token`).
 
 ## 10. Dependências
 
@@ -178,14 +189,15 @@ Definidas pela spec `0001-platform-routing-conventions` (ADRs `0003` e `0004`). 
 
 ### 13.1 Espaço de URLs
 
-| Zona                    | Prefixo     | Acesso                                                                   | Onde vive                                                               |
-| ----------------------- | ----------- | ------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
-| Páginas de autenticação | `/auth/*`   | Públicas                                                                 | Grupo `/auth` em `apps/app/src/router.tsx` (`AuthLayout`)               |
-| Páginas do produto      | `/app/*`    | Privadas (o guard chega com a spec `0005`; até lá `/app` está acessível) | Grupo `/app` em `apps/app/src/router.tsx` (`AppLayout`)                 |
-| API                     | `/api/v1/*` | Autenticação explícita, exceto `GET /api/v1/health`                      | `apps/api`; o prefixo é aplicado em `configureApp` (`src/bootstrap.ts`) |
+| Zona                    | Prefixo     | Acesso                                                    | Onde vive                                                               |
+| ----------------------- | ----------- | --------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Páginas de autenticação | `/auth/*`   | Públicas                                                  | Grupo `/auth` em `apps/app/src/router.tsx` (`AuthLayout`)               |
+| Páginas do produto      | `/app/*`    | Privadas: exigem sessão (guard da spec `0005`, ver §13.5) | Grupo `/app` em `apps/app/src/router.tsx` (`AppLayout`)                 |
+| API                     | `/api/v1/*` | Autenticação explícita, exceto `GET /api/v1/health`       | `apps/api`; o prefixo é aplicado em `configureApp` (`src/bootstrap.ts`) |
 
-- `/` redireciona para `/app`; qualquer caminho sem rota mostra a página "Page not found".
+- `/` redireciona para `/app` (e, sem sessão, `/app` para `/auth/sign-in`); qualquer caminho sem rota mostra a página "Page not found".
 - Página nova entra como filha de `authRoute` ou de `appRoute`; nunca direto na raiz.
+- Páginas de autenticação existentes: `/auth/sign-in` (0007), `/auth/sign-up` (0004), `/auth/forgot-password` (0009), `/auth/confirm-account` e `/auth/resend-confirmation` (0006) e `/auth/reset-password` (0010). A confirmação é um `POST` disparado pela página (nunca um `GET`), uma única vez por visita. A página de reset tira o token do endereço ao carregar (`router.navigate` com `replace`) e o guarda só em memória; o aviso de sucesso do sign-in vem de `?reset=success` (`validateSearch` da rota `sign-in`).
 - A API só serve `/api/v1/*`; fora dele responde 404 no envelope de erro. Uma `v2` exige ADR.
 
 ### 13.2 Contratos da API
@@ -222,3 +234,39 @@ Definidas pela spec `0001-platform-routing-conventions` (ADRs `0003` e `0004`). 
 - **pt-BR:** `.docs/`, specs, planos, ADRs e mensagens de commit.
 - Strings em pt-BR de código antigo migram quando o arquivo for alterado (hoje: `apps/app/src/lib/supabase.ts` e `apps/api/src/observability/telemetry.ts`).
 - Não há biblioteca de i18n; adotar uma (vários idiomas) exige decisão e ADR.
+
+### 13.4 Limite de requisições
+
+Módulo `apps/api/src/modules/rate-limit/` (spec `0003`, ADR `0005`). O limite é **opt-in por rota**: o guard é global, mas só age em rota com `@RateLimit('<policy>')`; rota sem o decorator nunca é limitada (inclusive `GET /api/v1/health`).
+
+Aplicar uma política a uma rota:
+
+```ts
+import { RateLimit } from "../rate-limit"; // ou o caminho relativo do módulo
+
+@Post("sign-in")
+@RateLimit("sign-in")
+signIn(@Body() body: SignInDto) { /* ... */ }
+```
+
+- **Políticas:** `AUTH_RATE_LIMIT_POLICIES` em `rate-limit.policies.ts` é o único lugar com os números (`sign-up` 5/60 min por IP; `sign-in` 10/10 min por IP + e-mail; `confirm-account` 10/10 min por IP; `resend-confirmation` 3/10 min por IP + e-mail; `forgot-password` 3/10 min por IP + e-mail; `reset-password` 10/10 min por IP). Política nova entra nesse registro; nome inexistente no decorator faz a rota responder 500 (erro de programação, nunca rota sem proteção em silêncio).
+- **Chave:** rota (`Classe.metodo`) + política + IP + (se a política é `ip-and-email`) o `email` string do corpo com trim e minúsculas, tudo em hash SHA-256 na memória. Sem `email` string, cai para a chave só por IP.
+- **Resposta ao exceder:** 429, header `Retry-After` (segundos, inteiro >= 1) e envelope `RATE_LIMITED` com `details: [{ "retryAfterSeconds": n }]`. Janela fixa por chave.
+- **Logs:** só `event: "rate_limited"` com o nome da política (e `rate_limit_store_error` quando o armazenamento falha). Nunca IP, e-mail ou chave.
+- **Fail-open:** se o armazenamento lançar erro, a requisição passa.
+- **Ordem de guards:** o `RateLimitModule` é importado logo após o `ConfigModule` no `AppModule`; guards globais futuros (ex.: sessão) devem ser registrados depois, para o limite rodar antes da autenticação.
+- **`TRUST_PROXY`** (`false` por padrão): com `true`, o IP vem do primeiro endereço de `X-Forwarded-For` (use só atrás de um proxy confiável; do contrário qualquer cliente forja o IP). Com `false`, o cabeçalho é ignorado e atrás de um proxy todos compartilham a cota do IP do proxy: configure antes do deploy.
+- **Limitação:** contadores em memória, **instância única**. Reiniciar a API zera as contagens e com mais de uma instância cada uma conta sozinha. O armazenamento fica atrás da interface `RateLimitStore`; Redis é backlog. Teto de 10 000 entradas, com evicção da mais antiga e descarte das expiradas.
+- **Testes:** use `resetRateLimitStore(app)` de `apps/api/test/support/rate-limit.ts` em `beforeEach`, e `createFakeClock()` com o provider `RATE_LIMIT_CLOCK` para avançar o tempo. Para uma política de teste, sobrescreva `RATE_LIMIT_POLICIES` (exemplo em `apps/api/test/rate-limit.int-spec.ts`).
+
+### 13.5 Sessão e proteção de rotas
+
+Módulo `apps/api/src/modules/auth/` (spec `0005`; modelo no ADR 0009, resumo em `ARCHITECTURE.md` §4.7).
+
+- **Header:** `Authorization: Bearer <jwt>`. O JWT só carrega `sub`, `sid`, `iat` e `exp`; a validade vem da linha em `sessions` (a API a lê a cada request). Emitir uma sessão revoga a anterior do mesmo usuário (uma ativa por usuário, garantido pelo banco).
+- **Resposta de sessão** (para os endpoints que emitem sessão): `presentSession(await sessions.issue(userId))` devolve `{accessToken, expiresAt, user:{id, firstName, lastName, email}}`. `GET /api/v1/auth/session` devolve só `{user}`.
+- **Rota aberta:** `@Public()` no método ou no controller; sem ele, 401 `UNAUTHENTICATED` ("Authentication required.") para token ausente, malformado, de assinatura inválida, expirado, sem `sid` ou de sessão revogada/inexistente, sem dizer qual. Rota inexistente continua 404.
+- **Rota fechada:** `@CurrentSession() session: ActiveSession` dá `session.userId`, `session.sessionId` e `session.user`.
+- **Ordem dos guards:** o de limite de requisições roda antes do de sessão (ver §13.4), então tentativas anônimas também contam.
+- **Segredo:** `AUTH_JWT_SECRET` (>= 32 caracteres) só no servidor, nunca em log nem em `VITE_*`. Falha do banco ao validar é 500, não 401.
+- **SPA:** o token fica em `localStorage` (`access_token`) via `lib/access-token.ts` (`getAccessToken`, `setAccessToken`, `clearAccessToken`; nunca lance, caem para memória). `lib/api-client.ts` envia o header e, num 401 `UNAUTHENTICATED`, limpa o token. Telas privadas entram como filhas de `appRoute` (o guard já cobre); páginas de `/auth/*` entram em `authRoute` (quem tem sessão é mandado para `/app`, exceto `confirm-account` e `reset-password`; a regra é `features/auth/auth-redirect.ts`). Leia a pessoa logada com `useSession()` (`GET /auth/session`). Sair: `useSignOut()` (`features/auth/use-sign-out.ts`) chama `POST /auth/sign-out` e, em `onSettled` (sucesso ou falha), faz `clearAccessToken()`, `queryClient.clear()` e navega para `/auth/sign-in`; no servidor, `SignOut` revoga só o `sid` da sessão atual.

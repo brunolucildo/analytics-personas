@@ -3,7 +3,7 @@
 > Spec executável. Preencha todas as seções; `TODO` é lacuna, não requisito.
 > Use `create-spec` para criar, `refine-spec` para auditar e `implement-me` para executar.
 
-- **Status:** rascunho
+- **Status:** concluída (R1 a R8 atendidos; gates verdes em 2026-11-09)
 - **Slug:** 0010-auth-reset-password
 - **Data:** 2026-11-09
 - **Atualizado em:** 2026-11-09
@@ -76,15 +76,15 @@ O link recebido no 0009 abre `/auth/reset-password?token=...`. A pessoa define a
 
 ## 6. Acceptance Criteria
 
-- [ ] Given token válido e senhas válidas, When `POST /api/v1/auth/reset-password`, Then 204; senha nova no sign-in funciona e a antiga não. (R1)
-- [ ] Given senhas inválidas ou diferentes, When `POST`, Then 400 `VALIDATION_FAILED` e o mesmo token ainda serve depois. (R2)
-- [ ] Given token desconhecido, expirado, usado ou do tipo errado, When `POST`, Then 400 `TOKEN_INVALID_OR_EXPIRED`. (R3)
-- [ ] Given duas requisições simultâneas, When mesmo token, Then uma 204 e outra 400. (R4)
-- [ ] Given sessão ativa A, When reset conclui, Then A → 401. (R5)
-- [ ] Given reset concluído e reset recusado, When ler as mensagens capturadas, Then só o primeiro gera e-mail "Your Analytics Personas password was changed". (R6)
-- [ ] Given 11 requisições em 10 min do mesmo IP, When a 11ª, Then 429. (R7)
-- [ ] Given o E2E (sign-up → confirmar → forgot → ler o e-mail → abrir o link → nova senha), When concluir, Then a URL final é `/auth/sign-in` com o aviso e o login com a nova senha leva a `/app`; Given o mesmo link de novo, Then estado de link inválido. (R8)
-- [ ] Given `bun run lint`, `check-types`, `build`, `test`, `test:integration` e `test:e2e`, Then passam.
+- [x] Given token válido e senhas válidas, When `POST /api/v1/auth/reset-password`, Then 204; senha nova no sign-in funciona e a antiga não. (R1)
+- [x] Given senhas inválidas ou diferentes, When `POST`, Then 400 `VALIDATION_FAILED` e o mesmo token ainda serve depois. (R2)
+- [x] Given token desconhecido, expirado, usado ou do tipo errado, When `POST`, Then 400 `TOKEN_INVALID_OR_EXPIRED`. (R3)
+- [x] Given duas requisições simultâneas, When mesmo token, Then uma 204 e outra 400. (R4)
+- [x] Given sessão ativa A, When reset conclui, Then A → 401. (R5)
+- [x] Given reset concluído e reset recusado, When ler as mensagens capturadas, Then só o primeiro gera e-mail "Your Analytics Personas password was changed". (R6)
+- [x] Given 11 requisições em 10 min do mesmo IP, When a 11ª, Then 429. (R7)
+- [x] Given o E2E (sign-up → confirmar → forgot → ler o e-mail → abrir o link → nova senha), When concluir, Then a URL final é `/auth/sign-in` com o aviso e o login com a nova senha leva a `/app`; Given o mesmo link de novo, Then estado de link inválido. (R8)
+- [x] Given `bun run lint`, `check-types`, `build`, `test`, `test:integration` e `test:e2e`, Then passam.
 
 ## 7. O que fazer
 
@@ -123,17 +123,21 @@ Como validar que a spec foi atendida:
 
 ## 11. Perguntas abertas e premissas
 
-| Pergunta/Premissa                                                                                                                    | Impacto                            | Bloqueante?     | Quem decide        |
-| ------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------- | --------------- | ------------------ |
-| Premissa: o reset não confirma a conta nem abre sessão; só troca a senha e segue para o sign-in.                                     | Pedido do solicitante.             | Não             | Produto            |
-| Premissa: o aviso de sucesso no sign-in vem por parâmetro de busca `reset=success` (reaproveitável e testável).                      | Detalhe de implementação do aviso. | Não             | Time de engenharia |
-| **Decisão (2026-11-09):** o token é removido da URL logo ao carregar a página (R8); recarregar exige abrir o link do e-mail de novo. | Segurança acima da conveniência.   | Não (resolvida) | Solicitante        |
-| Premissa: não há checagem de "nova senha igual à antiga".                                                                            | Segurança marginal.                | Não             | Produto            |
+| Pergunta/Premissa                                                                                                                                                                               | Impacto                                                              | Bloqueante?     | Quem decide        |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | --------------- | ------------------ |
+| Premissa: o reset não confirma a conta nem abre sessão; só troca a senha e segue para o sign-in.                                                                                                | Pedido do solicitante.                                               | Não             | Produto            |
+| Premissa: o aviso de sucesso no sign-in vem por parâmetro de busca `reset=success` (reaproveitável e testável).                                                                                 | Detalhe de implementação do aviso.                                   | Não             | Time de engenharia |
+| **Decisão (2026-11-09):** o token é removido da URL logo ao carregar a página (R8); recarregar exige abrir o link do e-mail de novo.                                                            | Segurança acima da conveniência.                                     | Não (resolvida) | Solicitante        |
+| Premissa: não há checagem de "nova senha igual à antiga".                                                                                                                                       | Segurança marginal.                                                  | Não             | Produto            |
+| Premissa (implementação): a revogação das sessões roda **dentro** da função SQL `auth_reset_password`, na mesma transação da troca da senha, e não numa chamada posterior ao `SessionService`.  | Uma falha entre as duas etapas deixaria uma sessão antiga viva (R5). | Não             | Time de engenharia |
+| Premissa (implementação): o corpo do e-mail de sucesso diz que a mudança que não foi da pessoa não deve ser ignorada; o layout do 0002 (rodapé "you can ignore this message") não foi alterado. | Evita contradição com o rodapé sem mexer no contrato do 0002.        | Não             | Time de engenharia |
+| Premissa (implementação): `<meta name="referrer" content="no-referrer">` em `apps/app/index.html` (mitigação do vazamento por `Referer`, §9).                                                   | Segurança do link.                                                   | Não             | Time de engenharia |
 
 ## 12. Refinamento
 
-| Data       | O que mudou                                                                                                                                           | Motivo                                                                                     |
-| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| 2026-11-09 | Spec criada pela skill `breakdown-specs` (épico de autenticação).                                                                                     | Capacidade "resetar senha".                                                                |
-| 2026-11-09 | Dependência de 0007 declarada.                                                                                                                        | Verificação de consistência do `breakdown-specs`: R1 e o E2E do R8 usam o sign-in do 0007. |
-| 2026-11-09 | Token removido da URL ao carregar a página (R8); transação do R1 vira função SQL chamada por RPC; e-mail verificado pelo provider `capture`/Mailtrap. | Respostas do quiz de perguntas abertas.                                                    |
+| Data       | O que mudou                                                                                                                                                                                                                | Motivo                                                                                     |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| 2026-11-09 | Spec criada pela skill `breakdown-specs` (épico de autenticação).                                                                                                                                                          | Capacidade "resetar senha".                                                                |
+| 2026-11-09 | Dependência de 0007 declarada.                                                                                                                                                                                             | Verificação de consistência do `breakdown-specs`: R1 e o E2E do R8 usam o sign-in do 0007. |
+| 2026-11-09 | Token removido da URL ao carregar a página (R8); transação do R1 vira função SQL chamada por RPC; e-mail verificado pelo provider `capture`/Mailtrap.                                                                      | Respostas do quiz de perguntas abertas.                                                    |
+| 2026-11-09 | Implementada (`implement-me`): função SQL `auth_reset_password` (inclui a revogação das sessões), `POST /auth/reset-password`, página `/auth/reset-password`, aviso `?reset=success` no sign-in, e-mail de senha alterada. | Execução da spec; premissas de implementação registradas em §11.                           |

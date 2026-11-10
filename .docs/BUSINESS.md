@@ -15,17 +15,17 @@ O diferencial não é "um chat genérico": é ter especialização por função,
 
 ## 3. Conceitos do domínio
 
-| Termo                    | Definição                                                                                                                     |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
-| **Expert**               | Agente de IA configurado para atuar como uma função específica do clube. Tem escopo, fontes autorizadas e formato de entrega. |
-| **Persona**              | Termo do nome do produto (`analytics-personas`); neste documento, o conceito operacional é **Expert**.                        |
-| **Conector**             | Integração que traz dados de uma fonte externa (Notion, Drive, Jira etc.).                                                    |
-| **Fonte**                | Documento, página, arquivo ou registro obtido por um conector.                                                                |
-| **Base de conhecimento** | Conjunto de fontes indexadas e disponíveis para um expert.                                                                    |
-| **Demanda**              | Pedido feito pelo usuário a um expert.                                                                                        |
-| **Entrega**              | Resposta do expert: análise, relatório, plano ou recomendação, com citações das fontes.                                       |
-| **Clube**                | Organização atendida. Limite de isolamento de dados (modelo a confirmar).                                                     |
-| **Área / Posição**       | Função de futebol que define o escopo do expert (ex.: Head Coach, Fisiologista).                                              |
+| Termo                    | Definição                                                                                                                       |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| **Expert**               | Agente de IA configurado para atuar como uma função específica do clube. Tem escopo, fontes autorizadas e formato de entrega.   |
+| **Persona**              | Termo do nome anterior do produto (`analytics-personas`, hoje **Rondo**); neste documento, o conceito operacional é **Expert**. |
+| **Conector**             | Integração que traz dados de uma fonte externa (Notion, Drive, Jira etc.).                                                      |
+| **Fonte**                | Documento, página, arquivo ou registro obtido por um conector.                                                                  |
+| **Base de conhecimento** | Conjunto de fontes indexadas e disponíveis para um expert.                                                                      |
+| **Demanda**              | Pedido feito pelo usuário a um expert.                                                                                          |
+| **Entrega**              | Resposta do expert: análise, relatório, plano ou recomendação, com citações das fontes.                                         |
+| **Clube**                | Organização atendida. Limite de isolamento de dados (modelo a confirmar).                                                       |
+| **Área / Posição**       | Função de futebol que define o escopo do expert (ex.: Head Coach, Fisiologista).                                                |
 
 ## 4. Experts iniciais
 

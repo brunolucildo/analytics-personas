@@ -7,6 +7,13 @@ import {
   redirect,
   type RouterHistory,
 } from "@tanstack/react-router";
+import { ConfirmAccountPage } from "./features/auth/confirm-account-page";
+import { ForgotPasswordPage } from "./features/auth/forgot-password-page";
+import { ResendConfirmationPage } from "./features/auth/resend-confirmation-page";
+import { ResetPasswordPage } from "./features/auth/reset-password-page";
+import { SignInPage } from "./features/auth/sign-in-page";
+import { SignUpPage } from "./features/auth/sign-up-page";
+import { getAccessToken } from "./lib/access-token";
 import { AppLayout } from "./routes/app-layout";
 import { AuthLayout } from "./routes/auth-layout";
 import { HomePage } from "./routes/home-page";
@@ -41,11 +48,56 @@ export function createAppRouter({ history, extraRoutes }: CreateAppRouterOptions
     component: AuthLayout,
   });
 
-  // Private group: every page under /app/*.
+  // Private group: every page under /app/*. Without a token the visitor never reaches the layout
+  // (and the API is never called); with one, `AppLayout` checks it against the API.
   const appRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: "app",
+    beforeLoad: () => {
+      if (getAccessToken() === null) {
+        throw redirect({ to: "/auth/sign-in", replace: true });
+      }
+    },
     component: AppLayout,
+  });
+
+  const signInRoute = createRoute({
+    getParentRoute: () => authRoute,
+    path: "sign-in",
+    // `?reset=success` (set after a password reset) makes the page show its success notice.
+    validateSearch: (search: Record<string, unknown>): { reset?: "success" } =>
+      search.reset === "success" ? { reset: "success" } : {},
+    component: SignInPage,
+  });
+
+  const signUpRoute = createRoute({
+    getParentRoute: () => authRoute,
+    path: "sign-up",
+    component: SignUpPage,
+  });
+
+  const forgotPasswordRoute = createRoute({
+    getParentRoute: () => authRoute,
+    path: "forgot-password",
+    component: ForgotPasswordPage,
+  });
+
+  const confirmAccountRoute = createRoute({
+    getParentRoute: () => authRoute,
+    path: "confirm-account",
+    component: ConfirmAccountPage,
+  });
+
+  const resendConfirmationRoute = createRoute({
+    getParentRoute: () => authRoute,
+    path: "resend-confirmation",
+    component: ResendConfirmationPage,
+  });
+
+  const resetPasswordRoute = createRoute({
+    getParentRoute: () => authRoute,
+    path: "reset-password",
+    component: ResetPasswordPage,
   });
 
   const homeRoute = createRoute({
@@ -56,7 +108,15 @@ export function createAppRouter({ history, extraRoutes }: CreateAppRouterOptions
 
   const routeTree = rootRoute.addChildren([
     indexRoute,
-    authRoute.addChildren(extraRoutes?.auth?.map((create) => create(authRoute)) ?? []),
+    authRoute.addChildren([
+      signInRoute,
+      signUpRoute,
+      forgotPasswordRoute,
+      confirmAccountRoute,
+      resendConfirmationRoute,
+      resetPasswordRoute,
+      ...(extraRoutes?.auth?.map((create) => create(authRoute)) ?? []),
+    ]),
     appRoute.addChildren([
       homeRoute,
       ...(extraRoutes?.app?.map((create) => create(appRoute)) ?? []),
@@ -67,3 +127,13 @@ export function createAppRouter({ history, extraRoutes }: CreateAppRouterOptions
 }
 
 export type AppRouter = ReturnType<typeof createAppRouter>;
+
+/**
+ * Leaves for the sign-in page when the API says the session is gone. Auth pages stay
+ * where they are: a stale token must not push someone off the sign-up page.
+ */
+export function redirectToSignIn(router: AppRouter): void {
+  if (!router.state.location.pathname.startsWith("/auth")) {
+    void router.navigate({ to: "/auth/sign-in", replace: true });
+  }
+}

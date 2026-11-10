@@ -16,10 +16,15 @@ export const API_PREFIX = "api/v1";
  * error envelope). Shared by the real bootstrap and by integration tests.
  */
 export function configureApp(app: INestApplication): INestApplication {
-  const appOrigin = app.get<ConfigService<Environment, true>>(ConfigService).get("appUrl", {
-    infer: true,
-  });
+  const config = app.get<ConfigService<Environment, true>>(ConfigService);
+  const appOrigin = config.get("appUrl", { infer: true });
 
+  // With TRUST_PROXY=true Express takes `request.ip` from the first X-Forwarded-For
+  // address; with false the header is ignored. The rate limiter keys on this IP.
+  app
+    .getHttpAdapter()
+    .getInstance()
+    .set("trust proxy", config.get("trustProxy", { infer: true }));
   app.useLogger(new StructuredLogger());
   app.setGlobalPrefix(API_PREFIX);
   app.enableCors({

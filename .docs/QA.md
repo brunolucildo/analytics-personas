@@ -5,19 +5,19 @@
 
 ## 1. Estado atual
 
-| Recurso                     | Estado                                                             |
-| --------------------------- | ------------------------------------------------------------------ |
-| Lint (OXLint)               | Configurado; passa                                                 |
-| Formatação (OXFmt)          | Configurada; idempotente                                           |
-| Tipos                       | Configurado em `app`, `api`, `docs` e `@repo/ui`; passa            |
-| Build                       | `apps/app/dist`, `apps/api/dist` e `apps/docs/.next`; passa        |
-| Testes unitários            | Vitest em `app` e `api`; passam                                    |
-| Testes de integração        | Vitest + Supertest em `api` (`/api/v1/health` e convenções); passa |
-| Testes E2E                  | Playwright (`e2e/home.spec.ts`, `e2e/routing.spec.ts`); passa      |
-| Cobertura                   | `bun run test:coverage` gera `coverage/`; sem threshold            |
-| Hooks de pre-commit         | Configurados (`lefthook.yml`); validados no commit raiz `227e0ad`  |
-| CI                          | Não configurado                                                    |
-| Acessibilidade automatizada | Não configurada                                                    |
+| Recurso                     | Estado                                                                                                                                                             |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Lint (OXLint)               | Configurado; passa                                                                                                                                                 |
+| Formatação (OXFmt)          | Configurada; idempotente                                                                                                                                           |
+| Tipos                       | Configurado em `app`, `api`, `docs` e `@repo/ui`; passa                                                                                                            |
+| Build                       | `apps/app/dist`, `apps/api/dist` e `apps/docs/.next`; passa                                                                                                        |
+| Testes unitários            | Vitest em `app` e `api`; passam                                                                                                                                    |
+| Testes de integração        | Vitest + Supertest em `api`, contra o Supabase local (exige `infra:up` e `db:migrate`); passa                                                                      |
+| Testes E2E                  | Playwright (`home`, `routing`, `sign-up`, `forgot-password`, `confirm-account`, `session`, `sign-out`, `sign-in`, `reset-password`); sobe app e API (`capture`) e exige o Supabase local; passa |
+| Cobertura                   | `bun run test:coverage` gera `coverage/`; sem threshold                                                                                                            |
+| Hooks de pre-commit         | Configurados (`lefthook.yml`); validados no commit raiz `227e0ad`                                                                                                  |
+| CI                          | Não configurado                                                                                                                                                    |
+| Acessibilidade automatizada | Não configurada                                                                                                                                                    |
 
 ### 1.1 Baseline verificado em 2026-11-07
 
@@ -75,15 +75,102 @@ Observabilidade (R9), com `bun run infra:up` (5 containers `healthy`) e a API co
 
 **Pré-requisito novo:** a API exige `APP_URL` (ver `.env.example`); `.env` antigos precisam dela para a API subir. Os testes usam `http://localhost:5173` em `apps/api/test/setup-env.ts`.
 
+### 1.4 Verificação da spec 0003 em 2026-11-09
+
+Executado na raiz, no worktree da spec (sem UI, sem Supabase e sem portas fixas: os testes de integração usam o servidor em processo do Supertest):
+
+| Gate                       | Resultado | Observação                                                                                        |
+| -------------------------- | --------- | ------------------------------------------------------------------------------------------------- |
+| `bun run lint`             | Passa     | 4 tasks, 0 warnings, 0 erros                                                                      |
+| `bun run check-types`      | Passa     | 4 tasks                                                                                           |
+| `bun run build`            | Passa     | `app`, `api` e `docs`                                                                             |
+| `bun run test`             | Passa     | `app`: 8 testes; `api`: 37 testes (armazenamento, políticas, chave, `TRUST_PROXY`)                |
+| `bun run test:integration` | Passa     | 24 testes; `test/rate-limit.int-spec.ts` cobre 429, `Retry-After`, e-mail/IP, janela, proxy, logs |
+| `bun run test:e2e`         | Não rodou | Sem UI nesta spec                                                                                 |
+
+### 1.5 Verificação da spec 0002 em 2026-11-09
+
+Executado no worktree da spec (código de saída 0): `bun run lint`, `bun run check-types`, `bun run build`, `bun run test` (`api`: 78 testes, `app`: 8) e `bun run test:integration` (16 testes, incluindo captura de e-mail, rota de teste 404 fora do `capture` e recusa de `capture` em produção). Nenhum teste usa rede externa. **Não verificado:** entrega real no Mailtrap e no Resend (sem credenciais); ver o checklist abaixo.
+
+**Pré-requisito novo:** a API exige `EMAIL_PROVIDER`, `EMAIL_FROM` e a credencial do provedor escolhido (ver `.env.example`); `.env` antigos precisam delas para a API subir. Os testes usam `EMAIL_PROVIDER=capture` em `apps/api/test/setup-env.ts`.
+
+### 1.6 Verificação da spec 0004 em 2026-11-09
+
+Executado no worktree da spec, na ordem abaixo (código de saída 0). Supabase local no ar com a migration aplicada; `test:e2e` rodou com `E2E_APP_PORT=5183 E2E_API_PORT=3012` porque a 5173 já havia um `vite` de outro processo (a configuração agora nunca reaproveita um servidor existente).
+
+| Gate                       | Resultado | Observação                                                                                                                                          |
+| -------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bun run lint`             | Passa     | 4 tasks, 0 warnings, 0 erros                                                                                                                        |
+| `bun run check-types`      | Passa     | 4 tasks                                                                                                                                             |
+| `bun run build`            | Passa     | `app`, `api` e `docs`; `service_role`, `auth_sign_up` e `argon2` não aparecem em `apps/app/dist`                                                    |
+| `bun run test`             | Passa     | `api`: 155 testes (19 arquivos); `app`: 36 testes (5 arquivos)                                                                                      |
+| `bun run test:integration` | Passa     | 58 testes: `auth-database` (12: RLS e RPC com `anon` e `authenticated`, concorrência, restrições), `auth-sign-up` (17: R2 a R7), mais os anteriores |
+| `bun run test:e2e`         | Passa     | 8 testes (Chromium): home, 404, e `sign-up` (formulário, senhas diferentes sem chamar a API, cadastro com e-mail capturado, 409 no campo)           |
+
+Banco (`psql` no container): RLS ligada em `users` e `auth_tokens`, 0 policies em `public`, índices `users_email_key`, `auth_tokens_token_hash_key` e `auth_tokens_user_id_type_idx`, `auth_sign_up` com `execute` só para `service_role`, sem grants de tabela para `anon`/`authenticated`. Os testes apagam o que criam; ao final, `select count(*) from public.users` = 0.
+
+Verificação manual de UI (`/auth/sign-up`, Chromium via Playwright, vite em dev): 375 / 768 / 1280 px sem scroll horizontal (`scrollWidth` = largura da viewport, inclusive com os erros de validação abertos); um único `h1` (30px); `lang="en-US"`; ordem de Tab: nome, sobrenome, e-mail, senha, confirmação, botão, link `Sign in`; foco com anel de 2px + 4px `#5C8001`; alvos de toque: campos 44px, botão 48px, link `Sign in` 52×44px; console sem erro nem warning (o 409 aparece só como log de rede do browser). Contraste calculado: erro `#B91C1C` sobre `#FFFDF5` 6,35:1; texto secundário `#6B6B6B` 5,23:1; texto do botão 6,42:1; anel de foco 4,54:1. **Achado e corrigido:** o erro de campo mostrado no `blur` deslocava o botão e engolia o clique (o `click` caía no `form`); os erros de validação agora aparecem no envio. **Não verificado:** leitor de tela; hover/active; `prefers-reduced-motion` (o spinner tem `motion-reduce:animate-none`, sem teste); `vite preview`.
+
+**Pré-requisitos novos:** `test:integration` e `test:e2e` exigem Docker, `bun run infra:up` e `bun run db:migrate` (sem o banco a `globalSetup` falha com a instrução). As chaves do Supabase vêm do ambiente ou de `supabase status -o env`. O E2E sobe uma API própria com `EMAIL_PROVIDER=capture` na 3002 e o app na 5173 (`E2E_APP_PORT` e `E2E_API_PORT` mudam as portas).
+
+### 1.7 Verificação da spec 0005 em 2026-11-09
+
+Executado no worktree da spec (código de saída 0), com o Supabase local no ar e a migration `20261109210000_create_sessions.sql` aplicada. O `test:e2e` rodou com `E2E_APP_PORT=5195 E2E_API_PORT=3025` porque a 5173 estava ocupada por outro processo.
+
+| Gate                       | Resultado | Observação                                                                                                                                                                                                                             |
+| -------------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bun run lint`             | Passa     | 4 tasks, 0 warnings, 0 erros                                                                                                                                                                                                           |
+| `bun run check-types`      | Passa     | 4 tasks                                                                                                                                                                                                                                |
+| `bun run build`            | Passa     | `app`, `api` e `docs`; `service_role`, `auth_issue_session` e `AUTH_JWT_SECRET` não aparecem em `apps/app/dist`                                                                                                                        |
+| `bun run test`             | Passa     | `api`: 214 testes (23 arquivos: serviço de sessão, assinador JWT, guard, repositório, ambiente); `app`: 89 testes (9 arquivos: token, `api-client`, `query-client`, redirecionamento, guard de `/app` e de `/auth/*`)                  |
+| `bun run test:integration` | Passa     | 96 testes (8 arquivos): `auth-sessions-database` (10: RLS e RPC com `anon`/`authenticated`, índice único parcial, concorrência), `auth-sessions` (R2 a R6: 401 sem motivo distinguível, sessão única, A 401 e B 200, ordem dos guards) |
+| `bun run test:e2e`         | Passa     | 22 testes (Chromium): API fechada, `/app` sem token, com token inválido e com token semeado, `/auth/sign-up` logado, carregando anunciado, retry, sessão única                                                                         |
+
+Banco: `sessions` com RLS ligada, 0 policies, índice `sessions_user_id_active_key` (parcial), `auth_issue_session` com `execute` só para `service_role` (`anon` e `authenticated` recebem erro pela API REST; conferido por `psql`: RLS ligada, 0 policies, `has_function_privilege` falso para `anon` e `authenticated` e verdadeiro para `service_role`). Ao final, `count(*)` de `public.sessions` e de `public.users` = 0 (os testes apagam o que criam). `AUTH_JWT_SECRET` ausente ou com 31 caracteres: `node dist/main.js` termina com erro citando a variável e sem ecoar o valor.
+
+Verificação manual de UI (`/app` carregando, erro e home, Chromium via Playwright, vite em dev): 375 / 768 / 1280 px sem scroll horizontal (`scrollWidth` = largura da viewport); um único `h1` em cada estado (home 36px no mobile e 60px a partir de 768px); `lang="en-US"`; o estado de carregamento tem `role="status"` e o texto "Verifying your session…"; botão `Try again` com 97×44px, foco por `Tab` com `:focus-visible` verdadeiro e anel de 2px + 4px `#5C8001`. Contraste calculado: `h1` e texto de carregamento sobre o fundo 19,44:1; texto secundário `#6B6B6B` 5,23:1. Console sem erro nem warning, exceto o `ERR_CONNECTION_REFUSED` provocado de propósito no teste de falha de rede. **Não verificado:** leitor de tela (o `role="status"` foi checado só pela árvore de acessibilidade do Playwright); hover/active; `prefers-reduced-motion` (o spinner tem `motion-reduce:animate-none`, sem teste); `vite preview`.
+
+**Pré-requisito novo:** a API exige `AUTH_JWT_SECRET` (>= 32 caracteres; ver `.env.example`); `.env` antigos precisam dela para a API subir. Os testes usam um valor fictício em `apps/api/test/setup-env.ts` e o E2E, em `playwright.config.ts`.
+
+### 1.9 Verificação da spec 0009 em 2026-11-09
+
+Executado no worktree da spec, em paralelo com a spec 0005 (outro worktree, mesmo Supabase local), com o lock de infraestrutura da orquestração. `test:e2e` rodou com `E2E_APP_PORT=5193 E2E_API_PORT=3022` porque a 5173 estava ocupada por outro processo. **`bun run db:migrate` falhou neste worktree** com `MigrationMissingLocalError` (o banco compartilhado já tinha a migration `20261109210000` da 0005, que não existe aqui); a migration `20261109220000` foi aplicada com `psql` no container (`docker exec ... psql -f`) e registrada em `supabase_migrations.schema_migrations`. Depois da integração das branches, `db:migrate` volta a funcionar.
+
+| Gate                       | Resultado | Observação                                                                                                                                                                                                 |
+| -------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bun run lint`             | Passa     | 4 tasks, 0 warnings, 0 erros                                                                                                                                                                               |
+| `bun run check-types`      | Passa     | 4 tasks                                                                                                                                                                                                    |
+| `bun run build`            | Passa     | `app`, `api` e `docs`; `service_role` e `auth_request_password_reset` não aparecem em `apps/app/dist`                                                                                                      |
+| `bun run test`             | Passa     | `api`: 174 testes (24 arquivos); `app`: 62 testes (8 arquivos)                                                                                                                                             |
+| `bun run test:integration` | Passa     | 79 testes; `auth-forgot-password` (21): R1 (status, corpo e cabeçalhos idênticos para conta confirmada, não confirmada e inexistente), R2 a R6, tempo de resposta com provedor lento, permissões da função |
+| `bun run test:e2e`         | Passa     | 11 testes (Chromium): home, 404, `sign-up` e `forgot-password` (formulário, e-mail inválido sem chamar a API, mensagem igual para os três casos e e-mail capturado só da conta confirmada)                 |
+
+Verificação manual de UI (`/auth/forgot-password`, Chromium via Playwright, vite em dev, `POST` interceptado com 202): 375 / 768 / 1280 px sem scroll horizontal (`scrollWidth` = largura da viewport, também com o erro de validação e com a mensagem de sucesso); um único `h1` (30px); `lang="en-US"`; ordem de Tab: e-mail, botão, link `Back to sign in`, todos com `:focus-visible` verdadeiro; alvos de toque: campo 44px, botão 48px, link 110×44px; console sem erro nem warning. O anel de foco usa as mesmas classes de `Input`, `Button` e do link da página de sign-up (medido na 0004); não foi medido de novo. **Não verificado:** leitor de tela (o `role="status"` é renderizado junto com a mensagem, não antes); contraste (mesmos tokens da 0004); Mailtrap real (só o provider `capture`).
+
+### 1.2 Spec `0006` (confirmar conta e reenviar confirmação), 2026-11-09
+
+| Gate                       | Resultado | Observação                                                                                                                                                                                   |
+| -------------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bun run lint`             | Passa     | 4 tasks, 0 warnings, 0 erros                                                                                                                                                                 |
+| `bun run check-types`      | Passa     | 4 tasks                                                                                                                                                                                      |
+| `bun run build`            | Passa     | `app`, `api` e `docs`                                                                                                                                                                        |
+| `bun run test`             | Passa     | `api`: 263 testes (32 arquivos); `app`: 149 testes (15 arquivos), incluindo a chamada única sob StrictMode                                                                                   |
+| `bun run test:integration` | Passa     | 153 testes; `auth-confirm-account` (36): R1 a R6 (token ruim de quatro tipos com o mesmo corpo e sem alterar linhas, concorrência 1x200 e 1x400, sessão A derrubada, 429, permissões)        |
+| `bun run test:e2e`         | Passa     | 30 testes (Chromium), 5 novos em `confirm-account`: link de e-mail leva a `/app` e o mesmo link depois é inválido, link do cadastro, link sem token ou falso, reenvio invalida o link antigo |
+
+Os E2E de `confirm-account` semeiam a conta não confirmada pela API do Supabase (`e2e/support/confirmation.ts`) em vez de chamar `POST /auth/sign-up`: a política `sign-up` (5 por hora por IP) já é consumida pelos outros specs. O e-mail do link vem do reenvio, lido no provider `capture`.
+
+Verificação manual de UI (`/auth/confirm-account` e `/auth/resend-confirmation`, Chromium via Playwright, vite em dev, API interceptada): 375 / 768 / 1280 px sem scroll horizontal (`scrollWidth` = largura da viewport, também com o erro de validação e com a mensagem de sucesso); um único `h1` (30px); `lang="en-US"`; sem erro de console; ordem de Tab do reenvio: e-mail, botão, link `Back to sign in`, todos com `:focus-visible`; na página de link inválido o primeiro Tab cai em `Request a new confirmation email` (alvo de 256x44 px).
+
 ## 2. Pré-requisitos
 
-| Item                   | Como obter                                                                  |
-| ---------------------- | --------------------------------------------------------------------------- |
-| Bun 1.4.4 e Node >= 24 | Instalação local                                                            |
-| Docker em execução     | Necessário para `infra:up`, `db:migrate`; os demais gates não dependem dele |
-| Supabase CLI           | `devDependency` (`supabase`); roda via `bunx supabase`                      |
-| Browsers do Playwright | `bunx playwright install` (uma vez)                                         |
-| `.env` na raiz         | Copie `.env.example` e preencha as chaves com `bunx supabase status -o env` |
+| Item                   | Como obter                                                                                                               |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Bun 1.4.4 e Node >= 24 | Instalação local                                                                                                         |
+| Docker em execução     | Necessário para `infra:up`, `db:migrate`, `test:integration` e `test:e2e`; lint, tipos, build e `test` não dependem dele |
+| Supabase CLI           | `devDependency` (`supabase`); roda via `bunx supabase`                                                                   |
+| Browsers do Playwright | `bunx playwright install` (uma vez)                                                                                      |
+| `.env` na raiz         | Copie `.env.example` e preencha as chaves com `bunx supabase status -o env`                                              |
 
 A API **não sobe** sem `SUPABASE_URL`, `SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY` (falha com exit 1 e mensagem acionável). Os testes definem valores fictícios em `apps/api/test/setup-env.ts`.
 
@@ -91,16 +178,16 @@ A API **não sobe** sem `SUPABASE_URL`, `SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_
 
 Execute na raiz do repositório, na ordem abaixo:
 
-| #   | Comando                    | O que valida                                | Critério                                                        |
-| --- | -------------------------- | ------------------------------------------- | --------------------------------------------------------------- |
-| 1   | `bun install`              | Dependências e lockfile                     | Sem erro; executar se `package.json`/`bun.lock` mudou           |
-| 2   | `bun run lint`             | OXLint nos workspaces (`--deny-warnings`)   | Zero erro e zero warning                                        |
-| 3   | `bun run check-types`      | `tsc --noEmit` (e `next typegen` em `docs`) | Zero erro de tipo (`types:check` é alias)                       |
-| 4   | `bun run build`            | Build de produção dos três apps             | Concluído; dispensa justificada só para docs/config sem impacto |
-| 5   | `bun run test`             | Vitest (unitário) em `app` e `api`          | Todos passam; sem modo watch                                    |
-| 6   | `bun run test:integration` | Supertest contra a API                      | Todos passam                                                    |
-| 7   | `bun run test:e2e`         | Playwright contra `http://localhost:5173`   | Todos passam                                                    |
-| 8   | Verificação manual         | Ver seção 5                                 | Checklist aplicável à mudança                                   |
+| #   | Comando                    | O que valida                                  | Critério                                                        |
+| --- | -------------------------- | --------------------------------------------- | --------------------------------------------------------------- |
+| 1   | `bun install`              | Dependências e lockfile                       | Sem erro; executar se `package.json`/`bun.lock` mudou           |
+| 2   | `bun run lint`             | OXLint nos workspaces (`--deny-warnings`)     | Zero erro e zero warning                                        |
+| 3   | `bun run check-types`      | `tsc --noEmit` (e `next typegen` em `docs`)   | Zero erro de tipo (`types:check` é alias)                       |
+| 4   | `bun run build`            | Build de produção dos três apps               | Concluído; dispensa justificada só para docs/config sem impacto |
+| 5   | `bun run test`             | Vitest (unitário) em `app` e `api`            | Todos passam; sem modo watch                                    |
+| 6   | `bun run test:integration` | Supertest contra a API e o Supabase local     | Todos passam                                                    |
+| 7   | `bun run test:e2e`         | Playwright (app 5173 + API 3002 em `capture`) | Todos passam                                                    |
+| 8   | Verificação manual         | Ver seção 5                                   | Checklist aplicável à mudança                                   |
 
 Outros comandos:
 
@@ -143,6 +230,8 @@ bun run dev
 
 Para subir um app isolado: `bun run dev --filter=app`, `--filter=api` ou `--filter=docs`.
 
+**E2E de autenticação** (`sign-up`, `confirm-account`, `sign-in`...): exige `bun run infra:up` e `bun run db:migrate` (Supabase local, usado para semear contas e pelas funções SQL). O `playwright.config.ts` sobe sozinho o app e uma API nova (`EMAIL_PROVIDER=capture`, rate limit em memória zerado, `AUTH_JWT_SECRET` de teste), lendo as chaves de `supabase status`; com as portas 5173/3002 ocupadas use `E2E_APP_PORT` e `E2E_API_PORT`.
+
 `apps/docs` é o site Next.js; `.docs/` é a documentação Markdown canônica. Não confunda.
 
 ## 5. Checklist manual
@@ -180,6 +269,7 @@ Aplique apenas o que a mudança afeta, mas registre o que foi verificado.
 ### 5.4 Dados, integrações e observabilidade
 
 - [ ] Estado vazio, carregando e erro implementados.
+- [ ] E-mail (Mailtrap), quando a mudança envia mensagem: no `.env` local, `EMAIL_PROVIDER=mailtrap`, `MAILTRAP_API_TOKEN` e `MAILTRAP_INBOX_ID` (Mailtrap > Email Sandbox > Inboxes > a caixa > API); suba a API (`bun run dev --filter=api`), dispare o fluxo (ou, para o teste isolado, um script que chame `EmailService.send`) e confirme que a mensagem aparece na caixa do Mailtrap com remetente igual a `EMAIL_FROM`, HTML e texto corretos. Com um token inválido o log deve trazer `email_delivery_failed` com `errorCode` `PROVIDER_UNAUTHORIZED`, sem a chave. O plano gratuito do Mailtrap tem limite de envios: prefira `capture` no dia a dia.
 - [ ] Timeout e falha de integração tratados.
 - [ ] Nenhuma chamada externa em loop ou sem limite.
 - [ ] Permissões verificadas (um usuário não acessa dado de outro clube).
@@ -245,3 +335,53 @@ Copie para o relatório final da tarefa:
 **Evidência:** print/log/URL
 **Impacto:** bloqueante / alto / médio / baixo
 ```
+
+### 1.10 Verificação da spec 0008 em 2026-11-09
+
+Executado no worktree da spec, em paralelo com a spec 0006 (outro worktree, mesmo Supabase local), com o lock de infraestrutura da orquestração. `test:e2e` rodou com `E2E_APP_PORT=5220 E2E_API_PORT=3050`. Sem a 0007, o E2E semeia o usuário e emite a sessão por helper (`e2e/support/session.ts`), como o `session.spec.ts`. Nenhuma migration nova.
+
+| Gate                       | Resultado | Observação                                                                                                                                                                              |
+| -------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bun run lint`             | Passa     | 4 tasks, 0 warnings, 0 erros                                                                                                                                                            |
+| `bun run check-types`      | Passa     | 4 tasks                                                                                                                                                                                 |
+| `bun run build`            | Passa     | `app`, `api` e `docs`                                                                                                                                                                   |
+| `bun run test`             | Passa     | `api`: 236 testes (29 arquivos, inclui `SignOut`); `app`: 124 testes (13 arquivos, inclui o botão: mouse, Enter, Space, desabilitado enquanto envia, rede/5xx/401)                      |
+| `bun run test:integration` | Passa     | 123 testes (10 arquivos); `auth-sign-out` (6): 204 sem corpo, `revoked_at`, token 401 em `GET /auth/session`, segundo sign-out 401, sem token/token inválido 401, outro usuário intacto |
+| `bun run test:e2e`         | Passa     | 30 testes (Chromium); `sign-out` (5): botão, token removido, token 401 na API, `/app` privado, "voltar", teclado, API inalcançável, área de toque >= 44x44                              |
+
+Verificação manual de UI (home em `/app`, Chromium via Playwright, vite em dev, API interceptada): 375 / 768 / 1280 px sem scroll horizontal (`scrollWidth` = largura da viewport); um único `h1`; botão `Sign out` com 112x44 px; `Tab` leva o foco ao botão (`:focus-visible` verdadeiro; o anel usa as classes do `Button` do `@repo/ui`, medidas nas specs anteriores); texto `#0A0A0A` sobre `#FFFDF5`; console sem erro nem warning. **Não verificado:** leitor de tela; hover/active; `prefers-reduced-motion` (o spinner tem `motion-reduce:animate-none`, sem teste); `vite preview`; anel de foco medido de novo nesta spec.
+
+### 1.11 Verificação da spec 0007 em 2026-11-09
+
+Executado no worktree da spec, com o lock de infraestrutura da orquestração. `test:e2e` rodou com `E2E_APP_PORT=5241 E2E_API_PORT=3070` (5173 e 3002 costumam estar ocupadas). Nenhuma migration nova (a leitura de credenciais é uma consulta simples a `users`, ADR 0008).
+
+| Gate                       | Resultado | Observação                                                                                                                                                                                                                                                                                                 |
+| -------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bun run lint`             | Passa     | 4 tasks, 0 warnings, 0 erros                                                                                                                                                                                                                                                                               |
+| `bun run check-types`      | Passa     | 4 tasks                                                                                                                                                                                                                                                                                                    |
+| `bun run build`            | Passa     | `app`, `api` e `docs`                                                                                                                                                                                                                                                                                      |
+| `bun run test`             | Passa     | `api`: 296 testes (39 arquivos: `SignIn`, verificador Argon2, repositório de credenciais, e-mail e mailer de nova sessão, DTO); `app`: 187 testes (19 arquivos: validação, descrição de falhas, página)                                                                                                    |
+| `bun run test:integration` | Passa     | 180 testes (12 arquivos); `auth-sign-in` (21): R1 (caixa e espaços, senha sem trim), R2 (corpo e headers idênticos, tempo comparável, 400), R3, R4 (token A 401, B 200), R5 (e-mail capturado sem IP/dispositivo/token; nada em falha), R6 (provedor fora: 200 e log sem PII), R7 (429 na 11ª, por e-mail) |
+| `bun run test:e2e`         | Passa     | 41 testes (Chromium); `sign-in` (6): formulário e links, 375 px sem scroll, login por teclado com e-mail de aviso, mensagem igual para senha errada e e-mail inexistente (senha limpa, foco na senha), conta não confirmada com atalho de reenvio, fluxo completo e dois navegadores                       |
+
+O E2E de autenticação exige `bun run infra:up` e `bun run db:migrate`; o fluxo completo (R9) usa uma conta semeada com hash real e o link de confirmação enviado de verdade pela página de reenvio, porque a cota de `POST /auth/sign-up` (5 por hora por IP) já é consumida pelos outros specs da mesma execução; o logout do fluxo usa o botão `Sign out` (0008).
+
+Verificação manual de UI (`/auth/sign-in`, Chromium via Playwright, vite em dev, API interceptada no estado de erro): 375 / 768 / 1280 px sem scroll horizontal; um único `h1`; botão `Sign in` com 275x48 px (375) e 396x48 px (768 e 1280); links com 44 px de altura; ordem do `Tab`: Email, Password, `Sign in`, `Forgot your password?`, `Create an account`, todos com `:focus-visible` e anel visível; 401 mostra "Invalid email or password." em `role="alert"` (`#B91C1C` sobre `#FFFDF5`); console sem erro. **Não verificado:** leitor de tela; hover/active; `prefers-reduced-motion`; e-mail de nova sessão na caixa real do Mailtrap (sem credenciais; verificado só no provider `capture`).
+
+
+### 1.12 Verificação da spec 0010 em 2026-11-09
+
+Executado no worktree da spec, com o lock de infraestrutura da orquestração. `test:e2e` rodou com `E2E_APP_PORT=5250 E2E_API_PORT=3080` (5173 e 5240 ocupadas por outros processos). **Migration aplicada** no Supabase local compartilhado: `20261109250000_add_auth_reset_password.sql` (função `auth_reset_password`, aditiva, `execute` só para `service_role`).
+
+| Gate                       | Resultado | Observação                                                                                                                                                                                                                                                                                                                   |
+| -------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bun run lint`             | Passa     | 4 tasks, 0 warnings, 0 erros                                                                                                                                                                                                                                                                                                 |
+| `bun run check-types`      | Passa     | 4 tasks                                                                                                                                                                                                                                                                                                                      |
+| `bun run build`            | Passa     | `app`, `api` e `docs`                                                                                                                                                                                                                                                                                                        |
+| `bun run test`             | Passa     | `api`: 323 testes (44 arquivos: `ResetPassword`, e-mail e mailer de senha alterada, DTO, repositório); `app`: 214 testes (22 arquivos: página de reset, validação, descritor de falha, aviso no sign-in, guard de `/auth/*`)                                                                                                  |
+| `bun run test:integration` | Passa     | 208 testes (13 arquivos); `auth-reset-password` (28): R1 (204, hash Argon2id, tokens irmãos usados, senha nova no sign-in e antiga recusada, sem sessão aberta), R2 (400 por campo sem gastar o token), R3 (mesmo corpo para quatro tipos de token ruim), R4 (concorrência 1x204 e 1x400), R5, R6 (e-mail, provedor fora), R7 (429), permissões da função |
+| `bun run test:e2e`         | Passa     | 48 testes (Chromium); `reset-password` (7): formulário, token removido da URL e recarga inválida, sem token, validação sem chamar a API, token recusado, acessível logado em 375 px e o fluxo completo (forgot, link do e-mail, nova senha, aviso no sign-in, sessão antiga 401, e-mail de sucesso, login, link reutilizado inválido) |
+
+O E2E semeia a conta direto no banco (hash real, `seedUserWithPassword`) em vez de chamar `POST /auth/sign-up` (5 por hora por IP, já consumidos pelos outros specs); o link vem da página `/auth/forgot-password` e do e-mail capturado.
+
+Verificação manual de UI (`/auth/reset-password` e `/auth/sign-in?reset=success`, Chromium via Playwright, vite em dev, API real): 375 / 768 / 1280 px sem scroll horizontal no formulário, com erros de validação, no estado de link inválido e no aviso do sign-in (`scrollWidth` = largura da viewport); um único `h1` (30px); ordem de Tab: `New password`, `Confirm new password`, `Reset password`, `Back to sign in`, todos com `:focus-visible` verdadeiro e anel de foco; alvos de 396x44, 396x44, 396x48 e 110x44 px; console sem erro. **Não verificado:** leitor de tela; hover/active; `prefers-reduced-motion`; contraste medido (as cores seguem as classes já usadas em sign-in e sign-up).

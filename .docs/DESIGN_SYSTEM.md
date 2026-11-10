@@ -2,7 +2,7 @@
 
 > **Público:** quem cria ou altera componentes de UI.
 > **Obrigatório** em conjunto com `DESIGN.md`.
-> **Estado:** fundação pronta. `packages/ui` tem Tailwind v4, configuração shadcn, tokens da paleta e um `Button`. Os demais primitivos ainda não existem.
+> **Estado:** fundação pronta. `packages/ui` tem Tailwind v4, configuração shadcn, tokens da paleta, `Button`, `Input` e `Label`. Os demais primitivos ainda não existem.
 
 ## 1. Decisão
 
@@ -31,7 +31,7 @@ Regras:
 
 - Se o componente é usado por mais de um app ou por mais de uma feature, ele pertence a `packages/ui`.
 - Se depende de uma regra de negócio ou de uma chamada de API, ele **não** pertence a `packages/ui`.
-- O contrato de exports é **explícito**: hoje `./button`, `./styles.css` e `./lib/utils` (mapa `exports` do `package.json`). Todo novo primitivo precisa de uma entrada nesse mapa na mesma mudança; imports de caminhos não exportados falham.
+- O contrato de exports é **explícito**: hoje `./button`, `./input`, `./label`, `./styles.css` e `./lib/utils` (mapa `exports` do `package.json`). Todo novo primitivo precisa de uma entrada nesse mapa na mesma mudança; imports de caminhos não exportados falham.
 - Um app que usa `@repo/ui` importa `@repo/ui/styles.css` e precisa que o Tailwind enxergue `packages/ui/src` (`@source "./"` já está em `styles.css`).
 
 ## 3. Tokens
@@ -80,6 +80,8 @@ Convenções:
 | Componente | Estado                                                                                                                                                                                 |
 | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Button`   | Primitivo real: aceita `className`, `asChild`, `variant` e `size`; `type="button"` por padrão; foco visível; alvo de toque de 44px no tamanho padrão; sem `alert` nem texto de produto |
+| `Input`    | Campo de texto de 44px de altura, borda de 2px, foco visível; `aria-invalid` troca a borda para `destructive` e mais grossa (o erro em texto fica por conta de quem usa, ligado por `aria-describedby`) |
+| `Label`    | `<label>` visível em 16px e negrito; sempre com `htmlFor`                                                                                                                                                |
 
 Os stubs herdados do template (`Card`, `Code` e o `Button` com `alert`) foram removidos. Novos primitivos entram pela receita da seção 6.
 

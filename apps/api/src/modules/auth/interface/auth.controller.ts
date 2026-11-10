@@ -1,0 +1,202 @@
+import { Body, Controller, Get, HttpCode, HttpStatus, Inject, Post } from "@nestjs/common";
+import { ApiException } from "../../../common/api-exception";
+import { Public } from "../../../common/public.decorator";
+import { RateLimit } from "../../rate-limit";
+import { ConfirmAccount } from "../application/confirm-account";
+import { RequestPasswordReset } from "../application/request-password-reset";
+import { SignIn } from "../application/sign-in";
+import { SignOut } from "../application/sign-out";
+import { ResendConfirmation } from "../application/resend-confirmation";
+import { ResetPassword } from "../application/reset-password";
+import { SignUp } from "../application/sign-up";
+import {
+  EmailAlreadyRegisteredError,
+  EmailNotConfirmedError,
+  InvalidConfirmationTokenError,
+  InvalidCredentialsError,
+  InvalidPasswordResetTokenError,
+} from "../domain/auth-errors";
+import { ConfirmAccountDto } from "./confirm-account.dto";
+import { ResendConfirmationDto } from "./resend-confirmation.dto";
+import { ForgotPasswordDto } from "./forgot-password.dto";
+import { ResetPasswordDto } from "./reset-password.dto";
+import type { ActiveSession } from "../domain/session-ports";
+import { CurrentSession } from "./current-session.decorator";
+import {
+  presentSession,
+  presentUser,
+  type SessionResponse,
+  type UserResponse,
+} from "./session.presenter";
+import { SignInDto } from "./sign-in.dto";
+import { SignUpDto } from "./sign-up.dto";
+
+@Controller("auth")
+export class AuthController {
+  constructor(
+    @Inject(SignUp) private readonly signUp: SignUp,
+    @Inject(RequestPasswordReset) private readonly requestPasswordReset: RequestPasswordReset,
+    @Inject(SignIn) private readonly signInUseCase: SignIn,
+    @Inject(SignOut) private readonly signOut: SignOut,
+    @Inject(ConfirmAccount) private readonly confirmAccountUseCase: ConfirmAccount,
+    @Inject(ResendConfirmation) private readonly resendConfirmationUseCase: ResendConfirmation,
+    @Inject(ResetPassword) private readonly resetPasswordUseCase: ResetPassword,
+  ) {}
+
+  @Post("sign-up")
+  @Public()
+  @HttpCode(HttpStatus.CREATED)
+  @RateLimit("sign-up")
+  async signUpAccount(@Body() body: SignUpDto): Promise<{ email: string }> {
+    try {
+      return await this.signUp.execute({
+        firstName: body.firstName,
+        lastName: body.lastName,
+        email: body.email,
+        password: body.password,
+      });
+    } catch (error) {
+      if (error instanceof EmailAlreadyRegisteredError) {
+        throw new ApiException(
+          HttpStatus.CONFLICT,
+          "EMAIL_ALREADY_REGISTERED",
+          "An account with this email already exists.",
+          [{ field: "email", message: "An account with this email already exists." }],
+        );
+      }
+
+      throw error;
+    }
+  }
+
+  /**
+   * Always answers 202 `{}`, whether the e-mail has a confirmed account, an
+   * unconfirmed one or none: the body, the status and the (background) mail
+   * delivery keep the route from revealing which addresses are registered.
+   */
+  @Post("forgot-password")
+  @Public()
+  @HttpCode(HttpStatus.ACCEPTED)
+  @RateLimit("forgot-password")
+  async forgotPassword(@Body() body: ForgotPasswordDto): Promise<Record<string, never>> {
+    await this.requestPasswordReset.execute({ email: body.email });
+
+    return {};
+  }
+
+  /**
+   * Sets a new password with the link token: 204 and no session (the person signs in next).
+   * The DTO is validated before the token is touched, so a rejected password does not use the
+   * link up. One answer for every bad token (unknown, expired, used, wrong type). Every session
+   * of the user is revoked in the same transaction that changes the password.
+   */
+  @Post("reset-password")
+  @Public()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @RateLimit("reset-password")
+  async resetPassword(@Body() body: ResetPasswordDto): Promise<void> {
+    try {
+      await this.resetPasswordUseCase.execute({ token: body.token, password: body.password });
+    } catch (error) {
+      if (error instanceof InvalidPasswordResetTokenError) {
+        throw new ApiException(
+          HttpStatus.BAD_REQUEST,
+          "TOKEN_INVALID_OR_EXPIRED",
+          "This link is invalid or has expired.",
+        );
+      }
+
+      throw error;
+    }
+  }
+
+  /**
+   * Opens a session with e-mail and password. A missing account and a wrong password end the
+   * same way (401 `INVALID_CREDENTIALS`); the account is only said to be unconfirmed (403) to
+   * someone who proved they know the password. A new session revokes the previous one.
+   */
+  @Post("sign-in")
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @RateLimit("sign-in")
+  async signInAccount(@Body() body: SignInDto): Promise<SessionResponse> {
+    try {
+      return presentSession(
+        await this.signInUseCase.execute({ email: body.email, password: body.password }),
+      );
+    } catch (error) {
+      if (error instanceof InvalidCredentialsError) {
+        throw new ApiException(
+          HttpStatus.UNAUTHORIZED,
+          "INVALID_CREDENTIALS",
+          "Invalid email or password.",
+        );
+      }
+
+      if (error instanceof EmailNotConfirmedError) {
+        throw new ApiException(
+          HttpStatus.FORBIDDEN,
+          "EMAIL_NOT_CONFIRMED",
+          "Confirm your email to sign in.",
+        );
+      }
+
+      throw error;
+    }
+  }
+
+  /**
+   * Revokes the session of the bearer token. Closed by default (no `@Public()`): without a
+   * valid session the guard answers 401 before this runs, so it can only end its own session.
+   */
+  @Post("sign-out")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async signOutSession(@CurrentSession() session: ActiveSession): Promise<void> {
+    await this.signOut.execute(session.sessionId);
+  }
+
+  /**
+   * Confirms the e-mail behind the link token and opens the session. One answer for
+   * every bad token (unknown, expired, used, wrong type): the reason is not told.
+   */
+  @Post("confirm-account")
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @RateLimit("confirm-account")
+  async confirmAccount(@Body() body: ConfirmAccountDto): Promise<SessionResponse> {
+    try {
+      return presentSession(await this.confirmAccountUseCase.execute({ token: body.token }));
+    } catch (error) {
+      if (error instanceof InvalidConfirmationTokenError) {
+        throw new ApiException(
+          HttpStatus.BAD_REQUEST,
+          "TOKEN_INVALID_OR_EXPIRED",
+          "This link is invalid or has expired.",
+        );
+      }
+
+      throw error;
+    }
+  }
+
+  /**
+   * Always answers 202 `{}`, whether the e-mail has an unconfirmed account, a
+   * confirmed one or none: the body, the status and the (background) mail delivery
+   * keep the route from revealing which addresses are registered.
+   */
+  @Post("resend-confirmation")
+  @Public()
+  @HttpCode(HttpStatus.ACCEPTED)
+  @RateLimit("resend-confirmation")
+  async resendConfirmation(@Body() body: ResendConfirmationDto): Promise<Record<string, never>> {
+    await this.resendConfirmationUseCase.execute({ email: body.email });
+
+    return {};
+  }
+
+  /** The user behind the current session (the guard already validated it). */
+  @Get("session")
+  getSession(@CurrentSession() session: ActiveSession): { user: UserResponse } {
+    return { user: presentUser(session.user) };
+  }
+}

@@ -3,7 +3,7 @@
 > Spec executável. Preencha todas as seções; `TODO` é lacuna, não requisito.
 > Use `create-spec` para criar, `refine-spec` para auditar e `implement-me` para executar.
 
-- **Status:** rascunho
+- **Status:** concluída (R1–R7 atendidos; gates verdes em 2026-11-09)
 - **Slug:** 0009-auth-forgot-password
 - **Data:** 2026-11-09
 - **Atualizado em:** 2026-11-09
@@ -124,6 +124,9 @@ Como validar que a spec foi atendida:
 | Premissa: conta não confirmada não recebe e-mail de reset (resposta genérica) e deve usar o reenvio do 0006. | Se o produto preferir que o reset confirme o e-mail, muda o 0010. | Não         | Produto            |
 | Premissa: o 202 não devolve nenhum dado no corpo (`{}`).                                                     | Contrato do SPA.                                                  | Não         | Time de engenharia |
 | Premissa: o link de reset não derruba as sessões ao ser pedido; só a troca de senha (0010) revoga sessões.   | Segurança vs. conveniência.                                       | Não         | Produto            |
+| Premissa (implementação): sem `@Public()` nesta spec, porque o guard global é da 0005; a rota já é pública hoje. | A 0005 deve marcar `forgot-password` como pública ao instalar o guard. | Não         | Time de engenharia |
+| Premissa (implementação): o redirecionamento de quem já está logado para `/app` (R7) é regra da 0005; a página não consulta sessão. | A 0005 acrescenta o redirecionamento na rota. | Não         | Time de engenharia |
+| Premissa (implementação): `Back to sign in` aponta para `/auth/sign-in` (0007, ainda sem página: cai na 404 até lá); o E2E verifica só o `href`. | Link temporariamente quebrado. | Não         | Time de engenharia |
 
 ## 12. Refinamento
 
@@ -131,3 +134,4 @@ Como validar que a spec foi atendida:
 | ---------- | --------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
 | 2026-11-09 | Spec criada pela skill `breakdown-specs` (épico de autenticação).                                                           | Capacidade "esqueci a senha".                                    |
 | 2026-11-09 | Verificação do e-mail passa a usar o provider `capture` (testes) e Mailtrap (manual), no lugar do servidor local de e-mail. | Decisão sobre provedores de e-mail no quiz de perguntas abertas. |
+| 2026-11-09 | Implementada (`implement-me`, modo orquestrado): premissas sobre `@Public()`, redirecionamento de logado e a rota `/auth/sign-in` registradas em §11; status `concluída`. | Execução da spec. |
