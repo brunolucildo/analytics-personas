@@ -71,6 +71,29 @@ afterEach(() => {
 });
 
 describe("reset password page", () => {
+  it("shows and hides each password on its own, keeping the values and without submitting", async () => {
+    renderPage();
+    const user = await fillForm();
+    const password = screen.getByLabelText("New password");
+    const confirmation = screen.getByLabelText("Confirm new password");
+
+    await user.click(screen.getByRole("button", { name: "Show new password" }));
+
+    expect(password).toHaveAttribute("type", "text");
+    expect(password).toHaveValue(NEW_PASSWORD);
+    expect(confirmation).toHaveAttribute("type", "password");
+
+    await user.click(screen.getByRole("button", { name: "Show password confirmation" }));
+
+    expect(confirmation).toHaveAttribute("type", "text");
+
+    await user.click(screen.getByRole("button", { name: "Hide new password" }));
+
+    expect(password).toHaveAttribute("type", "password");
+    expect(confirmation).toHaveAttribute("type", "text");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("renders the heading, the labelled masked fields, the button and the way back", async () => {
     renderPage();
 

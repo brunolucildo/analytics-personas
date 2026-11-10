@@ -28,7 +28,7 @@ async function mailTo(request: APIRequestContext, to: string, subject: string) {
 
 async function fillAndSubmit(page: Page, email: string, password: string) {
   await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill(password);
+  await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Sign in" }).click();
 }
 
@@ -41,7 +41,7 @@ test.describe("sign-in page", () => {
     await expect(page.locator("h1")).toHaveCount(1);
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Sign in");
     await expect(page.getByLabel("Email")).toBeVisible();
-    await expect(page.getByLabel("Password")).toHaveAttribute("type", "password");
+    await expect(page.getByLabel("Password", { exact: true })).toHaveAttribute("type", "password");
     await expect(page.getByRole("button", { name: "Sign in" })).toBeEnabled();
     await expect(page.getByRole("link", { name: "Forgot your password?" })).toHaveAttribute(
       "href",
@@ -51,6 +51,27 @@ test.describe("sign-in page", () => {
       "href",
       "/auth/sign-up",
     );
+  });
+
+  test("shows and hides the password with the toggle, by mouse and by keyboard", async ({
+    page,
+  }) => {
+    await page.goto("/auth/sign-in");
+    const password = page.getByLabel("Password", { exact: true });
+
+    await password.fill("correct horse battery");
+    await page.getByRole("button", { name: "Show password" }).click();
+    await expect(password).toHaveAttribute("type", "text");
+    await expect(password).toHaveValue("correct horse battery");
+
+    await page.getByRole("button", { name: "Hide password" }).click();
+    await expect(password).toHaveAttribute("type", "password");
+
+    await password.focus();
+    await page.keyboard.press("Tab");
+    await expect(page.getByRole("button", { name: "Show password" })).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(password).toHaveAttribute("type", "text");
   });
 
   test("fits a 375 px screen without horizontal scroll", async ({ page }) => {
@@ -80,7 +101,7 @@ test.describe("sign-in page", () => {
 
     await page.goto("/auth/sign-in");
     await page.getByLabel("Email").fill(email.toUpperCase());
-    await page.getByLabel("Password").fill(password);
+    await page.getByLabel("Password", { exact: true }).fill(password);
     await page.keyboard.press("Enter");
 
     await expect(page).toHaveURL(`${APP_URL}/app`);
@@ -113,8 +134,8 @@ test.describe("sign-in page", () => {
       await fillAndSubmit(page, target, "a wrong password");
 
       await expect(page.getByRole("alert")).toHaveText(INVALID_MESSAGE);
-      await expect(page.getByLabel("Password")).toHaveValue("");
-      await expect(page.getByLabel("Password")).toBeFocused();
+      await expect(page.getByLabel("Password", { exact: true })).toHaveValue("");
+      await expect(page.getByLabel("Password", { exact: true })).toBeFocused();
       await expect(page.getByLabel("Email")).toHaveValue(target);
       await expect(page).toHaveURL(`${APP_URL}/auth/sign-in`);
     }

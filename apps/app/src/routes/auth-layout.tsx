@@ -1,3 +1,4 @@
+import { RondoWordmark } from "@repo/ui/brand";
 import { Outlet, useLocation } from "@tanstack/react-router";
 import { getAuthPageRedirect } from "../features/auth/auth-redirect";
 import { SessionLoading } from "../features/auth/session-states";
@@ -24,14 +25,19 @@ export function AuthLayout() {
   return (
     <div
       data-testid="auth-layout"
-      className="flex min-h-screen items-center justify-center bg-background px-6 py-12 text-foreground"
+      className="flex min-h-screen flex-col items-center justify-center gap-10 bg-background px-6 py-12 text-foreground"
     >
       {mustWait ? (
         <SessionLoading />
       ) : (
-        <main className="w-full max-w-md">
-          <Outlet />
-        </main>
+        <>
+          <header>
+            <RondoWordmark title="Rondo" className="h-7 w-auto" />
+          </header>
+          <main className="w-full max-w-md">
+            <Outlet />
+          </main>
+        </>
       )}
     </div>
   );

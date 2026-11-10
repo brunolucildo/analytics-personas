@@ -118,25 +118,26 @@ Evite:
 
 ## 9. Do / Don't
 
-| Faça                                       | Não faça                                     |
-| ------------------------------------------ | -------------------------------------------- |
-| Usar uma cor de destaque por ação primária | Colorir todos os botões com cores diferentes |
-| Texto escuro sobre amarelo/laranja         | Texto branco sobre amarelo/laranja           |
-| Bordas nítidas e formas consistentes       | Misturar estilos flat, glass e neumórfico    |
-| Ícones pixel com grade consistente         | Misturar ícones de bibliotecas diferentes    |
-| Validar contraste e teclado                | Confiar apenas no visual                     |
+| Faça                                       | Não faça                                                |
+| ------------------------------------------ | ------------------------------------------------------- |
+| Usar uma cor de destaque por ação primária | Colorir todos os botões com cores diferentes            |
+| Texto escuro sobre amarelo/laranja         | Texto branco sobre amarelo/laranja                      |
+| Bordas nítidas e formas consistentes       | Misturar estilos flat, glass e neumórfico               |
+| Ícones pixel com grade consistente         | Misturar ícones de bibliotecas diferentes               |
+| Validar contraste e teclado                | Confiar apenas no visual                                |
+| Exibir a marca Rondo em toda tela (§11.2)  | Criar uma tela, ou um estado de tela cheia, sem a marca |
 
 ## 10. Estado da implementação
 
-| Item                             | Estado                                                                                                 |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| Paleta aplicada em tokens        | Sim (`packages/ui/src/styles.css`; `apps/docs/app/globals.css` repete uma parte em variáveis próprias) |
-| Fonte display                    | Não                                                                                                    |
-| Marca (logos Rondo)              | Assets em `packages/ui/assets/brand/`; ainda não aplicados em `apps/app` nem `apps/docs`               |
-| Componentes no estilo 8-bit      | Parcial (`Button` com borda de 2px e sombra dura; demais primitivos não existem)                       |
-| `lang="en-US"`                   | Sim (`apps/app` e `apps/docs`)                                                                         |
-| Revisão de contraste             | Não                                                                                                    |
-| Testes de teclado/leitor de tela | Não                                                                                                    |
+| Item                             | Estado                                                                                                               |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Paleta aplicada em tokens        | Sim (`packages/ui/src/styles.css`; `apps/docs/app/globals.css` repete uma parte em variáveis próprias)               |
+| Fonte display                    | Não                                                                                                                  |
+| Marca (logos Rondo)              | Sim: `RondoMark` e `RondoWordmark` em `@repo/ui/brand`; aplicados nas telas de `/auth`, na home, no 404 e no favicon |
+| Componentes no estilo 8-bit      | Parcial (`Button` com borda de 2px e sombra dura; demais primitivos não existem)                                     |
+| `lang="en-US"`                   | Sim (`apps/app` e `apps/docs`)                                                                                       |
+| Revisão de contraste             | Não                                                                                                                  |
+| Testes de teclado/leitor de tela | Não                                                                                                                  |
 
 Os tokens são definidos em `packages/ui/src/styles.css` e consumidos pelos componentes. Não espalhe hex pelo código. A duplicação de hex em `apps/docs/app/globals.css` é dívida: o `apps/docs` ainda não consome `@repo/ui`.
 
@@ -158,7 +159,22 @@ Todos os arquivos ficam em `packages/ui/assets/brand/`, são SVG de retângulos 
 - **Compacta:** bola pixel no centro e quatro quadrados em roda: `blaze-orange` (cima), `golden-glow` (direita), `lime-moss` (baixo) e `forest-moss` (esquerda). Quatro quadrados pequenos em `sunflower-gold` marcam o passe nas diagonais. Em fundo escuro, o quadrado da esquerda vira `sunflower-gold`, porque `forest-moss` some sobre `ink`.
 - **Estendida:** "ROND" em pixel e uma bola pixel no lugar do último "O". A bola usa uma grade mais fina que as letras (1 unidade contra 2), como na versão aprovada.
 
-### 11.2 Regras de uso
+### 11.2 Toda tela leva a marca
+
+**Regra:** toda tela do produto exibe o logo Rondo. Isso vale para páginas e também para telas cheias de estado: carregando, erro, vazio, 404 e qualquer outra que ocupe a janela. Uma tela nova sem a marca não passa na revisão.
+
+| Situação                                                                                   | Logo                                                                                              |
+| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| Tela com cabeçalho ou layout compartilhado (`/auth/*`, e o shell de `/app` quando existir) | Estendida no cabeçalho, com `title="Rondo"` (é a única vez que o nome aparece em texto de imagem) |
+| Tela cheia sem cabeçalho (home, carregando, erro, 404)                                     | Compacta, decorativa, acima do título ou da mensagem, em 56px (`size-14`)                         |
+
+- **No layout, não na página.** Quando as telas dividem um layout, a marca vai no layout (`AuthLayout`, `AppLayout` ou o shell futuro), uma vez, e não repetida em cada página. Telas fora de um layout incluem o componente elas mesmas.
+- **Uma marca por tela.** Se a tela já tem o logo estendido no cabeçalho, não repita o compacto no corpo.
+- **Componentes, não arquivos.** No app, use `RondoMark` e `RondoWordmark` de `@repo/ui/brand`; os SVGs de `packages/ui/assets/brand/` são para fora do app (docs, e-mails, favicon).
+- **Prova.** Toda tela nova ganha uma asserção da marca no teste da tela (veja `apps/app/src/brand.test.tsx`).
+- **Fora desta regra:** modais, popovers, toasts e componentes dentro de uma tela, que não repetem a marca. E-mails seguem a regra de e-mail, ainda a definir.
+
+### 11.3 Regras de uso
 
 - **Fundos:** versão clara sobre `paper` ou branco; versão escura sobre `ink`. Não coloque o logo sobre cor de destaque nem sobre imagem.
 - **Tamanho mínimo:** compacta com 16px de lado (múltiplos de 28 ficam nítidos: 28, 56, 84, 112); estendida com 70px de largura (múltiplos de 70).
@@ -167,6 +183,16 @@ Todos os arquivos ficam em `packages/ui/assets/brand/`, são SVG de retângulos 
 - **Acessibilidade:** o SVG tem `<title>Rondo</title>`. Quando o logo é decorativo ao lado do nome em texto, use `alt=""`; quando é o único nome visível, use `alt="Rondo"`.
 - **Tagline:** em texto normal (sans do corpo), nunca na fonte pixel abaixo de 16px, e em `ink` sobre `paper` ou `paper` sobre `ink`.
 
-### 11.3 Fora do escopo desta versão
+### 11.4 Onde a marca aparece
 
-Aplicar os logos em `apps/app` e `apps/docs`, favicon, título das páginas e e-mails, e trocar o nome exibido no código fazem parte da mudança de renomeação do repositório. A fonte display (Press Start 2P ou Silkscreen) ainda não está adotada.
+| Lugar                                                              | Logo                                    |
+| ------------------------------------------------------------------ | --------------------------------------- |
+| Telas `/auth/*` (cabeçalho)                                        | Estendida, com `title="Rondo"`          |
+| Home `/app` e página 404                                           | Compacta, decorativa                    |
+| Favicon de `apps/app` e `apps/docs`; página inicial de `apps/docs` | Compacta (favicon) e estendida (página) |
+
+Os componentes de `@repo/ui/brand` são a fonte para as telas do app. Como `apps/docs` ainda não consome `@repo/ui`, ele usa cópias dos SVGs (`apps/docs/app/icon.svg`, `apps/docs/public/brand/`) e `apps/app/public/favicon.svg`; um teste em `apps/app/src/brand.test.tsx` falha se as cópias ou os componentes divergirem de `packages/ui/assets/brand/`. As cores da marca são tokens fixos em `styles.css` (`--color-blaze-orange` etc.).
+
+### 11.5 Fora do escopo desta versão
+
+O nome exibido nos e-mails, nos logs e na telemetria ainda é "Analytics Personas". A fonte display (Press Start 2P ou Silkscreen) ainda não está adotada.

@@ -1,3 +1,4 @@
+import { RondoMark } from "@repo/ui/brand";
 import { SignOutButton } from "../features/auth/sign-out-button";
 import { useSession } from "../features/auth/use-session";
 
@@ -7,6 +8,7 @@ export function HomePage() {
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-4 px-6 text-center">
+      <RondoMark className="size-14" />
       <h1 className="text-4xl font-black tracking-tight sm:text-6xl">
         Welcome, {session.data?.user.firstName}
       </h1>

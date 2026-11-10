@@ -1,7 +1,7 @@
 import { Link, useRouter, useSearch } from "@tanstack/react-router";
 import { Button } from "@repo/ui/button";
-import { Input } from "@repo/ui/input";
 import { Label } from "@repo/ui/label";
+import { PasswordInput } from "@repo/ui/password-input";
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { describeResetPasswordFailure } from "./describe-reset-password-failure";
 import {
@@ -16,11 +16,12 @@ import { useResetPassword } from "./use-reset-password";
 
 interface FieldConfig {
   label: string;
+  visibilityLabel: string;
 }
 
 const FIELDS: Record<ResetPasswordField, FieldConfig> = {
-  password: { label: "New password" },
-  confirmPassword: { label: "Confirm new password" },
+  password: { label: "New password", visibilityLabel: "new password" },
+  confirmPassword: { label: "Confirm new password", visibilityLabel: "password confirmation" },
 };
 
 const CARD_CLASS = "border-2 border-border bg-card p-6 shadow-[4px_4px_0_0_var(--color-border)]";
@@ -183,10 +184,10 @@ export function ResetPasswordPage() {
     return (
       <div key={name} className="space-y-2">
         <Label htmlFor={inputId}>{FIELDS[name].label}</Label>
-        <Input
+        <PasswordInput
           id={inputId}
           name={name}
-          type="password"
+          visibilityLabel={FIELDS[name].visibilityLabel}
           autoComplete="new-password"
           value={values[name]}
           onChange={handleChange}

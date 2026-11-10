@@ -12,8 +12,8 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Analytics Personas — Documentation",
-  description: "Documentation site for the Analytics Personas project.",
+  title: "Rondo — Documentation",
+  description: "Documentation site for Rondo: club knowledge, in play.",
 };
 
 export default function RootLayout({

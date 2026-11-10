@@ -10,6 +10,10 @@
   padding: 48px 24px;
 }
 
+.logo {
+  image-rendering: pixelated;
+}
+
 .title {
   font-family: var(--font-geist-sans), sans-serif;
   font-size: clamp(2.5rem, 8vw, 4rem);

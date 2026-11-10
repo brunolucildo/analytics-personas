@@ -81,6 +81,26 @@ test.describe("reset password page", () => {
     );
   });
 
+  test("shows and hides each new password on its own", async ({ page }) => {
+    await page.goto("/auth/reset-password?token=any-link-token");
+    const password = page.getByLabel("New password", { exact: true });
+    const confirmation = page.getByLabel("Confirm new password");
+
+    await password.fill("a brand new password");
+    await confirmation.fill("a brand new password");
+    await page.getByRole("button", { name: "Show new password" }).click();
+
+    await expect(password).toHaveAttribute("type", "text");
+    await expect(confirmation).toHaveAttribute("type", "password");
+
+    await page.getByRole("button", { name: "Show password confirmation" }).click();
+    await expect(confirmation).toHaveAttribute("type", "text");
+
+    await page.getByRole("button", { name: "Hide new password" }).click();
+    await expect(password).toHaveAttribute("type", "password");
+    await expect(password).toHaveValue("a brand new password");
+  });
+
   test("removes the token from the URL on load, and a reload then shows the invalid link", async ({
     page,
   }) => {
@@ -217,11 +237,11 @@ test.describe("reset password flow", () => {
 
     // The old password stops working; the new one leads to /app.
     await page.getByLabel("Email").fill(email);
-    await page.getByLabel("Password").fill(oldPassword);
+    await page.getByLabel("Password", { exact: true }).fill(oldPassword);
     await page.getByRole("button", { name: "Sign in" }).click();
     await expect(page.getByRole("alert")).toHaveText("Invalid email or password.");
 
-    await page.getByLabel("Password").fill(NEW_PASSWORD);
+    await page.getByLabel("Password", { exact: true }).fill(NEW_PASSWORD);
     await page.getByRole("button", { name: "Sign in" }).click();
     await expect(page).toHaveURL(`${APP_URL}/app`);
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Welcome, Dora");
