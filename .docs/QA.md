@@ -234,6 +234,52 @@ Para subir um app isolado: `bun run dev --filter=app`, `--filter=api` ou `--filt
 
 `apps/docs` é o site Next.js; `.docs/` é a documentação Markdown canônica. Não confunda.
 
+### 4.1 MCP do Grafana (opcional)
+
+O `.mcp.json` da raiz registra o servidor [`mcp-grafana`](https://grafana.com/docs/grafana/latest/ai-tools/mcp/) para o Claude Code consultar o Grafana local (`http://localhost:3000`): dashboards, Mimir, Loki, Tempo e alertas. O arquivo **não tem segredo**: o `uvx --env-file .env` lê `GRAFANA_SERVICE_ACCOUNT_TOKEN` do `.env` local de cada pessoa (ignorado pelo git; o modelo está em `.env.example`), então cada dev usa o seu token. As estatísticas de uso anônimas do servidor (`GRAFANA_USAGE_STATS=disabled`) e o SDK do OpenTelemetry (`OTEL_SDK_DISABLED=true`, para o `mcp-grafana` não mandar telemetria própria ao Collector) ficam desligados.
+
+1. Instale o [`uv`](https://docs.astral.sh/uv/) (Windows: `winget install --id astral-sh.uv`).
+2. Com `bun run infra:up` no ar, abra o Grafana, vá em **Administration > Users and access > Service accounts**, crie uma conta (papel **Editor** para poder alterar dashboards; **Viewer** para só ler) e gere um token.
+3. Cole o token em `GRAFANA_SERVICE_ACCOUNT_TOKEN=` no `.env` da raiz e reinicie o app do Claude Code (ou rode `/mcp` para reconectar). Nunca coloque o token no repositório nem em `.env.example`. Uma variável de ambiente de mesmo nome já definida no sistema tem prioridade sobre o `.env`.
+4. Aprove o servidor `grafana` quando o Claude Code pedir e confirme com "liste os dashboards do Grafana": deve aparecer "Rondo — Observabilidade da API".
+
+**Cuidados com o `.env`:** o `--env-file` repassa o arquivo **inteiro** ao `mcp-grafana`, um binário de terceiros; por isso o `.env` deve ter só chaves locais de desenvolvimento (service role e `AUTH_JWT_SECRET` locais, token do Mailtrap), nunca de produção. O caminho `.env` é relativo à pasta do projeto onde o Claude Code roda: sem o arquivo (por exemplo num worktree novo, onde ele não existe) o `uvx` falha com `No environment file found` e o servidor não sobe; copie o `.env` para lá.
+
+Os dashboards do projeto são provisionados por arquivo (`infra/grafana/dashboards/`); alteração feita pela API do Grafana (inclusive pelo MCP) não vai para o arquivo e é perdida ao recriar o volume. Edite o JSON no repositório.
+
+**Windows (Docker Desktop):** o Grafana só relê `infra/grafana/dashboards/` ao iniciar, porque o bind mount não avisa mudanças de arquivo. Depois de criar, alterar ou apagar um dashboard, rode `docker compose restart grafana`; sem isso o dashboard novo não aparece e o removido continua listado (e a API recusa apagar dashboard provisionado).
+
+**Windows com o app do Claude Code (pacote MSIX) e perfil criptografado (EFS):** o `uv` falha ao gravar cache e Pythons em `AppData` (erro de "unidade diferente" ou `os error 6000`). Aponte-os para uma pasta fora do perfil, como variáveis de usuário: `UV_CACHE_DIR=D:\uv\cache`, `UV_PYTHON_INSTALL_DIR=D:\uv\python` e `UV_PYTHON_PREFERENCE=only-managed`. Isso é ajuste da máquina e não entra no `.mcp.json`.
+
+### 4.2 Teste de carga (k6)
+
+O teste de carga usa o [k6](https://k6.io) (`winget install GrafanaLabs.k6`, fora do repositório) contra uma **API isolada** que o runner sobe sozinho; nunca contra a API de dev. Pré-requisitos: `bun run infra:up` (Supabase local, Grafana, Mimir, Collector) e `bun run db:migrate`.
+
+```bash
+bun run load smoke
+```
+
+| Perfil     | Duração  | Para quê                                                                                                                                 |
+| ---------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `smoke`    | ~20 s    | Um passo por endpoint: prova que os cenários e o ambiente funcionam. Rode antes de qualquer outro perfil.                                |
+| `load`     | ~4 min   | Carga sustentada e realista (até 10 jornadas completas e 30 leitores simultâneos), para medir a latência.                                |
+| `stress`   | ~9 min   | Rampa além da capacidade (até 50 jornadas e 200 leitores) para achar o ponto de quebra. Os limites informam.                             |
+| `capacity` | ~2,5 min | Um caminho por vez, com `--only=edges`, `invalidCredentials`, `browse` ou `validation`, para comparar configurações em condições iguais. |
+
+O runner (`scripts/load-test.ts`): lê o Supabase de `supabase status` e **recusa** qualquer host que não seja local; recusa porta ocupada (`LOAD_API_PORT`, padrão 3013), porque um processo antigo atenderia no lugar e com outro código; compila e sobe a API com `EMAIL_PROVIDER=capture` e `TRUST_PROXY=true`; roda o k6, envia as métricas dele ao Mimir (`--no-prom` desliga) e, ao fim, derruba a API e apaga as contas `k6-*` do banco local. O resumo de cada execução fica em `load/results/` (ignorado pelo git).
+
+**Cenários** (`load/k6/lib/scenarios.js`): `lifecycle` (sign-up, e-mail capturado, confirm-account, session, resend-confirmation, sign-out, sign-in, forgot-password, reset-password e sign-in com a senha antiga e a nova), `browse` (health e session com token), `invalidCredentials` (401), `validation` (400 em todos os POSTs), `antiEnumeration` (202 para e-mails desconhecidos), `badTokens` (400), `edges` (404, preflight CORS, rotas fechadas sem sessão e health), `testSupport` (lista de e-mails) e `rateLimit` (estoura o sign-in e o sign-up de um mesmo IP e espera 429). `DELETE /test-support/emails` é chamado uma vez no `setup`.
+
+**IPs sintéticos:** o k6 manda `X-Forwarded-For` por cliente; com `TRUST_PROXY=true` isso vira o IP do limitador, então cada cliente tem a própria cota (sem isso, 5 sign-ups por hora por IP travariam o teste). Em produção sem proxy o cabeçalho é ignorado.
+
+**No Grafana:** abra "Rondo — Observabilidade da API" e escolha a execução em **Execução k6**; a seção "Teste de carga (k6)" mostra VUs, vazão, latência e falhas do lado do cliente, ao lado da latência medida na API. Depois de `docker compose restart grafana`, o dashboard atualizado aparece.
+
+**Investigar gargalo:** `bun run load capacity --only=<cenários> --label=<nome> --api-env=NOME=valor` (repetível; por exemplo `--api-env=OTEL_SDK_DISABLED=true` ou `--api-env=UV_THREADPOOL_SIZE=16`) muda uma variável da API por vez. Perfil de CPU da thread principal: `--api-env='NODE_OPTIONS=--require "<raiz>/load/profiler-preload.cjs"' --api-env=PROFILE_OUT=<arquivo>.cpuprofile --api-env=PROFILE_DELAY_MS=75000 --api-env=PROFILE_DURATION_MS=40000` (abre no Chrome DevTools). Sondas isoladas, sem a API: `node load/diagnostics/threadpool-probe.mjs`, `hash-capacity.mjs` e `rate-limit-store-cost.cjs` (esta exige a API compilada). Resultados e conclusões em `.specs/0014-load-testing-k6.md` §14.
+
+**Referência (2026-11-10, 28 núcleos, API e k6 na mesma máquina):** `load` com 171 req/s e p95 de 471 ms, sem falhas; `stress` satura a API em cerca de 170 req/s (event loop acima de 80%, p95 acima de 0,5 s) e estaciona em 160 a 240 req/s com p95 de ~10 s. Detalhes e hipóteses da causa em `.specs/0014-load-testing-k6.md` §13.
+
+**Limites do teste:** a API e o k6 dividem a máquina (e o `argon2` é CPU), então a saturação medida mistura os dois; `capture` não exercita o provedor de e-mail real; o buffer de 500 e-mails limita a concorrência do fluxo completo (`mail_missing` no resumo indica e-mail perdido).
+
 ## 5. Checklist manual
 
 Aplique apenas o que a mudança afeta, mas registre o que foi verificado.
@@ -276,7 +322,10 @@ Aplique apenas o que a mudança afeta, mas registre o que foi verificado.
 - [ ] Migration/rollback documentados.
 - [ ] Com `infra:up` e a API rodando, `GET /api/v1/health` gera trace no Tempo e log no Loki com `requestId` e sem PII.
 - [ ] Com o Collector parado (`docker compose stop otel-collector`), a API continua respondendo.
-- [ ] Observabilidade de auth (spec `0011`), com `infra:up` e a API compilada (`bun run build`; depois, em `apps/api`, `API_PORT=3012 EMAIL_PROVIDER=capture OTEL_SERVICE_NAME=rondo-api node dist/main.js`): faça sign-up, confirmação, sign-in (certo e errado), sign-out, forgot-password (com conta e sem) e reset. Aguarde até ~1 minuto (as métricas saem a cada 15 s) e confirme: no Mimir, `sum by (operation, outcome, reason) (auth_operations_total)` traz uma série por combinação, e `http_server_request_duration_seconds_count` tem `http_route` com templates (`unmatched` para path inexistente e preflight); no Loki, `{service_name="rondo-api"} | event="auth_operation"` traz uma linha por tentativa com `trace_id`; no Tempo, `{ name =~ "auth.*" }` traz `auth.sign_in` dentro do span HTTP, com a falha marcada e só `auth.error_code`. Nada de e-mail, senha, token, IP, `userId` ou `sid` em nenhum dos três. No Grafana, abra "Rondo — API" e "Rondo — Auth" (pasta "Rondo") e clique em **Open trace** numa linha de log (derived field); o Tempo deve abrir o trace.
+- [ ] Observabilidade de auth (spec `0011`), com `infra:up` e a API compilada (`bun run build`; depois, em `apps/api`, `API_PORT=3012 EMAIL_PROVIDER=capture OTEL_SERVICE_NAME=rondo-api node dist/main.js`): faça sign-up, confirmação, sign-in (certo e errado), sign-out, forgot-password (com conta e sem) e reset. Aguarde até ~1 minuto (as métricas saem a cada 15 s) e confirme: no Mimir, `sum by (operation, outcome, reason) (auth_operations_total)` traz uma série por combinação, e `http_server_request_duration_seconds_count` tem `http_route` com templates (`unmatched` para path inexistente e preflight); no Loki, `{service_name="rondo-api"} | event="auth_operation"` traz uma linha por tentativa com `trace_id`; no Tempo, `{ name =~ "auth.*" }` traz `auth.sign_in` dentro do span HTTP, com a falha marcada e só `auth.error_code`. Nada de e-mail, senha, token, IP, `userId` ou `sid` em nenhum dos três. No Grafana, abra "Rondo — Observabilidade da API" (pasta "Rondo") e clique em **Open trace** numa linha de log (derived field); o Tempo deve abrir o trace.
+- [ ] Observabilidade do Postgres (spec `0013`), com `infra:up` (o Supabase local no ar) e a API compilada: **suba-a numa porta livre** (confira antes que nada escuta nela; um `node dist/main.js` esquecido atende no lugar e roda código velho e outro banco) e com `SUPABASE_URL`, `SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY` do `bunx supabase status -o env` no ambiente do processo (o `.env` não os sobrescreve). Faça sign-up, sign-in (certo e errado) e forgot-password, espere ~40 s e confirme: no Mimir, `db_client_operation_duration_seconds_count` por `db_operation_name`, `db_collection_name` e `db_stored_procedure_name` (`users`, `auth_sign_up`, `auth_issue_session`…) e `postgresql_backends{job="rondo-postgres"}`; no Tempo, `{ span.db.system.name = "postgresql" }` mostra `select users` e `rpc …` dentro de `auth.*`; e nenhum trace traz o e-mail usado em `span.url.full` ou `span.url.query`, nem `client.address` nos spans de entrada. Nos primeiros ~30 s, `increase()` mostra 0 ou NaN para séries novas (limitação do contador OTLP, ver `ARCHITECTURE.md` §4.4).
+- [ ] Alertas (spec `0012`): depois de `docker compose restart grafana`, em Alerting > Alert rules (pasta "Rondo") as 19 regras aparecem com saúde `ok`. Pare a API por 3 minutos e confira que "API sem telemetria" dispara.
+- [ ] Proteção do hash (spec `0015`): com a API de teste (`bun run load capacity --only=browse,invalidCredentials`), o `session` fica na casa de centenas de ms enquanto o login inválido satura, e as recusas aparecem como 503 `SERVICE_BUSY` (motivo `service_busy`); com `--only=invalidCredentials --api-env=TRUST_PROXY=false` (um IP real, e-mails sempre diferentes) o 61º sign-in em 10 min recebe 429 da política `sign-in-ip`. No dashboard, "Fila de hashes (argon2)" mostra a ocupação e as recusas.
 
 ## 6. Dívidas de QA conhecidas
 
