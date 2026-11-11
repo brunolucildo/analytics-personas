@@ -7,13 +7,12 @@ import request from "supertest";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { AppModule } from "../src/app.module";
 import { configureApp } from "../src/bootstrap";
+import { EmailDeliveryError, EmailService } from "../src/modules/email";
 import {
   clearCapturedEmails,
-  EmailDeliveryError,
-  EmailService,
+  EMAIL_PROVIDER,
   getCapturedEmails,
-} from "../src/modules/email";
-import { EMAIL_PROVIDER } from "../src/modules/email/email.tokens";
+} from "../src/modules/email/testing";
 import { baseLogger } from "../src/observability/logger";
 import { resetRateLimitStore } from "./support/rate-limit";
 import { sessionsOf } from "./support/sessions";

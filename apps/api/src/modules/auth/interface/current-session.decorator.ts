@@ -1,6 +1,6 @@
 import { createParamDecorator, type ExecutionContext } from "@nestjs/common";
 import type { ActiveSession } from "../domain/session-ports";
-import type { AuthenticatedRequest } from "./auth.guard";
+import type { AuthenticatedRequest } from "./guards/auth.guard";
 
 /**
  * The session the `AuthGuard` resolved for this request. Only available on routes

@@ -7,7 +7,7 @@ import request from "supertest";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { AppModule } from "../src/app.module";
 import { configureApp } from "../src/bootstrap";
-import { clearCapturedEmails } from "../src/modules/email";
+import { clearCapturedEmails } from "../src/modules/email/testing";
 import { AUTH_FAILURE_REASONS } from "../src/observability/auth-telemetry";
 import { baseLogger } from "../src/observability/logger";
 import { resetRateLimitStore } from "./support/rate-limit";

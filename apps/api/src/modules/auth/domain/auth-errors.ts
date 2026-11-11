@@ -47,3 +47,15 @@ export class EmailNotConfirmedError extends Error {
     this.name = "EmailNotConfirmedError";
   }
 }
+
+/**
+ * Raised when the password hash budget is spent (every slot busy and the queue full). The
+ * request is refused at once instead of waiting behind the others; the boundary turns it into
+ * 503 with `Retry-After`. It carries nothing about the password, the account or the client.
+ */
+export class HashCapacityExceededError extends Error {
+  constructor(readonly retryAfterSeconds: number) {
+    super("Password hash capacity exceeded.");
+    this.name = "HashCapacityExceededError";
+  }
+}

@@ -6,7 +6,7 @@ import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { AppModule } from "../src/app.module";
 import { configureApp } from "../src/bootstrap";
-import { SessionService } from "../src/modules/auth/application/session.service";
+import { SessionService } from "../src/modules/auth/application/services/session.service";
 import { resetRateLimitStore } from "./support/rate-limit";
 import { seedConfirmedUser, sessionsOf } from "./support/sessions";
 import { assertMigrationsApplied, createAdminClient, deleteUsersByEmail } from "./support/supabase";

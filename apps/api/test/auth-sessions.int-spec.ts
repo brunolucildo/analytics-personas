@@ -6,7 +6,7 @@ import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { AppModule } from "../src/app.module";
 import { configureApp } from "../src/bootstrap";
-import { SessionService } from "../src/modules/auth/application/session.service";
+import { SessionService } from "../src/modules/auth/application/services/session.service";
 import { SESSION_TTL_MS } from "../src/modules/auth/domain/session-rules";
 import {
   AUTH_RATE_LIMIT_POLICIES,

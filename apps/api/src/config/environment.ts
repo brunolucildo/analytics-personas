@@ -1,5 +1,5 @@
 import { type EmailConfig, parseEmailConfig } from "../modules/email";
-import { MIN_JWT_SECRET_LENGTH } from "../modules/auth/domain/session-rules";
+import { MIN_JWT_SECRET_LENGTH } from "./auth-secret";
 
 export interface Environment {
   supabaseUrl: string;

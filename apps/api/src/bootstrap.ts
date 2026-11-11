@@ -7,7 +7,7 @@ import { AppModule } from "./app.module";
 import { AllExceptionsFilter, toErrorResponse } from "./common/all-exceptions.filter";
 import { createValidationException } from "./common/validation-exception";
 import type { Environment } from "./config/environment";
-import { createAuthTelemetryMiddleware } from "./modules/auth/interface/auth-telemetry.middleware";
+import { createAuthTelemetryMiddleware } from "./modules/auth";
 import { createHttpRouteMiddleware } from "./observability/http-route";
 import { baseLogger, StructuredLogger } from "./observability/logger";
 
