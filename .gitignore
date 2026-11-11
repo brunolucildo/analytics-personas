@@ -47,5 +47,8 @@ yarn-error.log*
 # Estado de execuções do refactor-slices
 .claude/refactor/
 
+# Artefatos das revisões da skill code-review
+.claude/review/
+
 # k6 load test output
 load/results

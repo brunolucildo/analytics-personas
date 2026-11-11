@@ -63,7 +63,7 @@ Portas: `apps/app` → **5173**; `apps/docs` → **3001**; `apps/api` → **3002
 
 ## 5. Skills
 
-Consulte o catálogo disponível antes de começar. O projeto tem oito skills próprias que definem o fluxo de trabalho:
+Consulte o catálogo disponível antes de começar. O projeto tem nove skills próprias que definem o fluxo de trabalho:
 
 | Skill             | Quando usar                                                         | O que produz                                             |
 | ----------------- | ------------------------------------------------------------------- | -------------------------------------------------------- |
@@ -75,12 +75,17 @@ Consulte o catálogo disponível antes de começar. O projeto tem oito skills pr
 | `orchestrate-me`  | várias specs de uma vez (`orchestrate-me 0001-0010`)                | 1 subagent por spec em worktree + integração + relatório |
 | `refactor-slices` | slices fora da arquitetura em camadas (`refactor-slices`)           | auditoria + plano + refactor + gates + commit/push + PR  |
 | `commit-and-push` | fim de cada spec (chamada pelo `implement-me`) ou pedido do usuário | commit Conventional Commits com co-author + push         |
+| `code-review`     | revisar um PR do GitHub (`/code-review <url-do-pr>`)                | revisão publicada no PR: comentários inline + geral      |
 
 Fluxo padrão: `create-spec` (ou `feature-concept`) → `refine-spec` quando precisar de auditoria → `implement-me <slug>`, que **termina sempre com `commit-and-push`**. Use `create-spec` quando o objetivo for apenas a spec; use `feature-concept` quando também for necessário planejar a implementação. Quando o pedido junta mais de uma capacidade (ex.: sign-in, sign-up, confirm-account e forgot-password; ou um CRUD completo), comece por `breakdown-specs`: ela quebra o pedido em várias specs pequenas, cria cada uma com `create-spec` e entrega o mapa de ordem e dependências; depois rode `implement-me` em cada spec, uma por vez, ou `orchestrate-me <range>` (ex.: `0001-0010`) para implementar várias de uma vez: o agente principal orquestra um subagent por spec, em background e em worktrees separados, respeitando as dependências, e integra tudo na branch `orchestrate/<primeira>-<ultima>`.
 
 `commit-and-push` analisa todas as mudanças pendentes, escreve a mensagem em Conventional Commits (descrição em pt-BR; `type` e `scope` em inglês), adiciona `Co-Authored-By: Claude Code <noreply@anthropic.com>`, faz `git add -A`, commita e dá push. Só roda a pedido do usuário ou no último passo do `implement-me`; nunca faz force push, `--amend`, `--no-verify` nem `git init`. Sem `.git` ela para e registra a pendência. **Destino fixo:** o push só vai para `https://github.com/brunolucildo/<repositorio>` via `origin`; qualquer outra URL a faz parar, e sem `origin` o commit fica local e o push vira pendência. Identidade dos commits: configurada só neste repositório (`.git/config`) como `Bruno Lucildo da Silva <49033432+brunolucildo@users.noreply.github.com>`; a skill não altera `user.name`/`user.email`. Estado atual: `main` publicada em `origin` = `https://github.com/brunolucildo/analytics-personas.git` (commit raiz `227e0ad`), com hooks do lefthook instalados neste clone. O push exige login do Git Credential Manager na conta `brunolucildo`; em outro clone, rode `bun run hooks:install`.
 
+`code-review` recebe o link de um PR do GitHub (`https://github.com/<dono>/<repo>/pull/<n>`, mais `--dry-run` e `--lang pt-BR|en-US` opcionais) e lança o agente `code-reviewer`, que revisa o diff com contexto, em modo somente leitura (sem checkout nem execução de código do PR), segundo as dimensões de `.claude/skills/code-review/references/review-checklist.md`: padrões, performance, bug/funcionalidade, legibilidade, acessibilidade, i18n, testes e observabilidade, além de segurança, arquitetura, dados, API, dependências, escopo e documentação. Os comentários seguem **Conventional Comments** (`<label> (<decorações>): <assunto>`; labels e decorações em inglês, texto em pt-BR por padrão) e a revisão é publicada em **uma única chamada** à API do GitHub: comentários inline ancorados no diff + um comentário geral no fim. **Regra do veredito:** pelo menos um comentário `issue` ou `(blocking)` → `REQUEST_CHANGES`; caso contrário → `APPROVE`; não há revisão neutra. O veredito é calculado por `.claude/skills/code-review/scripts/review-lint.mjs` (que também valida as linhas contra o diff), nunca escrito à mão. O GitHub não aceita aprovar nem pedir mudanças no próprio PR: nesse caso a revisão sai como `COMMENT` e o veredito fica no corpo. A revisão é estática: nenhum teste do PR é executado, e o corpo registra o que não foi verificado. Artefatos de cada execução ficam em `.claude/review/` (ignorado pelo git).
+
 **Onde as skills ficam:** `.claude/skills/<nome>/SKILL.md`, carregadas pelo Claude Code (invocação por `/<nome>`; a lista é lida ao iniciar a sessão). Esse é o único local; a antiga pasta `.agents/skills/` (convenção do OpenCode) foi removida. As skills de terceiros estão registradas em `skills-lock.json`, e `.claude/skills/` é ignorada pelo OXLint e pelo OXFmt para não reescrever código de terceiros.
+
+**Agentes próprios:** `.claude/agents/<nome>.md` (frontmatter `name`, `description`, `tools`), carregados pelo Claude Code ao iniciar a sessão e lançados por uma skill com a ferramenta `Agent` (`subagent_type: <nome>`). Hoje existe um: `code-reviewer`, usado pela skill `code-review`. Se a sessão ainda não o listar, reinicie-a; a skill tem um _fallback_ com `general-purpose`. `.claude/agents/` também é ignorada pelo OXLint e pelo OXFmt.
 
 Outras skills de referência:
 
@@ -112,6 +117,7 @@ infra/                      # configs de Grafana, Loki, Tempo, Mimir e OTel Coll
 scripts/                    # infra:up, infra:down, db:migrate (Bun)
 e2e/                        # testes Playwright
 .claude/skills/             # skills carregadas pelo Claude Code
+.claude/agents/             # agentes próprios (code-reviewer), usados pelas skills
 .docs/                      # documentação canônica do projeto
 .specs/                     # specs executáveis (_template.md + <slug>.md)
 .plans/                     # planos de implementação (<slug>-plan.md)

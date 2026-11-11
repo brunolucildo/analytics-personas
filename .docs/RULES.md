@@ -249,25 +249,26 @@ Ao parar, explique o bloqueio, apresente opções e recomende uma.
 
 Consulte o catálogo antes de começar. Skills de referência:
 
-| Contexto                          | Skill                                            |
-| --------------------------------- | ------------------------------------------------ |
-| Quebrar prompt grande em specs    | `breakdown-specs` (quando houver 2+ capacidades) |
-| Criar spec a partir de prompt     | `create-spec` (obrigatória no fluxo)             |
-| Refinar/auditar spec existente    | `refine-spec` (obrigatória no fluxo)             |
-| Interrogatório profundo + plano   | `feature-concept`                                |
-| Executar uma spec                 | `implement-me <slug>` (obrigatória no fluxo)     |
-| Executar um range de specs        | `orchestrate-me <range>` (subagents em paralelo) |
-| Refatorar slices fora das camadas | `refactor-slices` (auditoria + plano + refactor) |
-| Commitar e subir ao fim da spec   | `commit-and-push` (obrigatória no fluxo)         |
-| UI/design                         | `frontend-design`, `web-design-guidelines`       |
-| Next.js (`apps/docs`)             | `next-best-practices`                            |
-| Performance React/Next            | `vercel-react-best-practices`                    |
-| Testes orientados a comportamento | `tdd`                                            |
-| Postgres/Supabase                 | `supabase-postgres-best-practices`               |
-| E2E no browser                    | `playwright`                                     |
-| shadcn/ui e design system         | `shadcn`                                         |
-| Documentos                        | skills de `.docx`, `.pdf`, `.xlsx`, `pptx`       |
+| Contexto                          | Skill                                              |
+| --------------------------------- | -------------------------------------------------- |
+| Quebrar prompt grande em specs    | `breakdown-specs` (quando houver 2+ capacidades)   |
+| Criar spec a partir de prompt     | `create-spec` (obrigatória no fluxo)               |
+| Refinar/auditar spec existente    | `refine-spec` (obrigatória no fluxo)               |
+| Interrogatório profundo + plano   | `feature-concept`                                  |
+| Executar uma spec                 | `implement-me <slug>` (obrigatória no fluxo)       |
+| Executar um range de specs        | `orchestrate-me <range>` (subagents em paralelo)   |
+| Refatorar slices fora das camadas | `refactor-slices` (auditoria + plano + refactor)   |
+| Commitar e subir ao fim da spec   | `commit-and-push` (obrigatória no fluxo)           |
+| Revisar um PR do GitHub           | `code-review <url-do-pr>` (agente `code-reviewer`) |
+| UI/design                         | `frontend-design`, `web-design-guidelines`         |
+| Next.js (`apps/docs`)             | `next-best-practices`                              |
+| Performance React/Next            | `vercel-react-best-practices`                      |
+| Testes orientados a comportamento | `tdd`                                              |
+| Postgres/Supabase                 | `supabase-postgres-best-practices`                 |
+| E2E no browser                    | `playwright`                                       |
+| shadcn/ui e design system         | `shadcn`                                           |
+| Documentos                        | skills de `.docx`, `.pdf`, `.xlsx`, `pptx`         |
 
-As skills próprias do projeto vivem em `.claude/skills/` (carregadas pelo Claude Code, invocáveis por `/<nome>`): `breakdown-specs/`, `create-spec/`, `refine-spec/`, `feature-concept/`, `implement-me/`, `orchestrate-me/`, `refactor-slices/` e `commit-and-push/`. É o único local de skills; a antiga `.agents/skills/` (OpenCode) foi removida. Ao alterar uma skill, atualize este documento e `AGENTS.md` na mesma mudança.
+As skills próprias do projeto vivem em `.claude/skills/` (carregadas pelo Claude Code, invocáveis por `/<nome>`): `breakdown-specs/`, `create-spec/`, `refine-spec/`, `feature-concept/`, `implement-me/`, `orchestrate-me/`, `refactor-slices/`, `code-review/` e `commit-and-push/`. É o único local de skills; a antiga `.agents/skills/` (OpenCode) foi removida. Os agentes próprios vivem em `.claude/agents/` (hoje, `code-reviewer`, lançado pela skill `code-review`). Ao alterar uma skill, atualize este documento e `AGENTS.md` na mesma mudança.
 
 Se uma skill de terceiro não estiver instalada, **não invente** e **não bloqueie**: siga estes documentos, aplique o checklist equivalente e registre a ausência no relatório.
