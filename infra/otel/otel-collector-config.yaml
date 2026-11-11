@@ -9,9 +9,47 @@ receivers:
         endpoint: 0.0.0.0:4317
       http:
         endpoint: 0.0.0.0:4318
+  # Postgres server metrics (connections, transactions, locks, cache, size). Defaults point at the
+  # local Supabase database (`supabase/config.toml`: port 54322, user `postgres`) through the
+  # Docker host. For another database set POSTGRES_ENDPOINT, POSTGRES_USER and POSTGRES_PASSWORD
+  # (ideally a user with the `pg_monitor` role, never the superuser) in the environment.
+  postgresql:
+    endpoint: ${env:POSTGRES_ENDPOINT:-host.docker.internal:54322}
+    transport: tcp
+    username: ${env:POSTGRES_USER:-postgres}
+    password: ${env:POSTGRES_PASSWORD:-postgres}
+    databases:
+      - postgres
+    collection_interval: 15s
+    tls:
+      insecure: true
+    metrics:
+      postgresql.deadlocks:
+        enabled: true
+      postgresql.database.locks:
+        enabled: true
+      postgresql.temp_files:
+        enabled: true
+      postgresql.sequential_scans:
+        enabled: true
 
 processors:
   batch: {}
+  # The receiver reports no service name; without one the Mimir series would have no `job`.
+  resource/postgres:
+    attributes:
+      - key: service.name
+        value: rondo-postgres
+        action: upsert
+  # Resource attributes do not become Prometheus labels on this exporter; copy the ones we group by.
+  transform/postgres:
+    metric_statements:
+      - context: datapoint
+        statements:
+          - set(datapoint.attributes["database"], resource.attributes["postgresql.database.name"]) where resource.attributes["postgresql.database.name"] != nil
+          - set(datapoint.attributes["schema"], resource.attributes["postgresql.schema.name"]) where resource.attributes["postgresql.schema.name"] != nil
+          - set(datapoint.attributes["table"], resource.attributes["postgresql.table.name"]) where resource.attributes["postgresql.table.name"] != nil
+          - set(datapoint.attributes["index"], resource.attributes["postgresql.index.name"]) where resource.attributes["postgresql.index.name"] != nil
 
 exporters:
   otlp/tempo:
@@ -37,6 +75,10 @@ service:
     metrics:
       receivers: [otlp]
       processors: [batch]
+      exporters: [prometheusremotewrite]
+    metrics/postgres:
+      receivers: [postgresql]
+      processors: [resource/postgres, transform/postgres, batch]
       exporters: [prometheusremotewrite]
     logs:
       receivers: [otlp]

@@ -1,0 +1,1083 @@
+# Regras de alerta da API e do Postgres (Grafana provisioning).
+# Fonte de verdade: este arquivo. Alteração feita pela interface ou pela API do Grafana não vem para
+# cá e é perdida ao recriar o volume. Depois de editar, rode `docker compose restart grafana`.
+# Estado "sem dados" conta como normal; API e Postgres parados são detectados por absent_over_time.
+# Sem contact point próprio: as notificações usam a política padrão do Grafana.
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: "rondo-api"
+    folder: "Rondo"
+    interval: "1m"
+    rules:
+      - uid: "rondo-api-sem-telemetria"
+        title: "API sem telemetria"
+        condition: "C"
+        data:
+          - refId: "A"
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: "mimir"
+            model:
+              refId: "A"
+              datasource:
+                type: "prometheus"
+                uid: "mimir"
+              expr: 'absent_over_time(nodejs_eventloop_utilization_ratio{job="rondo-api"}[3m])'
+              instant: true
+              range: false
+              editorMode: "code"
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: "B"
+            datasourceUid: "__expr__"
+            model:
+              refId: "B"
+              type: "reduce"
+              expression: "A"
+              reducer: "last"
+              settings:
+                mode: "dropNN"
+              datasource:
+                type: "__expr__"
+                uid: "__expr__"
+          - refId: "C"
+            datasourceUid: "__expr__"
+            model:
+              refId: "C"
+              type: "threshold"
+              expression: "B"
+              conditions:
+                - evaluator:
+                    type: "gt"
+                    params:
+                      - 0
+              datasource:
+                type: "__expr__"
+                uid: "__expr__"
+        noDataState: "OK"
+        execErrState: "Error"
+        for: "2m"
+        annotations:
+          summary: "A API parou de enviar dados"
+          description: "Nenhum dado de runtime da API chegou ao Mimir nos últimos 3 minutos. A API está parada ou o Collector/Mimir está fora. Em ambiente local, dispara sempre que a API não está rodando."
+        labels:
+          severity: "critical"
+          service: "rondo-api"
+        isPaused: false
+      - uid: "rondo-api-5xx-sustentado"
+        title: "Erros 5xx sustentados (> 5%)"
+        condition: "C"
+        data:
+          - refId: "A"
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: "mimir"
+            model:
+              refId: "A"
+              datasource:
+                type: "prometheus"
+                uid: "mimir"
+              expr: '(sum(rate(http_server_request_duration_seconds_count{job="rondo-api",http_response_status_code=~"5.."}[5m])) or vector(0)) / sum(rate(http_server_request_duration_seconds_count{job="rondo-api"}[5m]))'
+              instant: true
+              range: false
+              editorMode: "code"
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: "B"
+            datasourceUid: "__expr__"
+            model:
+              refId: "B"
+              type: "reduce"
+              expression: "A"
+              reducer: "last"
+              settings:
+                mode: "dropNN"
+              datasource:
+                type: "__expr__"
+                uid: "__expr__"
+          - refId: "C"
+            datasourceUid: "__expr__"
+            model:
+              refId: "C"
+              type: "threshold"
+              expression: "B"
+              conditions:
+                - evaluator:
+                    type: "gt"
+                    params:
+                      - 0.05
+              datasource:
+                type: "__expr__"
+                uid: "__expr__"
+        noDataState: "OK"
+        execErrState: "Error"
+        for: "5m"
+        annotations:
+          summary: "Mais de 5% das requisições estão falhando com erro do servidor"
+          description: "Taxa de 5xx acima de 5% por 5 minutos. Veja os traces com erro e os logs de erro no dashboard."
+        labels:
+          severity: "critical"
+          service: "rondo-api"
+        isPaused: false
+      - uid: "rondo-api-resposta-5xx"
+        title: "Resposta 5xx registrada"
+        condition: "C"
+        data:
+          - refId: "A"
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: "loki"
+            model:
+              refId: "A"
+              datasource:
+                type: "loki"
+                uid: "loki"
+              expr: 'sum(count_over_time({service_name="rondo-api"} | res_statusCode >= 500 [5m]))'
+              queryType: "instant"
+              editorMode: "code"
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: "B"
+            datasourceUid: "__expr__"
+            model:
+              refId: "B"
+              type: "reduce"
+              expression: "A"
+              reducer: "last"
+              settings:
+                mode: "dropNN"
+              datasource:
+                type: "__expr__"
+                uid: "__expr__"
+          - refId: "C"
+            datasourceUid: "__expr__"
+            model:
+              refId: "C"
+              type: "threshold"
+              expression: "B"
+              conditions:
+                - evaluator:
+                    type: "gt"
+                    params:
+                      - 0
+              datasource:
+                type: "__expr__"
+                uid: "__expr__"
+        noDataState: "OK"
+        execErrState: "Error"
+        for: "0s"
+        annotations:
+          summary: "A API respondeu 5xx nos últimos 5 minutos"
+          description: "Contagem exata pelos logs de requisição (a métrica sozinha perde o primeiro erro de uma série nova)."
+        labels:
+          severity: "warning"
+          service: "rondo-api"
+        isPaused: false
+      - uid: "rondo-api-excecao-nao-tratada"
+        title: "Exceção não tratada"
+        condition: "C"
+        data:
+          - refId: "A"
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: "loki"
+            model:
+              refId: "A"
+              datasource:
+                type: "loki"
+                uid: "loki"
+              expr: 'sum(count_over_time({service_name="rondo-api"} |= "unhandled_exception" [5m]))'
+              queryType: "instant"
+              editorMode: "code"
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: "B"
+            datasourceUid: "__expr__"
+            model:
+              refId: "B"
+              type: "reduce"
+              expression: "A"
+              reducer: "last"
+              settings:
+                mode: "dropNN"
+              datasource:
+                type: "__expr__"
+                uid: "__expr__"
+          - refId: "C"
+            datasourceUid: "__expr__"
+            model:
+              refId: "C"
+              type: "threshold"
+              expression: "B"
+              conditions:
+                - evaluator:
+                    type: "gt"
+                    params:
+                      - 0
+              datasource:
+                type: "__expr__"
+                uid: "__expr__"
+        noDataState: "OK"
+        execErrState: "Error"
+        for: "0s"
+        annotations:
+          summary: "Uma exceção escapou de todos os handlers"
+          description: "Há um log unhandled_exception nos últimos 5 minutos. Abra o log, use o TraceID e corrija a causa."
+        labels:
+          severity: "critical"
+          service: "rondo-api"
+        isPaused: false
+      - uid: "rondo-api-latencia-p95-alta"
+        title: "Latência p95 alta (> 1 s)"
+        condition: "C"
+        data:
+          - refId: "A"
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: "mimir"
+            model:
+              refId: "A"
+              datasource:
+                type: "prometheus"
+                uid: "mimir"
+              expr: 'histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{job="rondo-api"}[5m])))'
+              instant: true
+              range: false
+              editorMode: "code"
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: "B"
+            datasourceUid: "__expr__"
+            model:
+              refId: "B"
+              type: "reduce"
+              expression: "A"
+              reducer: "last"
+              settings:
+                mode: "dropNN"
+              datasource:
+                type: "__expr__"
+                uid: "__expr__"
+          - refId: "C"
+            datasourceUid: "__expr__"
+            model:
+              refId: "C"
+              type: "threshold"
+              expression: "B"
+              conditions:
+                - evaluator:
+                    type: "gt"
+                    params:
+                      - 1
+              datasource:
+                type: "__expr__"
+                uid: "__expr__"
+        noDataState: "OK"
+        execErrState: "Error"
+        for: "10m"
+        annotations:
+          summary: "95% das requisições levam mais de 1 segundo"
+          description: "p95 acima de 1 s por 10 minutos. Veja a tabela de endpoints e os traces lentos."
+        labels:
+          severity: "warning"
+          service: "rondo-api"
+        isPaused: false
+      - uid: "rondo-api-event-loop-saturado"
+        title: "Event loop saturado (> 80%)"
+        condition: "C"
+        data:
+          - refId: "A"
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: "mimir"
+            model:
+              refId: "A"
+              datasource:
+                type: "prometheus"
+                uid: "mimir"
+              expr: 'avg(nodejs_eventloop_utilization_ratio{job="rondo-api"})'
+              instant: true
+              range: false
+              editorMode: "code"
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: "B"
+            datasourceUid: "__expr__"
+            model:
+              refId: "B"
+              type: "reduce"
+              expression: "A"
+              reducer: "last"
+              settings:
+                mode: "dropNN"
+              datasource:
+                type: "__expr__"
+                uid: "__expr__"
+          - refId: "C"
+            datasourceUid: "__expr__"
+            model:
+              refId: "C"
+              type: "threshold"
+              expression: "B"
+              conditions:
+                - evaluator:
+                    type: "gt"
+                    params:
+                      - 0.8
+              datasource:
+                type: "__expr__"
+                uid: "__expr__"
+        noDataState: "OK"
+        execErrState: "Error"
+        for: "5m"
+        annotations:
+          summary: "O event loop do Node está ocupado quase o tempo todo"
+          description: "Utilização acima de 80% por 5 minutos: gargalo de CPU, a latência tende a subir."
+        labels:
+          severity: "warning"
+          service: "rondo-api"
+        isPaused: false
+  - orgId: 1
+    name: "rondo-auth"
+    folder: "Rondo"
+    interval: "1m"
+    rules:
+      - uid: "rondo-auth-credenciais-invalidas"
+        title: "Pico de credenciais inválidas no login"
+        condition: "C"
+        data:
+          - refId: "A"
+            relativeTimeRange:
+              from: 900
+              to: 0
+            datasourceUid: "loki"
+            model:
+              refId: "A"
+              datasource:
+                type: "loki"
+                uid: "loki"
+              expr: 'sum(count_over_time({service_name="rondo-api"} | event="auth_operation" | operation="sign_in" | reason="invalid_credentials" [10m]))'
+              queryType: "instant"
+              editorMode: "code"
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: "B"
+            datasourceUid: "__expr__"
+            model:
+              refId: "B"
+              type: "reduce"
+              expression: "A"
+              reducer: "last"
+              settings:
+                mode: "dropNN"
+              datasource:
+                type: "__expr__"
+                uid: "__expr__"
+          - refId: "C"
+            datasourceUid: "__expr__"
+            model:
+              refId: "C"
+              type: "threshold"
+              expression: "B"
+              conditions:
+                - evaluator:
+                    type: "gt"
+                    params:
+                      - 30
+              datasource:
+                type: "__expr__"
+                uid: "__expr__"
+        noDataState: "OK"
+        execErrState: "Error"
+        for: "0s"
+        annotations:
+          summary: "Mais de 30 logins com credencial inválida em 10 minutos"
+          description: "Possível ataque de força bruta ou de credential stuffing, ou um cliente com senha antiga em loop."
+        labels:
+          severity: "warning"
+          service: "rondo-api"
+        isPaused: false
+      - uid: "rondo-auth-bloqueios-por-limite"
+        title: "Muitos bloqueios por limite de requisições"
+        condition: "C"
+        data:
+          - refId: "A"
+            relativeTimeRange:
+              from: 900
+              to: 0
+            datasourceUid: "loki"
+            model:
+              refId: "A"
+              datasource:
+                type: "loki"
+                uid: "loki"
+              expr: 'sum(count_over_time({service_name="rondo-api"} | event="rate_limited" [10m]))'
+              queryType: "instant"
+              editorMode: "code"
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: "B"
+            datasourceUid: "__expr__"
+            model:
+              refId: "B"
+              type: "reduce"
+              expression: "A"
+              reducer: "last"
+              settings:
+                mode: "dropNN"
+              datasource:
+                type: "__expr__"
+                uid: "__expr__"
+          - refId: "C"
+            datasourceUid: "__expr__"
+            model:
+              refId: "C"
+              type: "threshold"
+              expression: "B"
+              conditions:
+                - evaluator:
+                    type: "gt"
+                    params:
+                      - 20
+              datasource:
+                type: "__expr__"
+                uid: "__expr__"
+        noDataState: "OK"
+        execErrState: "Error"
+        for: "0s"
+        annotations:
+          summary: "Mais de 20 requisições barradas pelo limite (429) em 10 minutos"
+          description: "Abuso ou cliente em loop. Veja os bloqueios por política no dashboard."
+        labels:
+          severity: "warning"
+          service: "rondo-api"
+        isPaused: false
+      - uid: "rondo-auth-sucesso-signin-baixo"
+        title: "Taxa de sucesso do sign-in baixa (< 50%)"
+        condition: "C"
+        data:
+          - refId: "A"
+            relativeTimeRange:
+              from: 1200
+              to: 0
+            datasourceUid: "loki"
+            model:
+              refId: "A"
+              datasource:
+                type: "loki"
+                uid: "loki"
+              expr: '((sum(count_over_time({service_name="rondo-api"} | event="auth_operation" | operation="sign_in" | outcome="success" [15m])) or vector(0)) / sum(count_over_time({service_name="rondo-api"} | event="auth_operation" | operation="sign_in" [15m]))) and (sum(count_over_time({service_name="rondo-api"} | event="auth_operation" | operation="sign_in" [15m])) > 10)'
+              queryType: "instant"
+              editorMode: "code"
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: "B"
+            datasourceUid: "__expr__"
+            model:
+              refId: "B"
+              type: "reduce"
+              expression: "A"
+              reducer: "last"
+              settings:
+                mode: "dropNN"
+              datasource:
+                type: "__expr__"
+                uid: "__expr__"
+          - refId: "C"
+            datasourceUid: "__expr__"
+            model:
+              refId: "C"
+              type: "threshold"
+              expression: "B"
+              conditions:
+                - evaluator:
+                    type: "lt"
+                    params:
+                      - 0.5
+              datasource:
+                type: "__expr__"
+                uid: "__expr__"
+        noDataState: "OK"
+        execErrState: "Error"
+        for: "0s"
+        annotations:
+          summary: "Menos de metade dos sign-ins nos últimos 15 minutos deu certo"
+          description: "Com ao menos 10 tentativas. Pode ser ataque de credenciais, Supabase fora ou bug no login. Veja as falhas por motivo."
+        labels:
+          severity: "warning"
+          service: "rondo-api"
+        isPaused: false
+      - uid: "rondo-auth-fila-de-hash-cheia"
+        title: "Fila de hashes de senha cheia (503)"
+        condition: "C"
+        data:
+          - refId: "A"
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: "loki"
+            model:
+              refId: "A"
+              datasource:
+                type: "loki"
+                uid: "loki"
+              expr: 'sum(count_over_time({service_name="rondo-api"} | event="auth_operation" | reason="service_busy" [5m]))'
+              queryType: "instant"
+              editorMode: "code"
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: "B"
+            datasourceUid: "__expr__"
+            model:
+              refId: "B"
+              type: "reduce"
+              expression: "A"
+              reducer: "last"
+              settings:
+                mode: "dropNN"
+              datasource:
+                type: "__expr__"
+                uid: "__expr__"
+          - refId: "C"
+            datasourceUid: "__expr__"
+            model:
+              refId: "C"
+              type: "threshold"
+              expression: "B"
+              conditions:
+                - evaluator:
+                    type: "gt"
+                    params:
+                      - 0
+              datasource:
+                type: "__expr__"
+                uid: "__expr__"
+        noDataState: "OK"
+        execErrState: "Error"
+        for: "0s"
+        annotations:
+          summary: "A API recusou logins, cadastros ou resets por falta de capacidade de hash"
+          description: "Há respostas 503 SERVICE_BUSY nos últimos 5 minutos: a fila de hashes encheu. Pode ser pico legítimo ou um cliente abusando do login. Veja a fila de hashes e os bloqueios por política no dashboard."
+        labels:
+          severity: "warning"
+          service: "rondo-api"
+        isPaused: false
+      - uid: "rondo-email-falha-entrega"
+        title: "Falha na entrega de e-mail"
+        condition: "C"
+        data:
+          - refId: "A"
+            relativeTimeRange:
+              from: 900
+              to: 0
+            datasourceUid: "loki"
+            model:
+              refId: "A"
+              datasource:
+                type: "loki"
+                uid: "loki"
+              expr: 'sum(count_over_time({service_name="rondo-api"} | event=~".*email.*failed" [10m]))'
+              queryType: "instant"
+              editorMode: "code"
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: "B"
+            datasourceUid: "__expr__"
+            model:
+              refId: "B"
+              type: "reduce"
+              expression: "A"
+              reducer: "last"
+              settings:
+                mode: "dropNN"
+              datasource:
+                type: "__expr__"
+                uid: "__expr__"
+          - refId: "C"
+            datasourceUid: "__expr__"
+            model:
+              refId: "C"
+              type: "threshold"
+              expression: "B"
+              conditions:
+                - evaluator:
+                    type: "gt"
+                    params:
+                      - 0
+              datasource:
+                type: "__expr__"
+                uid: "__expr__"
+        noDataState: "OK"
+        execErrState: "Error"
+        for: "0s"
+        annotations:
+          summary: "Um e-mail transacional não foi entregue ao provedor"
+          description: "Confirmação, reset de senha ou aviso não saiu: o usuário fica sem o e-mail. Veja o provedor e as chaves."
+        labels:
+          severity: "warning"
+          service: "rondo-api"
+        isPaused: false
+  - orgId: 1
+    name: "rondo-dependencias"
+    folder: "Rondo"
+    interval: "1m"
+    rules:
+      - uid: "rondo-supabase-lento"
+        title: "Supabase lento (p95 > 2 s)"
+        condition: "C"
+        data:
+          - refId: "A"
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: "mimir"
+            model:
+              refId: "A"
+              datasource:
+                type: "prometheus"
+                uid: "mimir"
+              expr: 'histogram_quantile(0.95, sum by (le) (rate(http_client_request_duration_seconds_bucket{job="rondo-api",server_address=~".*supabase.*"}[5m])))'
+              instant: true
+              range: false
+              editorMode: "code"
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: "B"
+            datasourceUid: "__expr__"
+            model:
+              refId: "B"
+              type: "reduce"
+              expression: "A"
+              reducer: "last"
+              settings:
+                mode: "dropNN"
+              datasource:
+                type: "__expr__"
+                uid: "__expr__"
+          - refId: "C"
+            datasourceUid: "__expr__"
+            model:
+              refId: "C"
+              type: "threshold"
+              expression: "B"
+              conditions:
+                - evaluator:
+                    type: "gt"
+                    params:
+                      - 2
+              datasource:
+                type: "__expr__"
+                uid: "__expr__"
+        noDataState: "OK"
+        execErrState: "Error"
+        for: "5m"
+        annotations:
+          summary: "As chamadas HTTP ao Supabase estão lentas"
+          description: "p95 acima de 2 s por 5 minutos. As rotas de auth herdam essa latência."
+        labels:
+          severity: "warning"
+          service: "rondo-api"
+        isPaused: false
+      - uid: "rondo-supabase-erros"
+        title: "Supabase com erros (> 5%)"
+        condition: "C"
+        data:
+          - refId: "A"
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: "mimir"
+            model:
+              refId: "A"
+              datasource:
+                type: "prometheus"
+                uid: "mimir"
+              expr: '(sum(rate(http_client_request_duration_seconds_count{job="rondo-api",server_address=~".*supabase.*",http_response_status_code=~"[45].."}[5m])) or vector(0)) / sum(rate(http_client_request_duration_seconds_count{job="rondo-api",server_address=~".*supabase.*"}[5m]))'
+              instant: true
+              range: false
+              editorMode: "code"
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: "B"
+            datasourceUid: "__expr__"
+            model:
+              refId: "B"
+              type: "reduce"
+              expression: "A"
+              reducer: "last"
+              settings:
+                mode: "dropNN"
+              datasource:
+                type: "__expr__"
+                uid: "__expr__"
+          - refId: "C"
+            datasourceUid: "__expr__"
+            model:
+              refId: "C"
+              type: "threshold"
+              expression: "B"
+              conditions:
+                - evaluator:
+                    type: "gt"
+                    params:
+                      - 0.05
+              datasource:
+                type: "__expr__"
+                uid: "__expr__"
+        noDataState: "OK"
+        execErrState: "Error"
+        for: "5m"
+        annotations:
+          summary: "Mais de 5% das chamadas ao Supabase voltam com 4xx/5xx"
+          description: "Inclui 406 de consultas sem linha (normais). Se for só isso, ajuste o limite; senão, veja o banco."
+        labels:
+          severity: "warning"
+          service: "rondo-api"
+        isPaused: false
+  - orgId: 1
+    name: "rondo-postgres"
+    folder: "Rondo"
+    interval: "1m"
+    rules:
+      - uid: "rondo-db-falha-operacao"
+        title: "Falha de operação no banco (5xx/rede)"
+        condition: "C"
+        data:
+          - refId: "A"
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: "loki"
+            model:
+              refId: "A"
+              datasource:
+                type: "loki"
+                uid: "loki"
+              expr: 'sum(count_over_time({service_name="rondo-api"} | event="db_operation_failed" [5m]))'
+              queryType: "instant"
+              editorMode: "code"
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: "B"
+            datasourceUid: "__expr__"
+            model:
+              refId: "B"
+              type: "reduce"
+              expression: "A"
+              reducer: "last"
+              settings:
+                mode: "dropNN"
+              datasource:
+                type: "__expr__"
+                uid: "__expr__"
+          - refId: "C"
+            datasourceUid: "__expr__"
+            model:
+              refId: "C"
+              type: "threshold"
+              expression: "B"
+              conditions:
+                - evaluator:
+                    type: "gt"
+                    params:
+                      - 0
+              datasource:
+                type: "__expr__"
+                uid: "__expr__"
+        noDataState: "OK"
+        execErrState: "Error"
+        for: "0s"
+        annotations:
+          summary: "A API não conseguiu executar uma operação no Postgres"
+          description: "Erro do servidor (5xx) ou de rede numa query/RPC. Veja o log db_operation_failed e o trace."
+        labels:
+          severity: "critical"
+          service: "rondo-postgres"
+        isPaused: false
+      - uid: "rondo-db-operacao-lenta"
+        title: "Operações de banco lentas (p95 > 500 ms)"
+        condition: "C"
+        data:
+          - refId: "A"
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: "mimir"
+            model:
+              refId: "A"
+              datasource:
+                type: "prometheus"
+                uid: "mimir"
+              expr: 'histogram_quantile(0.95, sum by (le) (rate(db_client_operation_duration_seconds_bucket{job="rondo-api"}[5m])))'
+              instant: true
+              range: false
+              editorMode: "code"
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: "B"
+            datasourceUid: "__expr__"
+            model:
+              refId: "B"
+              type: "reduce"
+              expression: "A"
+              reducer: "last"
+              settings:
+                mode: "dropNN"
+              datasource:
+                type: "__expr__"
+                uid: "__expr__"
+          - refId: "C"
+            datasourceUid: "__expr__"
+            model:
+              refId: "C"
+              type: "threshold"
+              expression: "B"
+              conditions:
+                - evaluator:
+                    type: "gt"
+                    params:
+                      - 0.5
+              datasource:
+                type: "__expr__"
+                uid: "__expr__"
+        noDataState: "OK"
+        execErrState: "Error"
+        for: "10m"
+        annotations:
+          summary: "O p95 das operações no banco passou de 500 ms"
+          description: "Veja a latência por operação e alvo para achar a tabela ou função SQL lenta."
+        labels:
+          severity: "warning"
+          service: "rondo-postgres"
+        isPaused: false
+      - uid: "rondo-postgres-sem-metricas"
+        title: "Postgres sem métricas"
+        condition: "C"
+        data:
+          - refId: "A"
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: "mimir"
+            model:
+              refId: "A"
+              datasource:
+                type: "prometheus"
+                uid: "mimir"
+              expr: 'absent_over_time(postgresql_backends{job="rondo-postgres"}[3m])'
+              instant: true
+              range: false
+              editorMode: "code"
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: "B"
+            datasourceUid: "__expr__"
+            model:
+              refId: "B"
+              type: "reduce"
+              expression: "A"
+              reducer: "last"
+              settings:
+                mode: "dropNN"
+              datasource:
+                type: "__expr__"
+                uid: "__expr__"
+          - refId: "C"
+            datasourceUid: "__expr__"
+            model:
+              refId: "C"
+              type: "threshold"
+              expression: "B"
+              conditions:
+                - evaluator:
+                    type: "gt"
+                    params:
+                      - 0
+              datasource:
+                type: "__expr__"
+                uid: "__expr__"
+        noDataState: "OK"
+        execErrState: "Error"
+        for: "2m"
+        annotations:
+          summary: "O Collector não consegue ler o Postgres"
+          description: "Nenhuma métrica do servidor Postgres nos últimos 3 minutos: banco fora, credencial errada ou Collector sem acesso à porta. Em ambiente local, dispara quando o Supabase local está parado."
+        labels:
+          severity: "critical"
+          service: "rondo-postgres"
+        isPaused: false
+      - uid: "rondo-postgres-conexoes-altas"
+        title: "Conexões do Postgres acima de 80%"
+        condition: "C"
+        data:
+          - refId: "A"
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: "mimir"
+            model:
+              refId: "A"
+              datasource:
+                type: "prometheus"
+                uid: "mimir"
+              expr: 'sum(postgresql_backends{job="rondo-postgres"}) / max(postgresql_connection_max{job="rondo-postgres"})'
+              instant: true
+              range: false
+              editorMode: "code"
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: "B"
+            datasourceUid: "__expr__"
+            model:
+              refId: "B"
+              type: "reduce"
+              expression: "A"
+              reducer: "last"
+              settings:
+                mode: "dropNN"
+              datasource:
+                type: "__expr__"
+                uid: "__expr__"
+          - refId: "C"
+            datasourceUid: "__expr__"
+            model:
+              refId: "C"
+              type: "threshold"
+              expression: "B"
+              conditions:
+                - evaluator:
+                    type: "gt"
+                    params:
+                      - 0.8
+              datasource:
+                type: "__expr__"
+                uid: "__expr__"
+        noDataState: "OK"
+        execErrState: "Error"
+        for: "5m"
+        annotations:
+          summary: "O Postgres está perto do limite de conexões"
+          description: "Acima de 80% do max_connections por 5 minutos. Novas conexões serão recusadas perto de 100%."
+        labels:
+          severity: "warning"
+          service: "rondo-postgres"
+        isPaused: false
+      - uid: "rondo-postgres-deadlock"
+        title: "Deadlock no Postgres"
+        condition: "C"
+        data:
+          - refId: "A"
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: "mimir"
+            model:
+              refId: "A"
+              datasource:
+                type: "prometheus"
+                uid: "mimir"
+              expr: 'sum(increase(postgresql_deadlocks_total{job="rondo-postgres"}[10m]))'
+              instant: true
+              range: false
+              editorMode: "code"
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: "B"
+            datasourceUid: "__expr__"
+            model:
+              refId: "B"
+              type: "reduce"
+              expression: "A"
+              reducer: "last"
+              settings:
+                mode: "dropNN"
+              datasource:
+                type: "__expr__"
+                uid: "__expr__"
+          - refId: "C"
+            datasourceUid: "__expr__"
+            model:
+              refId: "C"
+              type: "threshold"
+              expression: "B"
+              conditions:
+                - evaluator:
+                    type: "gt"
+                    params:
+                      - 0
+              datasource:
+                type: "__expr__"
+                uid: "__expr__"
+        noDataState: "OK"
+        execErrState: "Error"
+        for: "0s"
+        annotations:
+          summary: "Houve deadlock nos últimos 10 minutos"
+          description: "Duas transações se travaram e uma foi abortada. Revise a ordem dos locks nas funções SQL."
+        labels:
+          severity: "critical"
+          service: "rondo-postgres"
+        isPaused: false
+      - uid: "rondo-postgres-cache-hit-baixo"
+        title: "Cache hit do Postgres abaixo de 90%"
+        condition: "C"
+        data:
+          - refId: "A"
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: "mimir"
+            model:
+              refId: "A"
+              datasource:
+                type: "prometheus"
+                uid: "mimir"
+              expr: 'sum(rate(postgresql_blocks_read_total{job="rondo-postgres",source=~"heap_hit|idx_hit"}[15m])) / sum(rate(postgresql_blocks_read_total{job="rondo-postgres",source=~"heap_.*|idx_.*"}[15m]))'
+              instant: true
+              range: false
+              editorMode: "code"
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: "B"
+            datasourceUid: "__expr__"
+            model:
+              refId: "B"
+              type: "reduce"
+              expression: "A"
+              reducer: "last"
+              settings:
+                mode: "dropNN"
+              datasource:
+                type: "__expr__"
+                uid: "__expr__"
+          - refId: "C"
+            datasourceUid: "__expr__"
+            model:
+              refId: "C"
+              type: "threshold"
+              expression: "B"
+              conditions:
+                - evaluator:
+                    type: "lt"
+                    params:
+                      - 0.9
+              datasource:
+                type: "__expr__"
+                uid: "__expr__"
+        noDataState: "OK"
+        execErrState: "Error"
+        for: "15m"
+        annotations:
+          summary: "O banco está lendo muito do disco"
+          description: "Menos de 90% dos blocos vêm da memória por 15 minutos: falta memória ou índice."
+        labels:
+          severity: "warning"
+          service: "rondo-postgres"
+        isPaused: false

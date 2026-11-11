@@ -44,3 +44,6 @@ store_gateway:
 
 limits:
   compactor_blocks_retention_period: 24h
+  # The default (150000 active series per tenant) is easy to exceed locally: every API restart adds
+  # a new `instance` and a load test adds more. Raise it here; it is a local development stack.
+  max_global_series_per_user: 1000000

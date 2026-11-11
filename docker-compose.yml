@@ -98,6 +98,13 @@ services:
       - "4317:4317"
       - "4318:4318"
       - "13133:13133"
+    environment:
+      POSTGRES_ENDPOINT: ${POSTGRES_ENDPOINT:-host.docker.internal:54322}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    extra_hosts:
+      # Docker Desktop already resolves it; Linux needs this line to reach the Supabase database.
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./infra/otel/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
     depends_on:

@@ -34,11 +34,16 @@ function loadDashboard(file: string): Dashboard {
 
 const dashboardFiles = readdirSync(DASHBOARDS).filter((file) => file.endsWith(".json"));
 
+// Panels that draw their own data: rows, text and the Grafana alert list carry no query.
+const NO_QUERY_PANELS = new Set(["row", "text", "alertlist"]);
+
 describe("provisioned Grafana dashboards", () => {
-  it("ships the API and Auth dashboards", () => {
-    expect(dashboardFiles.sort()).toEqual(["api.json", "auth.json"]);
-    expect(loadDashboard("api.json")).toMatchObject({ uid: "rondo-api", title: "Rondo — API" });
-    expect(loadDashboard("auth.json")).toMatchObject({ uid: "rondo-auth", title: "Rondo — Auth" });
+  it("ships the API observability dashboard", () => {
+    expect(dashboardFiles.sort()).toEqual(["api-observability.json"]);
+    expect(loadDashboard("api-observability.json")).toMatchObject({
+      uid: "rondo-api-observability",
+      title: "Rondo — Observabilidade da API",
+    });
   });
 
   it("has unique dashboard uids", () => {
@@ -55,7 +60,7 @@ describe("provisioned Grafana dashboards", () => {
 
       expect(new Set(ids).size).toBe(ids.length);
 
-      for (const panel of dashboard.panels.filter((item) => item.type !== "text")) {
+      for (const panel of dashboard.panels.filter((item) => !NO_QUERY_PANELS.has(item.type))) {
         expect(panel.targets?.length, `panel "${panel.title}" has no target`).toBeGreaterThan(0);
 
         for (const target of panel.targets ?? []) {
@@ -65,7 +70,7 @@ describe("provisioned Grafana dashboards", () => {
     });
 
     it("points every data panel at a provisioned datasource uid", () => {
-      for (const panel of dashboard.panels.filter((item) => item.type !== "text")) {
+      for (const panel of dashboard.panels.filter((item) => !NO_QUERY_PANELS.has(item.type))) {
         expect(
           KNOWN_DATASOURCES.has(panel.datasource?.uid ?? ""),
           `panel "${panel.title}" uses an unknown datasource`,
@@ -93,32 +98,65 @@ describe("provisioned Grafana dashboards", () => {
     });
   });
 
-  it("queries the labels and the route the API actually emits", () => {
-    const api = JSON.stringify(loadDashboard("api.json"));
-    const auth = JSON.stringify(loadDashboard("auth.json"));
+  it("queries the metrics, labels and route the API actually emits", () => {
+    const dashboard = JSON.stringify(loadDashboard("api-observability.json"));
 
-    expect(api).toContain("http_route");
-    expect(api).toContain("http_server_request_duration_seconds_bucket");
-    expect(auth).toContain("auth_operations_total");
-    expect(auth).toContain("auth_operation_duration_seconds_bucket");
-
-    for (const label of ["operation", "outcome", "reason"]) {
-      expect(auth).toContain(label);
+    for (const expected of [
+      "http_route",
+      "http_server_request_duration_seconds_bucket",
+      "http_client_request_duration_seconds_bucket",
+      "auth_operations_total",
+      "auth_operation_duration_seconds_bucket",
+      "nodejs_eventloop_utilization_ratio",
+      "v8js_memory_heap_used_bytes",
+      "db_client_operation_duration_seconds_bucket",
+      "db_operation_failed",
+      "postgresql_backends",
+      "postgresql_connection_max",
+      "postgresql_blocks_read_total",
+      "auth_hash_queued",
+      "auth_hash_queue_wait_seconds_bucket",
+      "auth_hash_rejected_total",
+      "k6_http_reqs_total",
+      "k6_http_req_duration_p95",
+      "k6_vus",
+      "operation",
+      "outcome",
+      "reason",
+    ]) {
+      expect(dashboard, `missing "${expected}"`).toContain(expected);
     }
   });
 
   it("only filters auth by operations and reasons that exist in the code", () => {
-    const auth = JSON.stringify(loadDashboard("auth.json"));
-    const used = [...auth.matchAll(/operation=\\"([a-z_]+)\\"/g)].map((match) => match[1]);
+    const dashboard = JSON.stringify(loadDashboard("api-observability.json"));
+    const used = [...dashboard.matchAll(/operation=\\"([a-z_]+)\\"/g)].map((match) => match[1]);
+
+    expect(used.length).toBeGreaterThan(0);
 
     for (const operation of used) {
       expect(AUTH_OPERATIONS as readonly string[]).toContain(operation);
     }
 
-    const reasons = [...auth.matchAll(/reason=\\"([a-z_]+)\\"/g)].map((match) => match[1]);
+    const reasons = [...dashboard.matchAll(/reason=\\"([a-z_]+)\\"/g)].map((match) => match[1]);
 
     for (const reason of reasons) {
       expect(AUTH_FAILURE_REASONS as readonly string[]).toContain(reason);
+    }
+  });
+
+  it("never selects span attributes that carry personal data", () => {
+    const dashboard = JSON.stringify(loadDashboard("api-observability.json"));
+
+    // The full URL and query string can hold e-mails and tokens; IP and user agent identify people.
+    for (const forbidden of [
+      "url.full",
+      "url.query",
+      "client.address",
+      "network.peer.address",
+      "user_agent.original",
+    ]) {
+      expect(dashboard, `forbidden attribute "${forbidden}"`).not.toContain(forbidden);
     }
   });
 });
@@ -138,5 +176,57 @@ describe("provisioned Grafana datasources", () => {
     expect(yaml).toMatch(/tracesToLogsV2:/);
     expect(yaml).toMatch(/datasourceUid: loki/);
     expect(yaml).toContain("$${__trace.traceId}");
+  });
+});
+
+describe("provisioned Grafana alert rules", () => {
+  const yaml = readFileSync(join(GRAFANA, "provisioning/alerting/rondo-alerts.yaml"), "utf8");
+  const uids = [...yaml.matchAll(/^ {6}- uid: "([^"]+)"/gm)].map((match) => match[1] as string);
+  const titles = [...yaml.matchAll(/^ {8}title: "([^"]+)"/gm)].map((match) => match[1] as string);
+
+  it("defines the rules in the Rondo folder with unique, short uids and titles", () => {
+    expect(uids.length).toBeGreaterThanOrEqual(15);
+    expect(new Set(uids).size).toBe(uids.length);
+    expect(new Set(titles).size).toBe(titles.length);
+    expect(titles).toHaveLength(uids.length);
+
+    for (const uid of uids) {
+      expect(uid.length, `uid "${uid}" is longer than Grafana's 40 characters`).toBeLessThanOrEqual(
+        40,
+      );
+    }
+
+    expect(yaml).toMatch(/folder: "Rondo"/);
+  });
+
+  it("gives every rule a pending period, a severity and a threshold", () => {
+    expect([...yaml.matchAll(/^ {8}for: "/gm)]).toHaveLength(uids.length);
+    expect([...yaml.matchAll(/^ {10}severity: "(critical|warning)"/gm)]).toHaveLength(uids.length);
+    expect([...yaml.matchAll(/type: "threshold"/g)]).toHaveLength(uids.length);
+  });
+
+  it("queries only the provisioned datasources", () => {
+    const used = [...yaml.matchAll(/datasourceUid: "([^"]+)"/g)].map((match) => match[1] as string);
+
+    for (const uid of used) {
+      expect(KNOWN_DATASOURCES.has(uid) || uid === "__expr__", `unknown datasource "${uid}"`).toBe(
+        true,
+      );
+    }
+  });
+
+  it("alerts on the API, auth, dependencies and Postgres, and on a stopped API or database", () => {
+    for (const expected of [
+      "absent_over_time(nodejs_eventloop_utilization_ratio",
+      "absent_over_time(postgresql_backends",
+      "http_server_request_duration_seconds_count",
+      "db_operation_failed",
+      "unhandled_exception",
+      "postgresql_deadlocks_total",
+      "postgresql_connection_max",
+      "invalid_credentials",
+    ]) {
+      expect(yaml, `missing "${expected}"`).toContain(expected);
+    }
   });
 });
