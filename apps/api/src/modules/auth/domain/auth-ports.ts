@@ -35,6 +35,12 @@ export interface TokenGenerator {
   generate(): IssuedToken;
 }
 
+/** One-way digest of a link token: the only form of the token that is stored or compared. */
+export interface TokenHasher {
+  /** SHA-256 (hex) of the token. */
+  hash(token: string): string;
+}
+
 export interface ConfirmationEmail {
   to: string;
   firstName: string;

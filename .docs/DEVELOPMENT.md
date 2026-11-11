@@ -21,18 +21,34 @@
 
 Cada domínio é uma fatia vertical com quatro camadas:
 
-| Camada           | Contém                                                 | Não contém                |
-| ---------------- | ------------------------------------------------------ | ------------------------- |
-| `domain`         | Entidades, value objects, regras, ports                | Framework, HTTP, SQL, SDK |
-| `application`    | Casos de uso, orquestração, transações                 | Detalhes de banco ou HTTP |
-| `infrastructure` | Repositórios, clients, filas, storage, LLM, conectores | Regra de negócio          |
-| `interface`      | Controllers, DTOs, guards, presenters                  | Acesso direto ao banco    |
+| Camada           | Contém                                                       | Não contém                |
+| ---------------- | ------------------------------------------------------------ | ------------------------- |
+| `domain`         | Entidades, value objects, regras, ports                      | Framework, HTTP, SQL, SDK |
+| `application`    | Casos de uso, orquestração, transações                       | Detalhes de banco ou HTTP |
+| `infrastructure` | Repositórios, clients, filas, storage, LLM, conectores       | Regra de negócio          |
+| `interface`      | Request handlers (um por endpoint), DTOs, guards, presenters | Acesso direto ao banco    |
 
 Dependências apontam para dentro: `interface → application → domain`; `infrastructure` implementa ports de `domain`/`application`.
+
+Layout de cada fatia (decisão no ADR `0014`):
+
+```text
+apps/api/src/modules/<dominio>/
+  <dominio>.module.ts, <dominio>.tokens.ts, index.ts   # só estes arquivos na raiz da fatia
+  domain/                  # regras puras, erros tipados e ports (`<fluxo>-ports.ts`)
+  application/
+    use-cases/             # <fluxo>.use-case.ts: uma classe, um fluxo, um `execute`
+    services/              # só capacidade reutilizável (ex.: `SessionService`), nunca um fluxo
+  infrastructure/          # adaptadores dos ports
+  interface/
+    request-handlers/      # <fluxo>.request-handler.ts: uma classe, um endpoint, um caso de uso
+    dto/  presenters/  guards/  decorators/
+```
 
 ### 2.2 Vertical slices
 
 - Organize por domínio, não por tipo global (`controllers/`, `services/` na raiz).
+- **Um endpoint, um request handler, um caso de uso:** cada endpoint HTTP tem uma classe em `interface/request-handlers/` que injeta **exatamente um** caso de uso; cada caso de uso é usado por um só handler. Dois endpoints com o mesmo comportamento usam dois casos de uso ou um serviço de capacidade em `application/services/`. O módulo Nest lista todos os handlers em `controllers`.
 - Compartilhamento só em `apps/api/src/modules/shared`, quando usado por 2+ módulos e estável.
 - Um módulo não importa outro módulo diretamente; se precisar, exponha um caso de uso ou um port.
 
@@ -85,10 +101,10 @@ apps/app/src/
 
 ## 5. API (Nest.js)
 
-- Controller fino: recebe DTO, chama caso de uso, devolve presenter.
+- Request handler fino: recebe DTO, chama **um** caso de uso, devolve presenter.
 - Validação de entrada com DTO/schema; rejeite payload inválido antes do caso de uso.
 - Erros de domínio são mapeados para HTTP na camada de interface; não vaze stack trace.
-- Nenhum acesso direto ao Supabase dentro do controller.
+- Nenhum acesso direto ao Supabase dentro do request handler.
 - Toda integração externa tem timeout, retry limitado e erro tipado.
 - **A API é fechada por padrão:** um `AuthGuard` global exige sessão em todo endpoint; só `@Public()` (`src/common/public.decorator.ts`) abre uma rota (hoje: `GET /api/v1/health`, `POST /api/v1/auth/sign-up`, `POST /api/v1/auth/sign-in` e `/test-support/emails`, que já é 404 fora do `capture`). Endpoint novo não precisa de nada para ser protegido; para ler a pessoa logada use `@CurrentSession()` (ver §13.5). Autorização além da sessão (papéis) fica explícita no caso de uso.
 - E-mail sai só por `EmailService` (`apps/api/src/modules/email`): o caso de uso chama `dispatch` **depois do commit**, para que falha do provedor não mude o resultado do request; use `send` só quando precisar do erro. Monte o corpo com `renderEmailLayout` e a tag `html` (ela escapa valores dinâmicos). Nunca importe SDK ou cliente de provedor fora do módulo `email` nem logue destinatário, assunto, corpo, link ou token.
@@ -113,7 +129,7 @@ apps/app/src/
 - Falha de conector não derruba a demanda inteira: registre, isole e informe a lacuna.
 - A API exporta traces, métricas e logs por OpenTelemetry para o Grafana LGTM (ver `ARCHITECTURE.md` §4.4). Exportação nunca bloqueia nem derruba o request.
 - Métricas mínimas a manter: latência, taxa de erro, throughput e, quando existirem, falhas por conector.
-- **Operação de auth nova** (endpoint em `modules/auth`): acrescente-a a `AUTH_OPERATIONS` e ao mapa de endpoints de `auth-telemetry.middleware.ts`, e embrulhe o caso de uso com `traceAuthOperation` no controller. Assim ela ganha contador, histograma, span e log `auth_operation` sem tocar na camada `application`. O catálogo de nomes e labels está em `ARCHITECTURE.md` §4.4.
+- **Operação de auth nova** (endpoint em `modules/auth`): acrescente-a a `AUTH_OPERATIONS` e ao mapa de endpoints de `auth-telemetry.middleware.ts`, e embrulhe o caso de uso com `traceAuthOperation` no request handler. Assim ela ganha contador, histograma, span e log `auth_operation` sem tocar na camada `application`. O catálogo de nomes e labels está em `ARCHITECTURE.md` §4.4.
 - **Labels e atributos só de conjuntos fechados:** `operation`, `outcome` e `reason` nunca recebem texto vindo do cliente. Código de erro novo precisa entrar em `AUTH_FAILURE_REASONS` (senão vira `request_failed`) e no dashboard.
 - **Telemetria sem PII e sem revelar contas:** nenhum e-mail, nome, senha, token, link, IP, `userId` ou `sid` em label, atributo ou log; o span de falha leva só o código de erro. Endpoint que responde igual com ou sem conta (`forgot-password`, `resend-confirmation`) deve registrar o mesmo resultado nos dois casos.
 - Telemetria nunca decide a resposta: erro dentro do middleware de telemetria é engolido.
@@ -183,7 +199,7 @@ Uma mudança só está pronta quando:
 ## 12. Anti-padrões proibidos
 
 - `any`, `@ts-ignore` e `eslint-disable` sem justificativa.
-- Regra de negócio em componente, controller ou página.
+- Regra de negócio em componente, request handler ou página.
 - Chamada direta ao banco a partir do browser.
 - `useEffect` para busca inicial de dados.
 - Texto hardcoded de produto em primitivo de UI.
@@ -255,16 +271,17 @@ import { RateLimit } from "../rate-limit"; // ou o caminho relativo do módulo
 
 @Post("sign-in")
 @RateLimit("sign-in")
-signIn(@Body() body: SignInDto) { /* ... */ }
+handle(@Body() body: SignInDto) { /* ... */ } // em SignInRequestHandler
 ```
 
-- **Políticas:** `AUTH_RATE_LIMIT_POLICIES` em `rate-limit.policies.ts` é o único lugar com os números (`sign-up` 5/60 min por IP; `sign-in-ip` 60/10 min por IP; `sign-in` 10/10 min por IP + e-mail; `confirm-account` 10/10 min por IP; `resend-confirmation` 3/10 min por IP + e-mail; `forgot-password` 3/10 min por IP + e-mail; `reset-password` 10/10 min por IP). Política nova entra nesse registro; nome inexistente no decorator faz a rota responder 500 (erro de programação, nunca rota sem proteção em silêncio).
+- **Políticas:** `AUTH_RATE_LIMIT_POLICIES` em `domain/rate-limit-policy.ts` é o único lugar com os números (`sign-up` 5/60 min por IP; `sign-in-ip` 60/10 min por IP; `sign-in` 10/10 min por IP + e-mail; `confirm-account` 10/10 min por IP; `resend-confirmation` 3/10 min por IP + e-mail; `forgot-password` 3/10 min por IP + e-mail; `reset-password` 10/10 min por IP). Política nova entra nesse registro; nome inexistente no decorator faz a rota responder 500 (erro de programação, nunca rota sem proteção em silêncio).
 - **Várias políticas:** `@RateLimit("sign-in-ip", "sign-in")` avalia na ordem dada e a primeira que estoura responde 429 (as seguintes nem são contadas); liste a mais ampla e barata primeiro.
-- **Chave:** rota (`Classe.metodo`) + política + IP + (se a política é `ip-and-email`) o `email` string do corpo com trim e minúsculas, tudo em hash SHA-256 na memória. Sem `email` string, cai para a chave só por IP.
+- **Chave:** rota (`RequestHandler.handle`, montada pelo guard) + política + IP + (se a política é `ip-and-email`) o `email` string do corpo com trim e minúsculas, tudo em hash SHA-256 na memória. Sem `email` string, cai para a chave só por IP.
 - **Resposta ao exceder:** 429, header `Retry-After` (segundos, inteiro >= 1) e envelope `RATE_LIMITED` com `details: [{ "retryAfterSeconds": n }]`. Janela fixa por chave.
 - **Logs:** só `event: "rate_limited"` com o nome da política (e `rate_limit_store_error` quando o armazenamento falha). Nunca IP, e-mail ou chave.
 - **Fail-open:** se o armazenamento lançar erro, a requisição passa.
-- **Ordem de guards:** o `RateLimitModule` é importado logo após o `ConfigModule` no `AppModule`; guards globais futuros (ex.: sessão) devem ser registrados depois, para o limite rodar antes da autenticação.
+- **Camadas:** `domain/` (`rate-limit-policy.ts`, `rate-limit-key.ts` com `buildRateLimitKeyParts` puro, `rate-limit-decision.ts` com `evaluateRateLimit` e o `Retry-After`, ports `RateLimitStore` e `KeyHasher` em `rate-limit-ports.ts`, `UnknownRateLimitPolicyError`); `application/use-cases/check-rate-limit.use-case.ts` (`CheckRateLimit.execute`: políticas na ordem do decorator, para na primeira que estoura, falha do armazenamento vira política indisponível); `infrastructure/` (`in-memory-rate-limit-store.ts`, `node-crypto-key-hasher.ts`, SHA-256 em hex); `interface/` (`guards/rate-limit.guard.ts` só traduz a decisão em 429 + `Retry-After` + log, `decorators/rate-limit.decorator.ts`).
+- **Ordem de guards:** o `APP_GUARD` do limite fica no `RateLimitModule`, que é importado logo após o `ConfigModule` no `AppModule` (antes do `AuthModule`); guards globais futuros (ex.: sessão) devem ser registrados depois, para o limite rodar antes da autenticação.
 - **`TRUST_PROXY`** (`false` por padrão): com `true`, o IP vem do primeiro endereço de `X-Forwarded-For` (use só atrás de um proxy confiável; do contrário qualquer cliente forja o IP). Com `false`, o cabeçalho é ignorado e atrás de um proxy todos compartilham a cota do IP do proxy: configure antes do deploy.
 - **Limitação:** contadores em memória, **instância única**. Reiniciar a API zera as contagens e com mais de uma instância cada uma conta sozinha. O armazenamento fica atrás da interface `RateLimitStore`; Redis é backlog. Teto de 10 000 entradas, com evicção da mais antiga e descarte das expiradas.
 - **Testes:** use `resetRateLimitStore(app)` de `apps/api/test/support/rate-limit.ts` em `beforeEach`, e `createFakeClock()` com o provider `RATE_LIMIT_CLOCK` para avançar o tempo. Para uma política de teste, sobrescreva `RATE_LIMIT_POLICIES` (exemplo em `apps/api/test/rate-limit.int-spec.ts`).
@@ -273,9 +290,10 @@ signIn(@Body() body: SignInDto) { /* ... */ }
 
 Módulo `apps/api/src/modules/auth/` (spec `0005`; modelo no ADR 0009, resumo em `ARCHITECTURE.md` §4.7).
 
+- **Handlers e casos de uso:** 8 request handlers em `interface/request-handlers/` (`SignUp`, `ForgotPassword`, `ResetPassword`, `SignIn`, `SignOut`, `ConfirmAccount`, `ResendConfirmation`, `GetSession`), cada um com o seu caso de uso; `GET /api/v1/auth/session` usa `GetSession`. O `HashLimiter` (infraestrutura) lança `HashCapacityExceededError` e os 3 handlers que fazem hash (`sign-up`, `sign-in`, `reset-password`) o traduzem em `ServiceBusyException` (503 `SERVICE_BUSY` com `Retry-After`). `MIN_JWT_SECRET_LENGTH` vive em `apps/api/src/config/auth-secret.ts`.
 - **Header:** `Authorization: Bearer <jwt>`. O JWT só carrega `sub`, `sid`, `iat` e `exp`; a validade vem da linha em `sessions` (a API a lê a cada request). Emitir uma sessão revoga a anterior do mesmo usuário (uma ativa por usuário, garantido pelo banco).
 - **Resposta de sessão** (para os endpoints que emitem sessão): `presentSession(await sessions.issue(userId))` devolve `{accessToken, expiresAt, user:{id, firstName, lastName, email}}`. `GET /api/v1/auth/session` devolve só `{user}`.
-- **Rota aberta:** `@Public()` no método ou no controller; sem ele, 401 `UNAUTHENTICATED` ("Authentication required.") para token ausente, malformado, de assinatura inválida, expirado, sem `sid` ou de sessão revogada/inexistente, sem dizer qual. Rota inexistente continua 404.
+- **Rota aberta:** `@Public()` no método ou na classe do request handler; sem ele, 401 `UNAUTHENTICATED` ("Authentication required.") para token ausente, malformado, de assinatura inválida, expirado, sem `sid` ou de sessão revogada/inexistente, sem dizer qual. Rota inexistente continua 404.
 - **Rota fechada:** `@CurrentSession() session: ActiveSession` dá `session.userId`, `session.sessionId` e `session.user`.
 - **Ordem dos guards:** o de limite de requisições roda antes do de sessão (ver §13.4), então tentativas anônimas também contam.
 - **Segredo:** `AUTH_JWT_SECRET` (>= 32 caracteres) só no servidor, nunca em log nem em `VITE_*`. Falha do banco ao validar é 500, não 401.

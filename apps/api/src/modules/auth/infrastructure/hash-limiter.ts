@@ -1,6 +1,6 @@
 import { type ObservableResult, metrics } from "@opentelemetry/api";
-import { ServiceBusyException } from "../../../common/service-busy.exception";
 import { DURATION_BUCKETS_SECONDS } from "../../../observability/duration-buckets";
+import { HashCapacityExceededError } from "../domain/auth-errors";
 
 /** Runs one password-hashing task under the hash budget. */
 export interface HashRunner {
@@ -13,7 +13,7 @@ export const UNLIMITED_HASH_RUNNER: HashRunner = { run: (task) => task() };
 export interface HashLimiterOptions {
   /** Hashes allowed at the same time. Keep it below the libuv thread pool size (default 4). */
   concurrency: number;
-  /** Hashes allowed to wait for a free slot; one more is refused with 503. */
+  /** Hashes allowed to wait for a free slot; one more is refused. */
   maxQueue: number;
   now?: () => number;
 }
@@ -79,7 +79,8 @@ function getInstruments() {
  * the calls to PostgREST share: past the machine's ceiling (about 33 hashes per second on the
  * development machine) the pool queue grows and every one of them waits behind the hashes. This
  * keeps fewer hashes in flight than there are pool threads, queues the rest in arrival order and,
- * when the queue is full, refuses at once with 503 instead of making everyone wait.
+ * when the queue is full, refuses at once (`HashCapacityExceededError`, 503 at the boundary) instead
+ * of making everyone wait.
  * Nothing about the password, the account or the client is stored or recorded.
  */
 export class HashLimiter implements HashRunner {
@@ -138,7 +139,7 @@ export class HashLimiter implements HashRunner {
     if (this.waiting.length >= this.maxQueue) {
       this.safely(() => getInstruments().rejected.add(1));
 
-      return Promise.reject(new ServiceBusyException(this.retryAfterSeconds()));
+      return Promise.reject(new HashCapacityExceededError(this.retryAfterSeconds()));
     }
 
     return new Promise<void>((resolve) => {

@@ -1,6 +1,7 @@
 import { jwtVerify, SignJWT } from "jose";
 import type { AccessTokenClaims, AccessTokenSigner } from "../domain/session-ports";
-import { isUuid, MIN_JWT_SECRET_LENGTH } from "../domain/session-rules";
+import { MIN_JWT_SECRET_LENGTH } from "../../../config/auth-secret";
+import { isUuid } from "../domain/session-rules";
 
 const ALGORITHM = "HS256";
 

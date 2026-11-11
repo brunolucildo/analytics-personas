@@ -1,8 +1,7 @@
-import { HttpStatus } from "@nestjs/common";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { type TelemetryRecorder, startTelemetryRecorder } from "../../../../test/support/telemetry";
-import { ServiceBusyException } from "../../../common/service-busy.exception";
 import { DURATION_BUCKETS_SECONDS } from "../../../observability/duration-buckets";
+import { HashCapacityExceededError } from "../domain/auth-errors";
 import { HashLimiter } from "./hash-limiter";
 
 function deferred<T = void>() {
@@ -89,7 +88,7 @@ describe("HashLimiter", () => {
     expect(limiter.activeCount).toBe(0);
   });
 
-  it("refuses with 503 SERVICE_BUSY when the queue is full, without running the task", async () => {
+  it("refuses with HashCapacityExceededError when the queue is full, without running the task", async () => {
     const limiter = new HashLimiter({ concurrency: 1, maxQueue: 2 });
     const gate = deferred();
     let refusedTaskRan = false;
@@ -105,10 +104,8 @@ describe("HashLimiter", () => {
 
     const failure = await refused.catch((error: unknown) => error);
 
-    expect(failure).toBeInstanceOf(ServiceBusyException);
-    expect((failure as ServiceBusyException).getStatus()).toBe(HttpStatus.SERVICE_UNAVAILABLE);
-    expect((failure as ServiceBusyException).code).toBe("SERVICE_BUSY");
-    expect((failure as ServiceBusyException).retryAfterSeconds).toBeGreaterThanOrEqual(1);
+    expect(failure).toBeInstanceOf(HashCapacityExceededError);
+    expect((failure as HashCapacityExceededError).retryAfterSeconds).toBeGreaterThanOrEqual(1);
     expect(refusedTaskRan).toBe(false);
 
     gate.resolve();
@@ -126,7 +123,9 @@ describe("HashLimiter", () => {
     const gate = deferred();
     const running = limiter.run(() => gate.promise);
 
-    await expect(limiter.run(() => Promise.resolve())).rejects.toBeInstanceOf(ServiceBusyException);
+    await expect(limiter.run(() => Promise.resolve())).rejects.toBeInstanceOf(
+      HashCapacityExceededError,
+    );
 
     gate.resolve();
     await running;
@@ -170,7 +169,7 @@ describe("HashLimiter", () => {
     const running = limiter.run(() => gate.promise);
     const refused = (await limiter
       .run(() => Promise.resolve())
-      .catch((e: unknown) => e)) as ServiceBusyException;
+      .catch((e: unknown) => e)) as HashCapacityExceededError;
 
     expect(refused.retryAfterSeconds).toBe(30);
 

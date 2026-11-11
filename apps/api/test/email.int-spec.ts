@@ -5,14 +5,8 @@ import request from "supertest";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { configureApp, createNestApp } from "../src/bootstrap";
 import { validateEnvironment } from "../src/config/environment";
-import {
-  clearCapturedEmails,
-  EmailModule,
-  EmailService,
-  getCapturedEmails,
-  renderEmailLayout,
-  html,
-} from "../src/modules/email";
+import { EmailModule, EmailService, html, renderEmailLayout } from "../src/modules/email";
+import { clearCapturedEmails, getCapturedEmails } from "../src/modules/email/testing";
 
 const baseEnv = {
   SUPABASE_URL: "http://127.0.0.1:54321",

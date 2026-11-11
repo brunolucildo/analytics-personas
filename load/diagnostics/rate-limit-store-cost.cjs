@@ -3,7 +3,10 @@
 //   node load/diagnostics/rate-limit-store-cost.cjs
 const path = require("node:path");
 const { InMemoryRateLimitStore, DEFAULT_MAX_ENTRIES } = require(
-  path.join(__dirname, "../../apps/api/dist/modules/rate-limit/in-memory-rate-limit-store.js"),
+  path.join(
+    __dirname,
+    "../../apps/api/dist/modules/rate-limit/infrastructure/in-memory-rate-limit-store.js",
+  ),
 );
 
 const WINDOW_MS = 10 * 60 * 1000;

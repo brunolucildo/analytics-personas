@@ -1,14 +1,9 @@
-import type { EmailAddress, EmailMessage } from "../../domain/email-message";
-
-export interface CapturedEmail extends EmailMessage {
-  from: EmailAddress;
-  capturedAt: string;
-}
+import type { CapturedEmail, CapturedEmailRepository } from "../../domain/captured-emails-ports";
 
 const MAX_CAPTURED_EMAILS = 500;
 
 /** In-memory mailbox of the `capture` provider. Never used outside tests. */
-export class CapturedEmailStore {
+export class CapturedEmailStore implements CapturedEmailRepository {
   private emails: CapturedEmail[] = [];
 
   add(email: CapturedEmail): void {

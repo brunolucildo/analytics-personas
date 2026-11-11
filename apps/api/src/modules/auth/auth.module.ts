@@ -5,18 +5,20 @@ import { APP_GUARD } from "@nestjs/core";
 import type { Environment } from "../../config/environment";
 import { createInstrumentedFetch } from "../../observability/db-telemetry";
 import { EmailModule, EmailService } from "../email";
-import { ConfirmAccount } from "./application/confirm-account";
-import { RequestPasswordReset } from "./application/request-password-reset";
-import { ResendConfirmation } from "./application/resend-confirmation";
-import { ResetPassword } from "./application/reset-password";
-import { SessionService } from "./application/session.service";
-import { SignIn } from "./application/sign-in";
-import { SignOut } from "./application/sign-out";
-import { SignUp } from "./application/sign-up";
+import { ConfirmAccount } from "./application/use-cases/confirm-account.use-case";
+import { GetSession } from "./application/use-cases/get-session.use-case";
+import { RequestPasswordReset } from "./application/use-cases/request-password-reset.use-case";
+import { ResendConfirmation } from "./application/use-cases/resend-confirmation.use-case";
+import { ResetPassword } from "./application/use-cases/reset-password.use-case";
+import { SessionService } from "./application/services/session.service";
+import { SignIn } from "./application/use-cases/sign-in.use-case";
+import { SignOut } from "./application/use-cases/sign-out.use-case";
+import { SignUp } from "./application/use-cases/sign-up.use-case";
 import type {
   ConfirmationMailer,
   PasswordHasher,
   TokenGenerator,
+  TokenHasher,
   UserRepository,
 } from "./domain/auth-ports";
 import type { ConfirmationRepository } from "./domain/confirm-account-ports";
@@ -44,13 +46,15 @@ import {
   PASSWORD_VERIFIER,
   SUPABASE_ADMIN_CLIENT,
   TOKEN_GENERATOR,
+  TOKEN_HASHER,
   USER_REPOSITORY,
 } from "./auth.tokens";
 import { ACCESS_TOKEN_SIGNER, SESSION_REPOSITORY } from "./session.tokens";
 import { Argon2PasswordHasher } from "./infrastructure/argon2-password-hasher";
 import { Argon2PasswordVerifier } from "./infrastructure/argon2-password-verifier";
 import { HashLimiter } from "./infrastructure/hash-limiter";
-import { CryptoTokenGenerator, hashToken } from "./infrastructure/crypto-token-generator";
+import { CryptoTokenGenerator } from "./infrastructure/crypto-token-generator";
+import { CryptoTokenHasher } from "./infrastructure/crypto-token-hasher";
 import { EmailServiceConfirmationMailer } from "./infrastructure/email-service-confirmation-mailer";
 import { EmailServiceNewSessionMailer } from "./infrastructure/email-service-new-session-mailer";
 import { EmailServicePasswordChangedMailer } from "./infrastructure/email-service-password-changed-mailer";
@@ -61,12 +65,28 @@ import { SupabasePasswordResetRepository } from "./infrastructure/supabase-passw
 import { JoseAccessTokenSigner } from "./infrastructure/jose-access-token-signer";
 import { SupabaseSessionRepository } from "./infrastructure/supabase-session.repository";
 import { SupabaseUserRepository } from "./infrastructure/supabase-user.repository";
-import { AuthController } from "./interface/auth.controller";
-import { AuthGuard } from "./interface/auth.guard";
+import { AuthGuard } from "./interface/guards/auth.guard";
+import { ConfirmAccountRequestHandler } from "./interface/request-handlers/confirm-account.request-handler";
+import { ForgotPasswordRequestHandler } from "./interface/request-handlers/forgot-password.request-handler";
+import { GetSessionRequestHandler } from "./interface/request-handlers/get-session.request-handler";
+import { ResendConfirmationRequestHandler } from "./interface/request-handlers/resend-confirmation.request-handler";
+import { ResetPasswordRequestHandler } from "./interface/request-handlers/reset-password.request-handler";
+import { SignInRequestHandler } from "./interface/request-handlers/sign-in.request-handler";
+import { SignOutRequestHandler } from "./interface/request-handlers/sign-out.request-handler";
+import { SignUpRequestHandler } from "./interface/request-handlers/sign-up.request-handler";
 
 @Module({
   imports: [EmailModule],
-  controllers: [AuthController],
+  controllers: [
+    SignUpRequestHandler,
+    ForgotPasswordRequestHandler,
+    ResetPasswordRequestHandler,
+    SignInRequestHandler,
+    SignOutRequestHandler,
+    ConfirmAccountRequestHandler,
+    ResendConfirmationRequestHandler,
+    GetSessionRequestHandler,
+  ],
   providers: [
     {
       // Service role: server only. It bypasses RLS, which is why the tables have no policies.
@@ -105,6 +125,7 @@ import { AuthGuard } from "./interface/auth.guard";
       useFactory: (limiter: HashLimiter) => new Argon2PasswordHasher(limiter),
     },
     { provide: TOKEN_GENERATOR, useClass: CryptoTokenGenerator },
+    { provide: TOKEN_HASHER, useClass: CryptoTokenHasher },
     {
       provide: CONFIRMATION_MAILER,
       inject: [EmailService, ConfigService],
@@ -182,9 +203,12 @@ import { AuthGuard } from "./interface/auth.guard";
     },
     {
       provide: ConfirmAccount,
-      inject: [CONFIRMATION_REPOSITORY, SessionService],
-      useFactory: (confirmations: ConfirmationRepository, sessions: SessionService) =>
-        new ConfirmAccount(confirmations, sessions, hashToken),
+      inject: [CONFIRMATION_REPOSITORY, SessionService, TOKEN_HASHER],
+      useFactory: (
+        confirmations: ConfirmationRepository,
+        sessions: SessionService,
+        tokenHasher: TokenHasher,
+      ) => new ConfirmAccount(confirmations, sessions, tokenHasher),
     },
     {
       provide: CREDENTIALS_REPOSITORY,
@@ -221,13 +245,15 @@ import { AuthGuard } from "./interface/auth.guard";
     },
     {
       provide: ResetPassword,
-      inject: [PASSWORD_RESET_REPOSITORY, PASSWORD_HASHER, PASSWORD_CHANGED_MAILER],
+      inject: [PASSWORD_RESET_REPOSITORY, PASSWORD_HASHER, PASSWORD_CHANGED_MAILER, TOKEN_HASHER],
       useFactory: (
         resets: PasswordResetRepository,
         hasher: PasswordHasher,
         mailer: PasswordChangedMailer,
-      ) => new ResetPassword(resets, hasher, mailer, hashToken),
+        tokenHasher: TokenHasher,
+      ) => new ResetPassword(resets, hasher, mailer, tokenHasher),
     },
+    { provide: GetSession, useFactory: () => new GetSession() },
     // Global guard: closes every route that is not `@Public()`. It is registered here, after
     // `RateLimitModule` in `AppModule`, so the rate limit still runs before authentication.
     { provide: APP_GUARD, useClass: AuthGuard },

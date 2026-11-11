@@ -5,10 +5,10 @@ import request from "supertest";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { AppModule } from "../src/app.module";
 import { configureApp } from "../src/bootstrap";
-import { ServiceBusyException } from "../src/common/service-busy.exception";
 import { HASH_LIMITER } from "../src/modules/auth/auth.tokens";
+import { HashCapacityExceededError } from "../src/modules/auth/domain/auth-errors";
 import { HashLimiter } from "../src/modules/auth/infrastructure/hash-limiter";
-import { clearCapturedEmails } from "../src/modules/email";
+import { clearCapturedEmails } from "../src/modules/email/testing";
 import { baseLogger } from "../src/observability/logger";
 import { resetRateLimitStore } from "./support/rate-limit";
 import { type TelemetryRecorder, startTelemetryRecorder } from "./support/telemetry";
@@ -146,7 +146,7 @@ describe("password hash protection (real API)", () => {
   });
 
   describe("when the hash queue is full", () => {
-    const full = { run: () => Promise.reject(new ServiceBusyException(3)) };
+    const full = { run: () => Promise.reject(new HashCapacityExceededError(3)) };
 
     it("answers sign-in with 503 SERVICE_BUSY and Retry-After, not as a crash", async () => {
       const app = await buildApp(full);

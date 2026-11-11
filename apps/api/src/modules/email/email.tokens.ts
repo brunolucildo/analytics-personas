@@ -1,2 +1,3 @@
 export const EMAIL_CONFIG = Symbol("EMAIL_CONFIG");
 export const EMAIL_PROVIDER = Symbol("EMAIL_PROVIDER");
+export const CAPTURED_EMAIL_REPOSITORY = Symbol("CAPTURED_EMAIL_REPOSITORY");
