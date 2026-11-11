@@ -1,5 +1,6 @@
 import { metrics, SpanStatusCode, trace } from "@opentelemetry/api";
 import { ApiException } from "../common/api-exception";
+import { DURATION_BUCKETS_SECONDS } from "./duration-buckets";
 
 /** Every authentication operation that has telemetry (the `operation` label and span suffix). */
 export const AUTH_OPERATIONS = [
@@ -27,6 +28,7 @@ export const AUTH_FAILURE_REASONS = [
   "email_not_confirmed",
   "token_invalid_or_expired",
   "internal_error",
+  "service_busy",
   "request_failed",
 ] as const;
 
@@ -73,6 +75,7 @@ function createInstruments() {
     duration: meter.createHistogram("auth.operation.duration", {
       description: "Time to answer an authentication request.",
       unit: "s",
+      advice: { explicitBucketBoundaries: DURATION_BUCKETS_SECONDS },
     }),
   };
 }

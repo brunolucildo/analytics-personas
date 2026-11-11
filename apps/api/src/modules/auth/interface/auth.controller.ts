@@ -125,7 +125,7 @@ export class AuthController {
   @Post("sign-in")
   @Public()
   @HttpCode(HttpStatus.OK)
-  @RateLimit("sign-in")
+  @RateLimit("sign-in-ip", "sign-in")
   async signInAccount(@Body() body: SignInDto): Promise<SessionResponse> {
     return traceAuthOperation("sign_in", async () => {
       try {

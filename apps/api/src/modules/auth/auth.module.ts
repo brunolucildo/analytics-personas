@@ -3,6 +3,7 @@ import { Module } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { APP_GUARD } from "@nestjs/core";
 import type { Environment } from "../../config/environment";
+import { createInstrumentedFetch } from "../../observability/db-telemetry";
 import { EmailModule, EmailService } from "../email";
 import { ConfirmAccount } from "./application/confirm-account";
 import { RequestPasswordReset } from "./application/request-password-reset";
@@ -36,6 +37,7 @@ import {
   CREDENTIALS_REPOSITORY,
   NEW_SESSION_MAILER,
   PASSWORD_CHANGED_MAILER,
+  HASH_LIMITER,
   PASSWORD_HASHER,
   PASSWORD_RESET_MAILER,
   PASSWORD_RESET_REPOSITORY,
@@ -47,6 +49,7 @@ import {
 import { ACCESS_TOKEN_SIGNER, SESSION_REPOSITORY } from "./session.tokens";
 import { Argon2PasswordHasher } from "./infrastructure/argon2-password-hasher";
 import { Argon2PasswordVerifier } from "./infrastructure/argon2-password-verifier";
+import { HashLimiter } from "./infrastructure/hash-limiter";
 import { CryptoTokenGenerator, hashToken } from "./infrastructure/crypto-token-generator";
 import { EmailServiceConfirmationMailer } from "./infrastructure/email-service-confirmation-mailer";
 import { EmailServiceNewSessionMailer } from "./infrastructure/email-service-new-session-mailer";
@@ -73,7 +76,11 @@ import { AuthGuard } from "./interface/auth.guard";
         createClient(
           config.get("supabaseUrl", { infer: true }),
           config.get("supabaseServiceRoleKey", { infer: true }),
-          { auth: { persistSession: false, autoRefreshToken: false } },
+          {
+            auth: { persistSession: false, autoRefreshToken: false },
+            // One span and one histogram point per Postgres call, with no query string or body.
+            global: { fetch: createInstrumentedFetch() },
+          },
         ),
     },
     {
@@ -82,7 +89,21 @@ import { AuthGuard } from "./interface/auth.guard";
       useFactory: (client: ConstructorParameters<typeof SupabaseUserRepository>[0]) =>
         new SupabaseUserRepository(client),
     },
-    { provide: PASSWORD_HASHER, useClass: Argon2PasswordHasher },
+    {
+      // One budget for every argon2 call of the process (hash and verify).
+      provide: HASH_LIMITER,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<Environment, true>) =>
+        new HashLimiter({
+          concurrency: config.get("authHashConcurrency", { infer: true }),
+          maxQueue: config.get("authHashQueueLimit", { infer: true }),
+        }),
+    },
+    {
+      provide: PASSWORD_HASHER,
+      inject: [HASH_LIMITER],
+      useFactory: (limiter: HashLimiter) => new Argon2PasswordHasher(limiter),
+    },
     { provide: TOKEN_GENERATOR, useClass: CryptoTokenGenerator },
     {
       provide: CONFIRMATION_MAILER,
@@ -171,7 +192,11 @@ import { AuthGuard } from "./interface/auth.guard";
       useFactory: (client: ConstructorParameters<typeof SupabaseCredentialsRepository>[0]) =>
         new SupabaseCredentialsRepository(client),
     },
-    { provide: PASSWORD_VERIFIER, useClass: Argon2PasswordVerifier },
+    {
+      provide: PASSWORD_VERIFIER,
+      inject: [HASH_LIMITER],
+      useFactory: (limiter: HashLimiter) => new Argon2PasswordVerifier(limiter),
+    },
     {
       provide: NEW_SESSION_MAILER,
       inject: [EmailService, ConfigService],

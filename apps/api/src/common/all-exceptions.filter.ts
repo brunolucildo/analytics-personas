@@ -2,9 +2,11 @@ import { type ArgumentsHost, Catch, type ExceptionFilter, HttpException } from "
 import { baseLogger } from "../observability/logger";
 import { ApiException, type ApiErrorBody } from "./api-exception";
 import { rememberErrorCode } from "./error-code";
+import { ServiceBusyException } from "./service-busy.exception";
 
 interface HttpResponse {
   locals?: Record<string, unknown>;
+  setHeader?(name: string, value: string | number): unknown;
   status(code: number): { json(body: unknown): void };
 }
 
@@ -80,7 +82,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const request = http.getRequest<{ id?: unknown }>();
     const { status, body } = toErrorResponse(exception);
 
-    if (status >= 500) {
+    if (exception instanceof ServiceBusyException) {
+      response.setHeader?.("Retry-After", exception.retryAfterSeconds);
+    }
+
+    // A deliberate `ApiException` (such as 503 SERVICE_BUSY) is an answer, not a crash.
+    if (status >= 500 && !(exception instanceof ApiException)) {
       // The stack goes to the structured log only, never to the response.
       baseLogger.error({ requestId: request.id, err: exception }, "unhandled_exception");
     }

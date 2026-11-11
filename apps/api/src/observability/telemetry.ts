@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
 import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-http";
 import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http";
@@ -7,6 +8,7 @@ import { BatchLogRecordProcessor } from "@opentelemetry/sdk-logs";
 import { PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
 import { NodeSDK } from "@opentelemetry/sdk-node";
 import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
+import { outgoingUrlAttributes, redactHttpRequestSpan } from "./span-redaction";
 
 const endpoint = (process.env.OTEL_EXPORTER_OTLP_ENDPOINT ?? "http://localhost:4318").replace(
   /\/$/,
@@ -20,6 +22,10 @@ const sdk = new NodeSDK({
   resourceDetectors: [],
   resource: resourceFromAttributes({
     [ATTR_SERVICE_NAME]: process.env.OTEL_SERVICE_NAME ?? "rondo-api",
+    // One random id per process: it becomes the `instance` label in Mimir. Without it two API
+    // processes (dev and a load test, or two replicas) write to the same series and their
+    // counters overwrite each other. Not personal data; a new one on every restart.
+    "service.instance.id": randomUUID(),
   }),
   traceExporter: new OTLPTraceExporter({
     url: `${endpoint}/v1/traces`,
@@ -43,7 +49,13 @@ const sdk = new NodeSDK({
       }),
     }),
   ],
-  instrumentations: [getNodeAutoInstrumentations()],
+  instrumentations: [
+    getNodeAutoInstrumentations({
+      // Query strings carry PostgREST filters (e-mail, session id) and client input; IPs identify people.
+      "@opentelemetry/instrumentation-http": { requestHook: redactHttpRequestSpan },
+      "@opentelemetry/instrumentation-undici": { startSpanHook: outgoingUrlAttributes },
+    }),
+  ],
 });
 
 if (process.env.OTEL_SDK_DISABLED !== "true") {

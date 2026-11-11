@@ -144,6 +144,7 @@ describe("authentication observability (real API, in-memory OpenTelemetry)", () 
         metrics: [
           ...(await recorder.metric("auth.operations")),
           ...(await recorder.metric("auth.operation.duration")),
+          ...(await recorder.metric("db.client.operation.duration")),
         ],
         logs: authLogs(),
       }),
@@ -341,6 +342,47 @@ describe("authentication observability (real API, in-memory OpenTelemetry)", () 
 
     expect(response.status).toBe(200);
     track(response.body.accessToken as string);
+  });
+
+  it("database: each Postgres call is a child span and a duration point named by table or function", async () => {
+    const { email } = await createAccount("db", true);
+
+    recorder.reset();
+
+    const response = await signIn(email);
+
+    expect(response.status).toBe(200);
+    track(response.body.accessToken as string);
+
+    const parent = authSpans("auth.sign_in")[0];
+    const dbSpans = recorder
+      .spans()
+      .filter((span) => span.attributes["db.system.name"] === "postgresql");
+
+    expect(dbSpans.map((span) => span.name)).toEqual(
+      expect.arrayContaining(["select users", "rpc auth_issue_session"]),
+    );
+
+    for (const span of dbSpans) {
+      expect(span.parentSpanContext?.spanId).toBe(parent?.spanContext().spanId);
+      expect(span.attributes["db.response.status_code"]).toBe("200");
+    }
+
+    const points = await recorder.metric("db.client.operation.duration");
+
+    expect(points.map((point) => point.attributes)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ "db.operation.name": "select", "db.collection.name": "users" }),
+        expect.objectContaining({
+          "db.operation.name": "rpc",
+          "db.stored_procedure.name": "auth_issue_session",
+        }),
+      ]),
+    );
+
+    for (const point of points) {
+      expect(point.attributes).not.toHaveProperty("error.type");
+    }
   });
 
   it("only emits the closed reason set and leaks no personal data in any signal", () => {

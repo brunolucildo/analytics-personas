@@ -3,6 +3,7 @@ import { SpanStatusCode, trace } from "@opentelemetry/api";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { type TelemetryRecorder, startTelemetryRecorder } from "../../test/support/telemetry";
 import { ApiException } from "../common/api-exception";
+import { DURATION_BUCKETS_SECONDS } from "./duration-buckets";
 import {
   AUTH_FAILURE_REASONS,
   recordAuthAttempt,
@@ -20,6 +21,7 @@ describe("reasonOf", () => {
     expect(reasonOf(429, "RATE_LIMITED")).toBe("rate_limited");
     expect(reasonOf(401, "UNAUTHENTICATED")).toBe("unauthenticated");
     expect(reasonOf(500, "INTERNAL_ERROR")).toBe("internal_error");
+    expect(reasonOf(503, "SERVICE_BUSY")).toBe("service_busy");
   });
 
   it("collapses any other code into request_failed", () => {
@@ -92,6 +94,9 @@ describe("auth telemetry instruments", () => {
       const durations = await recorder.metric("auth.operation.duration");
 
       expect(durations).toHaveLength(2);
+      // Bounds in seconds: the OpenTelemetry default (0, 5, 10, 25...) is in ms and would put every
+      // request in the first bucket, making the p95 meaningless.
+      expect(durations[0]?.boundaries).toEqual(DURATION_BUCKETS_SECONDS);
       expect(durations.find((point) => point.attributes.outcome === "failure")).toMatchObject({
         attributes: { operation: "sign_in", outcome: "failure" },
         value: 1,

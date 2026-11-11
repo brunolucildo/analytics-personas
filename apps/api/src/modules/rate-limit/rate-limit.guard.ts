@@ -46,15 +46,24 @@ export class RateLimitGuard implements CanActivate {
   ) {}
 
   canActivate(context: ExecutionContext): boolean {
-    const policyName = this.reflector.getAllAndOverride<string | undefined>(RATE_LIMIT_METADATA, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const metadata = this.reflector.getAllAndOverride<string | readonly string[] | undefined>(
+      RATE_LIMIT_METADATA,
+      [context.getHandler(), context.getClass()],
+    );
 
-    if (policyName === undefined) {
+    if (metadata === undefined) {
       return true;
     }
 
+    for (const policyName of typeof metadata === "string" ? [metadata] : metadata) {
+      this.enforce(policyName, context);
+    }
+
+    return true;
+  }
+
+  /** Counts the request against one policy and throws 429 when it is over the limit. */
+  private enforce(policyName: string, context: ExecutionContext): void {
     const policy = this.policies[policyName];
 
     if (policy === undefined) {
@@ -67,7 +76,7 @@ export class RateLimitGuard implements CanActivate {
     const hit = this.count(policyName, policy, context, request);
 
     if (hit === undefined || hit.count <= policy.limit) {
-      return true;
+      return;
     }
 
     const retryAfterSeconds = Math.max(1, Math.ceil((hit.resetAt - this.now()) / 1000));

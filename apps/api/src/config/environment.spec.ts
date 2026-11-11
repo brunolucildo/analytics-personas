@@ -34,6 +34,48 @@ describe("validateEnvironment", () => {
     },
   );
 
+  describe("hash budget", () => {
+    it("defaults to one slot below the default libuv thread pool and a queue of 64", () => {
+      const environment = validateEnvironment(validEnv);
+
+      expect(environment.authHashConcurrency).toBe(3);
+      expect(environment.authHashQueueLimit).toBe(64);
+    });
+
+    it("follows UV_THREADPOOL_SIZE, always leaving one thread free", () => {
+      expect(
+        validateEnvironment({ ...validEnv, UV_THREADPOOL_SIZE: "8" }).authHashConcurrency,
+      ).toBe(7);
+      expect(
+        validateEnvironment({ ...validEnv, UV_THREADPOOL_SIZE: "1" }).authHashConcurrency,
+      ).toBe(1);
+    });
+
+    it("lets AUTH_HASH_CONCURRENCY and AUTH_HASH_QUEUE_LIMIT override the defaults", () => {
+      const environment = validateEnvironment({
+        ...validEnv,
+        AUTH_HASH_CONCURRENCY: "2",
+        AUTH_HASH_QUEUE_LIMIT: "0",
+      });
+
+      expect(environment.authHashConcurrency).toBe(2);
+      expect(environment.authHashQueueLimit).toBe(0);
+    });
+
+    it.each([
+      ["AUTH_HASH_CONCURRENCY", "0"],
+      ["AUTH_HASH_CONCURRENCY", "2.5"],
+      ["AUTH_HASH_CONCURRENCY", "many"],
+      ["AUTH_HASH_QUEUE_LIMIT", "-1"],
+      ["AUTH_HASH_QUEUE_LIMIT", "lots"],
+      ["UV_THREADPOOL_SIZE", "0"],
+    ])("fails naming %s when the value is %s", (name, value) => {
+      expect(() => validateEnvironment({ ...validEnv, [name]: value })).toThrowError(
+        new RegExp(name),
+      );
+    });
+  });
+
   it("exposes the validated e-mail configuration", () => {
     expect(validateEnvironment(validEnv).email).toMatchObject({ provider: "capture" });
   });

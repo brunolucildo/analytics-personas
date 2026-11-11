@@ -19,6 +19,8 @@ export interface RecordedPoint {
   value: number;
   /** Histogram sum (seconds, for duration histograms); `undefined` for counters. */
   sum?: number;
+  /** Histogram bucket upper bounds; `undefined` for counters. */
+  boundaries?: number[];
 }
 
 /**
@@ -82,13 +84,16 @@ export function startTelemetryRecorder() {
                 attributes: { ...point.attributes },
                 value: 0,
               };
-              const histogram = point.value as { count?: number; sum?: number } | number;
+              const histogram = point.value as
+                | { count?: number; sum?: number; buckets?: { boundaries?: number[] } }
+                | number;
 
               if (typeof histogram === "number") {
                 known.value += histogram;
               } else {
                 known.value += histogram.count ?? 0;
                 known.sum = (known.sum ?? 0) + (histogram.sum ?? 0);
+                known.boundaries = histogram.buckets?.boundaries;
               }
 
               totals.set(key, known);
