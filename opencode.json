@@ -1,0 +1,21 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "timeout": {
+      "startup": 120000,
+      "catalog": 60000
+    },
+    "servers": {
+      "grafana": {
+        "type": "local",
+        "command": ["uvx", "--env-file", ".env", "mcp-grafana"],
+        "codemode": true,
+        "environment": {
+          "GRAFANA_URL": "http://localhost:3000",
+          "GRAFANA_USAGE_STATS": "disabled",
+          "OTEL_SDK_DISABLED": "true"
+        }
+      }
+    }
+  }
+}

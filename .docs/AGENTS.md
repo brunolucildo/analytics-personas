@@ -63,7 +63,7 @@ Portas: `apps/app` → **5173**; `apps/docs` → **3001**; `apps/api` → **3002
 
 ## 5. Skills
 
-Consulte o catálogo disponível antes de começar. O projeto tem sete skills próprias que definem o fluxo de trabalho:
+Consulte o catálogo disponível antes de começar. O projeto tem oito skills próprias que definem o fluxo de trabalho:
 
 | Skill             | Quando usar                                                         | O que produz                                             |
 | ----------------- | ------------------------------------------------------------------- | -------------------------------------------------------- |
@@ -73,6 +73,7 @@ Consulte o catálogo disponível antes de começar. O projeto tem sete skills pr
 | `feature-concept` | ideia que exige interrogatório profundo **e** plano de execução     | `.specs/<slug>.md` + `.plans/<slug>-plan.md`             |
 | `implement-me`    | spec/plano pronto para virar código (`implement-me <slug>`)         | implementação + QA + ADR + commit/push + relatório       |
 | `orchestrate-me`  | várias specs de uma vez (`orchestrate-me 0001-0010`)                | 1 subagent por spec em worktree + integração + relatório |
+| `refactor-slices` | slices fora da arquitetura em camadas (`refactor-slices`)           | auditoria + plano + refactor + gates + commit/push + PR  |
 | `commit-and-push` | fim de cada spec (chamada pelo `implement-me`) ou pedido do usuário | commit Conventional Commits com co-author + push         |
 
 Fluxo padrão: `create-spec` (ou `feature-concept`) → `refine-spec` quando precisar de auditoria → `implement-me <slug>`, que **termina sempre com `commit-and-push`**. Use `create-spec` quando o objetivo for apenas a spec; use `feature-concept` quando também for necessário planejar a implementação. Quando o pedido junta mais de uma capacidade (ex.: sign-in, sign-up, confirm-account e forgot-password; ou um CRUD completo), comece por `breakdown-specs`: ela quebra o pedido em várias specs pequenas, cria cada uma com `create-spec` e entrega o mapa de ordem e dependências; depois rode `implement-me` em cada spec, uma por vez, ou `orchestrate-me <range>` (ex.: `0001-0010`) para implementar várias de uma vez: o agente principal orquestra um subagent por spec, em background e em worktrees separados, respeitando as dependências, e integra tudo na branch `orchestrate/<primeira>-<ultima>`.
