@@ -43,3 +43,6 @@ yarn-error.log*
 # Estado de execuções do orchestrate-me
 .claude/orchestrate/
 .claude/worktrees/
+
+# k6 load test output
+load/results
