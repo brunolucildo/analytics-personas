@@ -27,7 +27,7 @@ export function parseEmailFrom(value: string | undefined): EmailAddress {
   }
 
   throw new Error(
-    'EMAIL_FROM must be an e-mail address, optionally with a name, for example "Analytics Personas <no-reply@example.com>".',
+    'EMAIL_FROM must be an e-mail address, optionally with a name, for example "Rondo <no-reply@example.com>".',
   );
 }
 

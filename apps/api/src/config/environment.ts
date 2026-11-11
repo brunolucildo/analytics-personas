@@ -13,6 +13,10 @@ export interface Environment {
   email: EmailConfig;
   /** HS256 secret of the access tokens. Server only: never logged, never in the bundle. */
   authJwtSecret: string;
+  /** Password hashes allowed to run at the same time (see `HashLimiter`). */
+  authHashConcurrency: number;
+  /** Password hashes allowed to wait for a free slot before the API answers 503. */
+  authHashQueueLimit: number;
 }
 
 const REQUIRED_VARIABLES = [
@@ -58,6 +62,48 @@ function parseAuthJwtSecret(value: string | undefined): string {
   return value;
 }
 
+const DEFAULT_THREAD_POOL_SIZE = 4;
+const DEFAULT_HASH_QUEUE_LIMIT = 64;
+
+function parseInteger(
+  name: string,
+  value: string | undefined,
+  fallback: number,
+  min: number,
+): number {
+  if (value === undefined || value.trim() === "") {
+    return fallback;
+  }
+
+  const parsed = Number(value);
+
+  if (!Number.isInteger(parsed) || parsed < min) {
+    throw new Error(`${name} must be an integer of at least ${min}.`);
+  }
+
+  return parsed;
+}
+
+/**
+ * Hashes in flight stay below the libuv thread pool (`UV_THREADPOOL_SIZE`, default 4) so the JWT
+ * check, `randomBytes` and the calls to the database always find a free thread.
+ */
+function parseHashConcurrency(env: Record<string, string | undefined>): number {
+  const threadPool = parseInteger(
+    "UV_THREADPOOL_SIZE",
+    env.UV_THREADPOOL_SIZE,
+    DEFAULT_THREAD_POOL_SIZE,
+    1,
+  );
+
+  return parseInteger(
+    "AUTH_HASH_CONCURRENCY",
+    env.AUTH_HASH_CONCURRENCY,
+    Math.max(1, threadPool - 1),
+    1,
+  );
+}
+
 export function validateEnvironment(env: Record<string, string | undefined>): Environment {
   const missing = REQUIRED_VARIABLES.filter((name) => !env[name]);
 
@@ -83,9 +129,16 @@ export function validateEnvironment(env: Record<string, string | undefined>): En
     appUrl: parseAppOrigin(env.APP_URL as string),
     apiPort,
     otelEndpoint: env.OTEL_EXPORTER_OTLP_ENDPOINT ?? "http://localhost:4318",
-    otelServiceName: env.OTEL_SERVICE_NAME ?? "analytics-personas-api",
+    otelServiceName: env.OTEL_SERVICE_NAME ?? "rondo-api",
     trustProxy: parseTrustProxy(env.TRUST_PROXY),
     email: parseEmailConfig(env),
     authJwtSecret: parseAuthJwtSecret(env.AUTH_JWT_SECRET),
+    authHashConcurrency: parseHashConcurrency(env),
+    authHashQueueLimit: parseInteger(
+      "AUTH_HASH_QUEUE_LIMIT",
+      env.AUTH_HASH_QUEUE_LIMIT,
+      DEFAULT_HASH_QUEUE_LIMIT,
+      0,
+    ),
   };
 }

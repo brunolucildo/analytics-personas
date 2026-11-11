@@ -6,7 +6,7 @@
 
 ## 1. O que é o projeto
 
-**Rondo** (antes "Analytics Personas") é uma plataforma para criar, configurar e operar _experts_: agentes de IA especializados em funções de um clube de futebol (Head Coach, Analista de Desempenho, Jurídico Esportivo, Fisiologista etc.). Os experts consomem dados de conectores externos (Notion, Google Drive, PDF, Markdown, Confluence, Jira, Linear, ClickUp, Google Docs, Google Sheets) para produzir análises sob demanda. O nome do produto é **Rondo**; os identificadores técnicos (repositório, pacotes, containers do Docker, `project_id` do Supabase) ainda usam `analytics-personas` até o repositório ser renomeado, e o nome exibido em código e e-mails (por exemplo, "New sign-in to Analytics Personas") será trocado em uma mudança de código à parte.
+**Rondo** (antes "Analytics Personas") é uma plataforma para criar, configurar e operar _experts_: agentes de IA especializados em funções de um clube de futebol (Head Coach, Analista de Desempenho, Jurídico Esportivo, Fisiologista etc.). Os experts consomem dados de conectores externos (Notion, Google Drive, PDF, Markdown, Confluence, Jira, Linear, ClickUp, Google Docs, Google Sheets) para produzir análises sob demanda. O nome do produto é **Rondo**; o único identificador técnico que ainda usa `analytics-personas` é o repositório remoto no GitHub, até ele ser renomeado; pacotes, containers do Docker, `project_id` do Supabase, telemetria e e-mails já usam Rondo.
 
 **Estado atual:** fundação técnica pronta (spec `0000-foundation`). O monorepo Turborepo tem um cliente React + Vite (`apps/app`), uma API Nest.js (`apps/api`), o site de docs em Next.js (`apps/docs`) e o design system (`packages/ui`), com Supabase local, observabilidade Grafana LGTM e testes unitário, de integração e E2E. O espaço de URLs (`/api/v1/*`, `/auth/*`, `/app/*`) e o idioma en-US estão definidos em `DEVELOPMENT.md` §13 (spec `0001`). **Ainda não existem** features de produto, autenticação completa (há cadastro, confirmação de conta, sign-in, sessão, sign-out e o pedido de redefinição de senha; redefinição de senha com troca da senha), ingestão de conectores, agentes nem CI. Não trate a arquitetura-alvo como se já estivesse implementada.
 
@@ -114,7 +114,7 @@ e2e/                        # testes Playwright
 .docs/                      # documentação canônica do projeto
 .specs/                     # specs executáveis (_template.md + <slug>.md)
 .plans/                     # planos de implementação (<slug>-plan.md)
-.adrs/                      # Architecture Decision Records (0001 a 0004)
+.adrs/                      # Architecture Decision Records (0001 a 0010)
 ```
 
 `apps/docs` (site Next.js) **não é** o mesmo que `.docs/` (Markdown canônico).

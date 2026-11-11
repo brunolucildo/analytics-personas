@@ -198,7 +198,7 @@ describe("POST /api/v1/auth/forgot-password", () => {
       const token = pattern.exec(message?.text ?? "")?.[1];
 
       expect(token).toBeDefined();
-      expect(message?.subject).toBe("Reset your Analytics Personas password");
+      expect(message?.subject).toBe("Reset your Rondo password");
       expect(message?.text).toContain("Hi Bianca,");
       expect(message?.text).toContain("1 hour");
       expect(message?.text).toContain("If you didn't request this, you can ignore this email");

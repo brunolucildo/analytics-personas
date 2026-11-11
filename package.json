@@ -1,5 +1,5 @@
 {
-  "name": "analytics-personas",
+  "name": "rondo",
   "private": true,
   "workspaces": [
     "apps/*",
@@ -16,6 +16,7 @@
     "test": "turbo run test",
     "test:integration": "turbo run test:integration",
     "test:e2e": "playwright test",
+    "load": "bun run scripts/load-test.ts",
     "test:coverage": "turbo run test:coverage",
     "infra:up": "bun run scripts/infra-up.ts",
     "infra:down": "bun run scripts/infra-down.ts",

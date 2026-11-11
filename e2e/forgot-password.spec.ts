@@ -5,7 +5,7 @@ import { E2E_EMAIL_PREFIX } from "./support/global-teardown";
 const APP_URL = process.env.E2E_APP_URL ?? "http://localhost:5173";
 const API_URL = `${process.env.E2E_API_URL ?? "http://localhost:3002"}/api/v1`;
 const PASSWORD = "correct horse battery";
-const RESET_SUBJECT = "Reset your Analytics Personas password";
+const RESET_SUBJECT = "Reset your Rondo password";
 const SUCCESS = "If an account exists for that email, we sent instructions to reset your password.";
 
 function newEmail(label: string): string {

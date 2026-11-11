@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { InMemoryRateLimitStore } from "./in-memory-rate-limit-store";
 
 function createClock(start = 1_000_000) {
@@ -92,6 +92,46 @@ describe("InMemoryRateLimitStore", () => {
     }
 
     expect(store.size).toBe(100);
+  });
+
+  it("still clears expired entries at the cap once the scan interval has passed", () => {
+    const clock = createClock();
+    const store = new InMemoryRateLimitStore(clock.now, 3);
+
+    store.hit("a", 1_000);
+    store.hit("b", 1_000);
+    store.hit("c", 1_000);
+    clock.advance(5_000);
+    store.hit("d", 60_000);
+
+    expect(store.size).toBe(1);
+  });
+
+  it("does not scan every entry for each new key at the cap", () => {
+    const clock = createClock();
+    const store = new InMemoryRateLimitStore(clock.now, 1_000);
+
+    for (let index = 0; index < 1_000; index += 1) {
+      store.hit(`warm-${index}`, 60_000);
+    }
+
+    // A full scan iterates the map; count how many happen for 500 new keys at the cap.
+    const iterate = vi.spyOn(Map.prototype, Symbol.iterator);
+
+    for (let index = 0; index < 500; index += 1) {
+      store.hit(`new-${index}`, 60_000);
+    }
+
+    const scans = iterate.mock.calls.length;
+
+    iterate.mockRestore();
+
+    expect(scans).toBeLessThanOrEqual(1);
+    expect(store.size).toBe(1_000);
+
+    // After the interval the scan is allowed again.
+    clock.advance(1_000);
+    store.hit("later", 60_000);
   });
 
   it("forgets everything on reset", () => {

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { CaptureEmailProvider } from "./capture-email-provider";
 import { CapturedEmailStore } from "./captured-email-store";
 
-const from = { name: "Analytics Personas", address: "no-reply@analytics-personas.local" };
+const from = { name: "Rondo", address: "no-reply@rondo.local" };
 
 function message(to: string, subject = "Hello") {
   return { to, subject, text: "text", html: "<p>html</p>", purpose: "test" };

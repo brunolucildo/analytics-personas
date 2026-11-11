@@ -20,7 +20,7 @@ describe("EmailServicePasswordChangedMailer", () => {
     const message = dispatch.mock.calls[0]?.[0];
 
     expect(message.to).toBe("ana@example.test");
-    expect(message.subject).toBe("Your Analytics Personas password was changed");
+    expect(message.subject).toBe("Your Rondo password was changed");
     expect(message.text).toContain(`${APP_URL}/auth/forgot-password`);
   });
 

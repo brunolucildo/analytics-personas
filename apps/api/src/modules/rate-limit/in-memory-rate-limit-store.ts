@@ -2,6 +2,8 @@ import type { RateLimitHit, RateLimitStore } from "./rate-limit-store";
 
 export const DEFAULT_MAX_ENTRIES = 10_000;
 const SWEEP_INTERVAL_MS = 60_000;
+/** Minimum time between two full scans triggered by a new key arriving at the cap. */
+const CAP_SWEEP_INTERVAL_MS = 1_000;
 
 /**
  * Fixed-window counters kept in a `Map` (insertion ordered). Memory is bounded:
@@ -10,6 +12,7 @@ const SWEEP_INTERVAL_MS = 60_000;
 export class InMemoryRateLimitStore implements RateLimitStore {
   private readonly entries = new Map<string, RateLimitHit>();
   private nextSweepAt = 0;
+  private nextCapSweepAt = 0;
 
   constructor(
     private readonly now: () => number = Date.now,
@@ -32,8 +35,13 @@ export class InMemoryRateLimitStore implements RateLimitStore {
     // New key or expired window: start over and move the key to the newest slot.
     this.entries.delete(key);
 
-    if (this.entries.size >= this.maxEntries) {
+    // At the cap every new key would otherwise scan every entry. Windows last minutes, so the scan
+    // finds almost nothing and the oldest entry is evicted right after anyway: under many distinct
+    // clients that is O(cap) work per request on the main thread (the load test saw the event loop
+    // saturate at ~230 req/s). At most one full scan per interval; eviction alone keeps the cap.
+    if (this.entries.size >= this.maxEntries && now >= this.nextCapSweepAt) {
       this.sweep(now);
+      this.nextCapSweepAt = now + CAP_SWEEP_INTERVAL_MS;
     }
 
     while (this.entries.size >= this.maxEntries) {
@@ -56,6 +64,7 @@ export class InMemoryRateLimitStore implements RateLimitStore {
   reset(): void {
     this.entries.clear();
     this.nextSweepAt = 0;
+    this.nextCapSweepAt = 0;
   }
 
   /** Number of live entries; exposed for tests of the memory bound. */

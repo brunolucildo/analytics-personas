@@ -22,7 +22,7 @@ export function buildPasswordChangedEmail({
   changedAt,
   forgotPasswordUrl,
 }: PasswordChangedEmailInput): EmailMessage {
-  const subject = "Your Analytics Personas password was changed";
+  const subject = "Your Rondo password was changed";
   const when = formatUtc(changedAt);
   const { html: document, text } = renderEmailLayout({
     title: subject,

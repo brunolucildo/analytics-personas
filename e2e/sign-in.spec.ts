@@ -6,7 +6,7 @@ import { ACCESS_TOKEN_KEY } from "./support/session";
 
 const APP_URL = process.env.E2E_APP_URL ?? "http://localhost:5173";
 const API_URL = `${process.env.E2E_API_URL ?? "http://localhost:3002"}/api/v1`;
-const NEW_SESSION_SUBJECT = "New sign-in to Analytics Personas";
+const NEW_SESSION_SUBJECT = "New sign-in to Rondo";
 const CONFIRM_SUBJECT = "Confirm your email address";
 const INVALID_MESSAGE = "Invalid email or password.";
 const LINK_PATTERN = /(https?:\/\/\S+\/auth\/confirm-account\?token=[A-Za-z0-9_-]+)/;

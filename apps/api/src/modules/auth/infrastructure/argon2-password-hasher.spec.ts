@@ -1,6 +1,7 @@
 import argon2 from "argon2";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { Argon2PasswordHasher } from "./argon2-password-hasher";
+import type { HashRunner } from "./hash-limiter";
 
 describe("Argon2PasswordHasher", () => {
   const hasher = new Argon2PasswordHasher();
@@ -21,5 +22,20 @@ describe("Argon2PasswordHasher", () => {
     ]);
 
     expect(first).not.toBe(second);
+  });
+
+  it("runs every hash under the hash budget and lets a refusal reach the caller", async () => {
+    const run = vi.fn((task: () => Promise<unknown>) => task());
+    const runner = { run } as HashRunner;
+
+    const hash = await new Argon2PasswordHasher(runner).hash("through the budget");
+
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(hash.startsWith("$argon2id$")).toBe(true);
+
+    const refusal = new Error("queue full");
+    const refusing: HashRunner = { run: () => Promise.reject(refusal) };
+
+    await expect(new Argon2PasswordHasher(refusing).hash("x")).rejects.toBe(refusal);
   });
 });

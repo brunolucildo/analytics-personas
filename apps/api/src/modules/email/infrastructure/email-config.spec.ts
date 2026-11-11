@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { parseEmailConfig, parseEmailFrom } from "./email-config";
 
-const from = "Analytics Personas <no-reply@analytics-personas.local>";
+const from = "Rondo <no-reply@rondo.local>";
 
 describe("parseEmailConfig", () => {
   it("accepts capture with a named sender", () => {
     expect(parseEmailConfig({ EMAIL_PROVIDER: "capture", EMAIL_FROM: from })).toEqual({
       provider: "capture",
-      from: { name: "Analytics Personas", address: "no-reply@analytics-personas.local" },
+      from: { name: "Rondo", address: "no-reply@rondo.local" },
     });
   });
 
@@ -94,8 +94,8 @@ describe("parseEmailConfig", () => {
 describe("parseEmailFrom", () => {
   it("parses a bare address and a quoted name", () => {
     expect(parseEmailFrom("no-reply@example.com")).toEqual({ address: "no-reply@example.com" });
-    expect(parseEmailFrom('"Analytics Personas" <no-reply@example.com>')).toEqual({
-      name: "Analytics Personas",
+    expect(parseEmailFrom('"Rondo" <no-reply@example.com>')).toEqual({
+      name: "Rondo",
       address: "no-reply@example.com",
     });
   });

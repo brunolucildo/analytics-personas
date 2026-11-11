@@ -39,6 +39,12 @@ class RateLimitProbeController {
     return { received: typeof body };
   }
 
+  @Get("multi")
+  @RateLimit("probe-ip", "probe-email")
+  multi() {
+    return { ok: true };
+  }
+
   @Get("typo")
   @RateLimit("does-not-exist")
   typo() {
@@ -66,6 +72,8 @@ describe("Rate limiting", () => {
       supabaseUrl: "http://127.0.0.1:54321",
       supabaseServiceRoleKey: "test-service-role-key",
       authJwtSecret: "test-only-jwt-secret-0123456789-abcdefghij",
+      authHashConcurrency: 3,
+      authHashQueueLimit: 64,
       trustProxy,
       email: { provider: "capture", from: { name: "Test", address: "no-reply@test.local" } },
     };
@@ -199,6 +207,27 @@ describe("Rate limiting", () => {
       expect((await http.post("/api/v1/probe/by-email").send({})).status).toBe(201);
       expect((await http.post("/api/v1/probe/by-email")).status).toBe(201);
       expect((await http.post("/api/v1/probe/by-email").send({ email: ["a"] })).status).toBe(429);
+    });
+
+    it("checks several policies in the order given and the first one over its limit answers", async () => {
+      const warn = vi.spyOn(baseLogger, "warn");
+
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        await request(app.getHttpServer()).get("/api/v1/probe/multi").expect(200);
+      }
+
+      // probe-ip (3 per IP) is listed first, so it is the one that blocks the 4th request.
+      const blocked = await request(app.getHttpServer()).get("/api/v1/probe/multi").expect(429);
+
+      expect(blocked.body.error.code).toBe("RATE_LIMITED");
+      expect(Number(blocked.headers["retry-after"])).toBeGreaterThanOrEqual(1);
+
+      const policies = warn.mock.calls
+        .map(([fields]) => fields as { event?: string; policy?: string })
+        .filter((fields) => fields?.event === "rate_limited")
+        .map((fields) => fields.policy);
+
+      expect(policies).toEqual(["probe-ip"]);
     });
 
     it("clears every counter with resetRateLimitStore", async () => {

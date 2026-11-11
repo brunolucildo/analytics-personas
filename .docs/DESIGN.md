@@ -195,4 +195,4 @@ Os componentes de `@repo/ui/brand` são a fonte para as telas do app. Como `apps
 
 ### 11.5 Fora do escopo desta versão
 
-O nome exibido nos e-mails, nos logs e na telemetria ainda é "Analytics Personas". A fonte display (Press Start 2P ou Silkscreen) ainda não está adotada.
+O nome exibido nos e-mails, nos logs e na telemetria é "Rondo". A fonte display (Press Start 2P ou Silkscreen) ainda não está adotada.

@@ -13,7 +13,7 @@ describe("buildNewSessionEmail", () => {
 
   it("has the subject, the recipient and the purpose", () => {
     expect(message.to).toBe("ana@example.test");
-    expect(message.subject).toBe("New sign-in to Analytics Personas");
+    expect(message.subject).toBe("New sign-in to Rondo");
     expect(message.purpose).toBe("new_session");
   });
 

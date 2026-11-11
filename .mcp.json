@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "grafana": {
+      "command": "uvx",
+      "args": ["--env-file", ".env", "mcp-grafana"],
+      "env": {
+        "GRAFANA_URL": "http://localhost:3000",
+        "GRAFANA_USAGE_STATS": "disabled",
+        "OTEL_SDK_DISABLED": "true"
+      }
+    }
+  }
+}

@@ -32,7 +32,7 @@ const SESSION_PATH = "/api/v1/auth/session";
 const OLD_PASSWORD = "the old password";
 const NEW_PASSWORD = "a brand new password";
 const HOUR_MS = 60 * 60 * 1000;
-const SUBJECT = "Your Analytics Personas password was changed";
+const SUBJECT = "Your Rondo password was changed";
 const INVALID_BODY = {
   error: { code: "TOKEN_INVALID_OR_EXPIRED", message: "This link is invalid or has expired." },
 };

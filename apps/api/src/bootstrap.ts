@@ -7,6 +7,8 @@ import { AppModule } from "./app.module";
 import { AllExceptionsFilter, toErrorResponse } from "./common/all-exceptions.filter";
 import { createValidationException } from "./common/validation-exception";
 import type { Environment } from "./config/environment";
+import { createAuthTelemetryMiddleware } from "./modules/auth/interface/auth-telemetry.middleware";
+import { createHttpRouteMiddleware } from "./observability/http-route";
 import { baseLogger, StructuredLogger } from "./observability/logger";
 
 export const API_PREFIX = "api/v1";
@@ -27,6 +29,9 @@ export function configureApp(app: INestApplication): INestApplication {
     .set("trust proxy", config.get("trustProxy", { infer: true }));
   app.useLogger(new StructuredLogger());
   app.setGlobalPrefix(API_PREFIX);
+  // First on purpose: the CORS middleware answers preflights by itself, so anything registered
+  // after it never sees them. This gives every request, preflights included, its `http_route`.
+  app.use(createHttpRouteMiddleware());
   app.enableCors({
     // Callback form: any origin other than the app gets no CORS headers at all.
     origin: (
@@ -62,6 +67,8 @@ export function configureApp(app: INestApplication): INestApplication {
       },
     }),
   );
+  // Counts every auth attempt, including those refused before a controller runs (400, 401, 429).
+  app.use(createAuthTelemetryMiddleware({ prefix: API_PREFIX }));
   // Nest only answers 404 under the global prefix; everything else would fall
   // through to Express's HTML 404. Nothing is served outside the prefix.
   app.use(

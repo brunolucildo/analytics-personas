@@ -7,7 +7,7 @@ import type { FetchFunction } from "./http-delivery";
 import { MailtrapEmailProvider } from "./mailtrap/mailtrap-email-provider";
 import { ResendEmailProvider } from "./resend/resend-email-provider";
 
-const from = { name: "Analytics Personas", address: "no-reply@analytics-personas.local" };
+const from = { name: "Rondo", address: "no-reply@rondo.local" };
 const message: EmailMessage = {
   to: "pat@example.test",
   subject: "Welcome <b>aboard</b>",
@@ -64,7 +64,7 @@ const providers: Array<{
     expectedUrl: "https://sandbox.api.mailtrap.io/api/send/4242",
     expectedAuth: "Bearer mt-token",
     expectedBody: {
-      from: { email: "no-reply@analytics-personas.local", name: "Analytics Personas" },
+      from: { email: "no-reply@rondo.local", name: "Rondo" },
       to: [{ email: "pat@example.test" }],
       subject: "Welcome <b>aboard</b>",
       text: "Plain body",
@@ -77,7 +77,7 @@ const providers: Array<{
     expectedUrl: "https://api.resend.com/emails",
     expectedAuth: "Bearer rs-key",
     expectedBody: {
-      from: "Analytics Personas <no-reply@analytics-personas.local>",
+      from: "Rondo <no-reply@rondo.local>",
       to: ["pat@example.test"],
       subject: "Welcome <b>aboard</b>",
       text: "Plain body",
