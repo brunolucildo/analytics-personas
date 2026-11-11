@@ -10,6 +10,7 @@
   },
   "ignorePatterns": [
     ".claude/skills/**",
+    ".claude/agents/**",
     "**/node_modules/**",
     "**/dist/**",
     "**/.next/**",
