@@ -1,6 +1,6 @@
 # 0008 — Acesso a dados com `supabase-js` (service role) e funções SQL por RPC
 
-- **Status:** aceito
+- **Status:** substituído por [0015](0015-postgres-nativo-com-pg.md)
 - **Data:** 2026-11-09
 
 ## Contexto

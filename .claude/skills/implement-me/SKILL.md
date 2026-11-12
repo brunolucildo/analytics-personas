@@ -129,7 +129,7 @@ Antes de cada fatia, carregue as skills especializadas aplicáveis:
 | UI, identidade visual              | `frontend-design`                  |
 | Revisão de UI, a11y, UX            | `web-design-guidelines`            |
 | shadcn/ui, design system           | `shadcn`                           |
-| Postgres, migrations, RLS, queries | `supabase-postgres-best-practices` |
+| Postgres, migrations, privilégios (`grant`/`revoke`), queries | `supabase-postgres-best-practices` |
 | Fluxo E2E no browser               | `playwright`                       |
 
 Se uma skill não estiver instalada, siga os equivalentes em `.docs` e registre a ausência no relatório. Não invente comandos ou APIs.

@@ -1,6 +1,5 @@
 import { createHash } from "node:crypto";
 import type { INestApplication } from "@nestjs/common";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { Test } from "@nestjs/testing";
 import request from "supertest";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -16,10 +15,12 @@ import { baseLogger } from "../src/observability/logger";
 import { resetRateLimitStore } from "./support/rate-limit";
 import {
   assertMigrationsApplied,
-  createAdminClient,
   deleteUsersByEmail,
+  findUserByEmail,
+  listTokensOfUser,
+  listUsersByEmail,
   uniqueEmail,
-} from "./support/supabase";
+} from "./support/database";
 
 const PASSWORD = "correct horse battery";
 const SIGN_UP_PATH = "/api/v1/auth/sign-up";
@@ -36,7 +37,6 @@ function validBody(email: string, overrides: Record<string, unknown> = {}) {
 }
 
 describe("POST /api/v1/auth/sign-up", () => {
-  const admin: SupabaseClient = createAdminClient();
   const createdEmails: string[] = [];
   let app: INestApplication;
 
@@ -48,13 +48,11 @@ describe("POST /api/v1/auth/sign-up", () => {
   }
 
   async function findUser(email: string) {
-    const { data } = await admin.from("users").select("*").eq("email", email);
-
-    return data?.[0] ?? null;
+    return findUserByEmail(email);
   }
 
   beforeAll(async () => {
-    await assertMigrationsApplied(admin);
+    await assertMigrationsApplied();
 
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
 
@@ -65,7 +63,7 @@ describe("POST /api/v1/auth/sign-up", () => {
 
   afterAll(async () => {
     await app.close();
-    await deleteUsersByEmail(admin, createdEmails);
+    await deleteUsersByEmail(createdEmails);
   });
 
   beforeEach(() => {
@@ -175,9 +173,9 @@ describe("POST /api/v1/auth/sign-up", () => {
 
       expect(responses.map((response) => response.status).sort()).toEqual([201, 409]);
 
-      const { data } = await admin.from("users").select("id").eq("email", email);
+      const users = await listUsersByEmail(email);
 
-      expect(data).toHaveLength(1);
+      expect(users).toHaveLength(1);
     });
   });
 
@@ -207,15 +205,15 @@ describe("POST /api/v1/auth/sign-up", () => {
       expect(token).toBeDefined();
 
       const user = await findUser(email);
-      const { data: tokens } = await admin.from("auth_tokens").select("*").eq("user_id", user?.id);
+      const tokens = await listTokensOfUser(user?.id as string);
 
       expect(tokens).toHaveLength(1);
 
-      const stored = tokens?.[0];
+      const stored = tokens[0];
       const hashOfLinkToken = createHash("sha256")
         .update(token as string)
         .digest("hex");
-      const expiresIn = new Date(stored?.expires_at).getTime() - before;
+      const expiresIn = (stored?.expires_at.getTime() ?? 0) - before;
 
       expect(stored?.token_hash).toBe(hashOfLinkToken);
       expect(JSON.stringify(stored)).not.toContain(token as string);
@@ -260,7 +258,7 @@ describe("POST /api/v1/auth/sign-up", () => {
       expect(response.status).toBe(201);
 
       const user = await findUser(email);
-      const { data: tokens } = await admin.from("auth_tokens").select("id").eq("user_id", user?.id);
+      const tokens = await listTokensOfUser(user?.id as string);
 
       expect(user).not.toBeNull();
       expect(tokens).toHaveLength(1);

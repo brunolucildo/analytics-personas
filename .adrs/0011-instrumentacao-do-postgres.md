@@ -1,6 +1,6 @@
 # 0011 — Instrumentação do Postgres pelo `fetch` do `supabase-js` e pelo receiver do Collector
 
-- **Status:** aceito
+- **Status:** substituído por [0016](0016-instrumentacao-do-postgres-no-pool.md)
 - **Data:** 2026-11-10
 
 ## Contexto

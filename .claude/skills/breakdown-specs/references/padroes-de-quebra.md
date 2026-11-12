@@ -12,7 +12,7 @@ Convenções:
 
 Prompt típico: “autenticação com sign-in, sign-up, confirmar conta, esqueci a senha…”.
 
-**Decisões compartilhadas a fechar antes do corte** (irreversíveis, valem para todas as specs): provedor (Supabase Auth ou outro; ver pergunta aberta em `.docs/BUSINESS.md`), identificador (e-mail, usuário), política de senha, modelo de sessão (cookie/token, expiração), quando a conta é considerada ativa, isolamento por clube/workspace, e-mail transacional (remetente, templates, limites), o que não pode ser logado (senha, token, link).
+**Decisões compartilhadas a fechar antes do corte** (irreversíveis, valem para todas as specs): provedor de identidade (hoje própria na API, ADR `0007`; ver `.docs/BUSINESS.md`), identificador (e-mail, usuário), política de senha, modelo de sessão (cookie/token, expiração), quando a conta é considerada ativa, isolamento por clube/workspace, e-mail transacional (remetente, templates, limites), o que não pode ser logado (senha, token, link).
 
 | Nº | Slug sugerido | Capacidade | Depende de | Observação |
 | -- | ------------- | ---------- | ---------- | ---------- |

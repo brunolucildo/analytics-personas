@@ -6,7 +6,7 @@ import type {
   StoredSession,
 } from "../../src/modules/auth/domain/session-ports";
 
-/** In-memory `SessionRepository` for unit tests: same contract as the Supabase one. */
+/** In-memory `SessionRepository` for unit tests: same contract as the Postgres one. */
 export class InMemorySessionRepository implements SessionRepository {
   readonly sessions: Array<StoredSession & { userId: string }> = [];
 

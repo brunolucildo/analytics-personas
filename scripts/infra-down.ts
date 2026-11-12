@@ -1,14 +1,8 @@
-import { assertDocker, run, supabaseCommand } from "./lib/command";
+import { assertDocker, run } from "./lib/command";
 
 assertDocker();
 
-const supabaseCode = await run("supabase stop", supabaseCommand("stop", "--no-backup"));
-
-if (supabaseCode !== 0) {
-  console.warn("Supabase nao estava rodando (ou ja foi parado); seguindo para os containers.");
-}
-
-const composeCode = await run("docker compose down --remove-orphans", [
+const composeCode = await run("docker compose down", [
   "docker",
   "compose",
   "down",
@@ -19,4 +13,4 @@ if (composeCode !== 0) {
   process.exit(1);
 }
 
-console.log("\nInfra parada.");
+console.log("\nInfra parada. O volume do Postgres foi preservado.");

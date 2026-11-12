@@ -88,9 +88,9 @@ apps/app/src/
 - Rotas vivem em `src/router.tsx` (TanStack Router, rotas em código): páginas públicas são filhas do grupo `/auth`, páginas privadas do grupo `/app` (ver §13.1). Layouts e páginas de composição ficam em `src/routes/`.
 - Não use `useEffect` para carregar dado inicial; use query.
 - Componentes só apresentam; regra de negócio fica na API ou em funções puras testáveis.
-- Nunca coloque segredo, service role key ou token em código de cliente.
+- Nunca coloque segredo, credencial de banco ou token em código de cliente.
 - Só variáveis `VITE_*` entram no bundle; trate-as como públicas. O `.env` é lido da raiz (`envDir`).
-- Acesse o Supabase pelo cliente de `lib/supabase.ts` (só chave pública); dados sensíveis passam pela API.
+- O SPA não fala com o banco: todo dado passa pela API (`VITE_API_URL`). Não existe cliente de banco no bundle.
 
 **`apps/docs` (Next.js):**
 
@@ -104,20 +104,20 @@ apps/app/src/
 - Request handler fino: recebe DTO, chama **um** caso de uso, devolve presenter.
 - Validação de entrada com DTO/schema; rejeite payload inválido antes do caso de uso.
 - Erros de domínio são mapeados para HTTP na camada de interface; não vaze stack trace.
-- Nenhum acesso direto ao Supabase dentro do request handler.
+- Nenhum acesso direto ao banco dentro do request handler: ele chama um caso de uso, que usa um port.
 - Toda integração externa tem timeout, retry limitado e erro tipado.
 - **A API é fechada por padrão:** um `AuthGuard` global exige sessão em todo endpoint; só `@Public()` (`src/common/public.decorator.ts`) abre uma rota (hoje: `GET /api/v1/health`, `POST /api/v1/auth/sign-up`, `POST /api/v1/auth/sign-in` e `/test-support/emails`, que já é 404 fora do `capture`). Endpoint novo não precisa de nada para ser protegido; para ler a pessoa logada use `@CurrentSession()` (ver §13.5). Autorização além da sessão (papéis) fica explícita no caso de uso.
 - E-mail sai só por `EmailService` (`apps/api/src/modules/email`): o caso de uso chama `dispatch` **depois do commit**, para que falha do provedor não mude o resultado do request; use `send` só quando precisar do erro. Monte o corpo com `renderEmailLayout` e a tag `html` (ela escapa valores dinâmicos). Nunca importe SDK ou cliente de provedor fora do módulo `email` nem logue destinatário, assunto, corpo, link ou token.
 
-## 6. Dados (PostgreSQL/Supabase)
+## 6. Dados (PostgreSQL)
 
 - Migrations versionadas; schema não é alterado "na mão" em produção.
 - Nomes de tabela/coluna em `snake_case`; tipos explícitos; FKs e índices justificados.
-- Multi-tenant exige isolamento no banco (RLS) e teste cobrindo acesso cruzado.
-- Service role key só no servidor.
-- Acesso a dados na API: repositórios em `infrastructure` usam `@supabase/supabase-js` com a service role. O que exige transação vive em função SQL chamada por RPC (migration), com `revoke all on function ... from public, anon, authenticated` e `grant execute ... to service_role`. Tabelas com dado sensível: RLS ligada, **sem policies** e `revoke all` de `anon`/`authenticated`.
+- Multi-tenant exige isolamento no banco (RLS ou predicado de tenant em toda query) e teste cobrindo acesso cruzado. Hoje o banco não usa RLS: a API é o único cliente e acessa como `rondo_app`.
+- `DATABASE_URL` e `DATABASE_MIGRATOR_URL` só no servidor e nos scripts; nunca em `VITE_*`, bundle ou log.
+- Acesso a dados na API: repositórios em `infrastructure` usam `pg` (node-postgres) por um `Pool` e **SQL parametrizado** (`$1..$n`); nunca concatene valor na string SQL e não use `select *`. Os repositórios dependem de `DatabaseClient` (`observability/db-telemetry.ts`), não do Pool. O que exige transação vive em função SQL chamada por `select` (migration). Dois roles: `rondo_migrator` (dono do schema, DDL, só no runner de migrations) e `rondo_app` (DML e `execute`, usado pela API); a migration concede `grant` ao `rondo_app` e o `alter default privileges` cobre tabelas futuras. Nunca dê DDL ao `rondo_app` nem recrie `anon`/`authenticated`/`service_role`. Decisão em ADR `0015`.
 - Erro do banco vira `DataAccessError` (mensagem fixa, só operação e código): a mensagem do Postgres pode repetir valores como o e-mail. Concorrência se resolve no banco (índice único + `on conflict`), nunca com "consulta e depois insere".
-- Migration nova: nome `<timestamp>_<descricao>.sql`, comentário de rollback no topo e `bun run db:migrate` para aplicar no Supabase local.
+- Migration nova: arquivo `db/migrations/<aaaaMMddHHmmss>_<descricao>.sql`, comentário de rollback no topo e `bun run db:migrate` para aplicar no Postgres local. O runner (`scripts/db-migrate.ts`) aplica em ordem, uma transação por arquivo, registra o checksum em `schema_migrations` e **recusa** arquivo já aplicado que mudou: migration aplicada não se edita, crie outra (só vale editar enquanto nenhum banco real a recebeu). `bun run infra:reset` recria o volume local.
 - Storage com URLs assinadas e validação de tipo/tamanho de arquivo.
 - Dados pessoais: minimize coleta, não logue PII, defina retenção.
 
@@ -133,8 +133,8 @@ apps/app/src/
 - **Labels e atributos só de conjuntos fechados:** `operation`, `outcome` e `reason` nunca recebem texto vindo do cliente. Código de erro novo precisa entrar em `AUTH_FAILURE_REASONS` (senão vira `request_failed`) e no dashboard.
 - **Telemetria sem PII e sem revelar contas:** nenhum e-mail, nome, senha, token, link, IP, `userId` ou `sid` em label, atributo ou log; o span de falha leva só o código de erro. Endpoint que responde igual com ou sem conta (`forgot-password`, `resend-confirmation`) deve registrar o mesmo resultado nos dois casos.
 - Telemetria nunca decide a resposta: erro dentro do middleware de telemetria é engolido.
-- **Acesso a dados novo:** todo `createClient` do `@supabase/supabase-js` na API recebe `global: { fetch: createInstrumentedFetch() }` (`observability/db-telemetry.ts`). Assim cada query ganha span, histograma e log de falha, por tabela ou função, sem tocar no repositório. Nome de tabela e de função SQL só com letras minúsculas, dígitos e `_`; outro formato vira `unknown` na telemetria.
-- **Span, métrica e log de banco nunca levam o filtro, o corpo, o texto da query nem o resultado.** Filtro por e-mail ou `sid` vai na query string do PostgREST: é por isso que `url.full` e `url.query` são sobrescritos (`span-redaction.ts`). Instrumentação nova que grave URL, IP ou query precisa passar pelo mesmo cuidado.
+- **Acesso a dados novo:** toda query da API passa por `DatabaseClient.query(call, text, values)` (`observability/db-telemetry.ts`), com `call = { operation, collection | procedure }` declarado pelo repositório (`select`, `insert`, `update`, `delete`, `rpc` ou `other`). Assim cada query ganha span `<operation> <alvo>`, histograma e log de falha sem inferir nada do SQL. Nome de tabela e de função SQL só com letras minúsculas, dígitos e `_`; outro formato vira `unknown` na telemetria. Não use o `Pool` direto.
+- **Span, métrica e log de banco nunca levam o texto do SQL, os parâmetros nem o resultado.** E-mail, hash de senha, hash de token e `sid` trafegam nos parâmetros: por isso não há `db.statement`, e `error.type` é só o SQLSTATE (ou `connection`). Só falha de infraestrutura (conexão, classes `08`, `53`, `57`, `58`) marca o span como `ERROR` e gera `db_operation_failed`; violação de unicidade ou de check é fluxo de negócio. Instrumentação nova que grave URL, IP ou query precisa passar pelo mesmo cuidado (ver `span-redaction.ts`). Decisão em ADR `0016`.
 - **Histograma de duração novo:** passe `advice: { explicitBucketBoundaries: DURATION_BUCKETS_SECONDS }`; sem isso o OpenTelemetry usa limites em milissegundos e o p95 em segundos não tem significado.
 - **Regra de alerta nova:** acrescente-a ao `rondo-alerts.yaml` com `uid` de até 40 caracteres, `for`, `severity` e limiar; evento raro conta logs (Loki), não `increase()` de contador. O teste `grafana-assets.spec.ts` valida o arquivo.
 - **Código novo que usa `argon2`:** passe a chamada por um `HashRunner` (o `HashLimiter` injetado por `HASH_LIMITER`), como fazem `Argon2PasswordHasher` e `Argon2PasswordVerifier`. Chamar `argon2.hash` ou `argon2.verify` direto contorna o limite de hashes simultâneos e volta a enfileirar o pool de threads inteiro. A fila cheia chega ao chamador como `ServiceBusyException` (503): não a transforme em "senha errada" nem em 500. `AUTH_HASH_CONCURRENCY` e `AUTH_HASH_QUEUE_LIMIT` são opcionais.
@@ -165,10 +165,10 @@ Regras:
 - Não faça teste depender de dado real, rede externa ou ordem de execução.
 - Bug corrigido ganha teste de regressão.
 - Ao adicionar um novo tipo de teste ou workspace, crie o script real, adicione a task no `turbo.json` e atualize `QA.md`. Não invente comandos.
-- Testes da API definem env fictícia em `apps/api/test/setup-env.ts`; não use chave real nem a service role.
+- Testes da API definem env fictícia em `apps/api/test/setup-env.ts`; não use credencial de banco real.
 - Teste que envolve e-mail roda com `EMAIL_PROVIDER=capture` (já definido em `setup-env.ts`) e lê as mensagens com `getCapturedEmails({ to })`; um processo separado (E2E) usa `GET /api/v1/test-support/emails?to=<endereço>` e `DELETE` no mesmo caminho para limpar. Nenhum teste envia e-mail real nem chama Mailtrap ou Resend.
-- Teste de integração roda contra o **Supabase local** (`bun run infra:up` e `bun run db:migrate` antes): a `globalSetup` (`apps/api/test/support/global-setup.ts`) lê as chaves de `supabase status -o env` quando não estão no ambiente e falha com a instrução se o banco não estiver no ar. Use e-mails únicos (`uniqueEmail` de `test/support/supabase.ts`) e apague o que criou (`deleteUsersByEmail`); o banco é compartilhado. Teste unitário usa os fakes de `test/support/in-memory-auth.ts`.
-- Testes de `AppModule` que sobrescrevem o `ConfigService` com um objeto fake precisam incluir `email`, `supabaseUrl`, `supabaseServiceRoleKey`, `authJwtSecret`, `authHashConcurrency` e `authHashQueueLimit` (exemplo em `apps/api/test/rate-limit.int-spec.ts`). `AUTH_JWT_SECRET` fictícia vem de `apps/api/test/setup-env.ts`.
+- Teste de integração roda contra o **Postgres local** (`bun run infra:up` e `bun run db:migrate` antes): a `globalSetup` (`apps/api/test/support/global-setup.ts`) exige `DATABASE_URL` (definida em `setup-env.ts` para o banco local) e falha com a instrução de rodar `infra:up` e `db:migrate` se o banco não responder ou não tiver a tabela `users`. Semeie e leia por SQL com os helpers de `apps/api/test/support/database.ts` (`insertUser`, `insertToken`, `listTokensOfUser`, `deleteUsersByEmail`...), use e-mails únicos (`uniqueEmail`) e apague o que criou; o banco é compartilhado. Teste unitário usa os fakes de `test/support/in-memory-auth.ts`.
+- Testes de `AppModule` que sobrescrevem o `ConfigService` com um objeto fake precisam incluir `email`, `databaseUrl`, `authJwtSecret`, `authHashConcurrency` e `authHashQueueLimit` (exemplo em `apps/api/test/rate-limit.int-spec.ts`). `AUTH_JWT_SECRET` fictícia vem de `apps/api/test/setup-env.ts`.
 - Rota de teste declarada num módulo de teste (`controllers: [Probe]`) é fechada como qualquer outra: marque com `@Public()` quando o teste não for de autenticação, ou use um token de `SessionService.issue` (ver `apps/api/test/auth-sessions.int-spec.ts`). Para semear um usuário confirmado sem passar por sign-up/sign-in use `seedConfirmedUser` de `apps/api/test/support/sessions.ts`; no E2E, `seedSignedInUser` de `e2e/support/session.ts` (usuários `e2e-session-*`, apagados no `globalTeardown`). Quando o teste precisa **entrar de verdade** (sign-in), a senha precisa ter hash Argon2id real: no integration, `argon2.hash` no `beforeAll` (ver `apps/api/test/auth-sign-in.int-spec.ts`); no E2E, `seedUserWithPassword` de `e2e/support/credentials.ts` (hash fixo da senha de teste `SEEDED_PASSWORD`, conta confirmada ou não). Cuidado com a cota de `POST /auth/sign-up` (5 por hora por IP, compartilhada por todos os specs de uma execução do Playwright): semeie a conta em vez de cadastrar. O e-mail de teste tem de caber no limite de 64 caracteres da parte local do `IsEmail` (rótulo curto).
 - No SPA, `renderApp` de `apps/app/src/test/render-app.tsx` monta router e `QueryClient` como o `main.tsx`; use `stubSessionFetch` para responder `GET /auth/session` e grave o token em `localStorage` (`access_token`).
 
@@ -257,7 +257,7 @@ Definidas pela spec `0001-platform-routing-conventions` (ADRs `0003` e `0004`). 
 
 - **en-US:** textos de interface, mensagens e códigos de erro da API, e-mails, rotas, identificadores, comentários e mensagens de log e de erro no código novo.
 - **pt-BR:** `.docs/`, specs, planos, ADRs e mensagens de commit.
-- Strings em pt-BR de código antigo migram quando o arquivo for alterado (hoje: `apps/app/src/lib/supabase.ts` e `apps/api/src/observability/telemetry.ts`).
+- Strings em pt-BR de código antigo migram quando o arquivo for alterado (hoje: `apps/api/src/observability/telemetry.ts`).
 - Não há biblioteca de i18n; adotar uma (vários idiomas) exige decisão e ADR.
 
 ### 13.4 Limite de requisições

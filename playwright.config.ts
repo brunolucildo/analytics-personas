@@ -1,9 +1,9 @@
 import { defineConfig, devices } from "@playwright/test";
-import { ensureLocalSupabaseEnv } from "./scripts/lib/supabase-env";
 
-// The sign-up flow needs the API and the local database: take the keys from
-// `supabase status` unless they are already in the environment. Workers inherit them.
-ensureLocalSupabaseEnv();
+// The sign-up flow needs the API and the local Postgres: default to the
+// development `DATABASE_URL` unless the environment already provides one.
+// Workers inherit it (and the API under test connects to the same database).
+process.env.DATABASE_URL ??= "postgres://rondo_app:rondo@localhost:5432/rondo";
 
 // Defaults match the dev setup (5173 and 3002). Override the ports when another
 // process already holds them: `E2E_APP_PORT=5183 E2E_API_PORT=3012 bun run test:e2e`.
@@ -58,6 +58,7 @@ export default defineConfig({
       env: {
         API_PORT: String(API_PORT),
         APP_URL,
+        DATABASE_URL: process.env.DATABASE_URL as string,
         AUTH_JWT_SECRET: process.env.AUTH_JWT_SECRET as string,
         EMAIL_PROVIDER: "capture",
         EMAIL_FROM: "Rondo <no-reply@rondo.local>",

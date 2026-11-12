@@ -264,7 +264,7 @@ Consulte o catálogo antes de começar. Skills de referência:
 | Next.js (`apps/docs`)             | `next-best-practices`                              |
 | Performance React/Next            | `vercel-react-best-practices`                      |
 | Testes orientados a comportamento | `tdd`                                              |
-| Postgres/Supabase                 | `supabase-postgres-best-practices`                 |
+| Postgres                          | `supabase-postgres-best-practices`                 |
 | E2E no browser                    | `playwright`                                       |
 | shadcn/ui e design system         | `shadcn`                                           |
 | Documentos                        | skills de `.docx`, `.pdf`, `.xlsx`, `pptx`         |

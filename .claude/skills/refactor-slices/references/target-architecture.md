@@ -183,7 +183,7 @@ export class SignInUseCase {
 ## 5. Ports e adaptadores
 
 - Port = interface em `domain` (ou `application` quando o contrato só existe para orquestração) com nome de intenção: `UserRepository`, `PasswordHasher`, `NewSessionMailer`.
-- Adaptador = classe em `infrastructure` que implementa o port e esconde o detalhe (Supabase, Argon2, Resend, HTTP).
+- Adaptador = classe em `infrastructure` que implementa o port e esconde o detalhe (Postgres, Argon2, Resend, HTTP).
 - O módulo Nest faz a ligação: token → `useFactory`/`useClass` → implementação.
 - O use case depende do token/port, nunca da classe concreta.
 - Erros de infraestrutura são traduzidos para erros tipados antes de cruzar a fronteira (`DataAccessError`).
@@ -215,7 +215,7 @@ A refatoração é estrutural. Estes contratos **não podem mudar**:
 - operações, labels e motivos de telemetria (`AUTH_OPERATIONS`, `AUTH_FAILURE_REASONS`);
 - políticas e chaves de rate limit;
 - regras de `@Public()` e do `AuthGuard`;
-- SQL, RPC, migrations e permissões;
+- SQL, funções SQL, migrations e permissões;
 - templates, assuntos e conteúdo de e-mail;
 - dependências externas.
 

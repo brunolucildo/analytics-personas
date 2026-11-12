@@ -1,7 +1,7 @@
 -- 0010-auth-reset-password: atomic "reset password" function.
 --
--- Same security model as 0004: called only by the API (service role) through RPC;
--- `execute` is revoked from public, anon and authenticated.
+-- Same security model as 0004: called by the API with `rondo_app`; `execute` is
+-- revoked from public and granted to `rondo_app` only.
 --
 -- Rollback (run manually; it does not restore any previous password):
 --   drop function if exists public.auth_reset_password(text, text);
@@ -63,6 +63,6 @@ end;
 $$;
 
 revoke all on function public.auth_reset_password(text, text)
-  from public, anon, authenticated;
+  from public;
 grant execute on function public.auth_reset_password(text, text)
-  to service_role;
+  to rondo_app;

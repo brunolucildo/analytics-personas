@@ -1,6 +1,5 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import type { INestApplication } from "@nestjs/common";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { Test } from "@nestjs/testing";
 import argon2 from "argon2";
 import request from "supertest";
@@ -18,12 +17,15 @@ import { resetRateLimitStore } from "./support/rate-limit";
 import { sessionsOf } from "./support/sessions";
 import {
   assertMigrationsApplied,
-  createAdminClient,
   deleteUsersByEmail,
-  restRequest,
-  signRoleToken,
+  findUserById,
+  insertToken,
+  insertUser,
+  listTokensOfUser,
+  query,
+  resetPassword,
   uniqueEmail,
-} from "./support/supabase";
+} from "./support/database";
 
 const RESET_PATH = "/api/v1/auth/reset-password";
 const SIGN_IN_PATH = "/api/v1/auth/sign-in";
@@ -47,7 +49,6 @@ function newToken(): string {
 const bearer = (token: string) => ({ authorization: `Bearer ${token}` });
 
 describe("POST /api/v1/auth/reset-password", () => {
-  const admin: SupabaseClient = createAdminClient();
   const createdEmails: string[] = [];
   let app: INestApplication;
   let oldPasswordHash: string;
@@ -58,21 +59,15 @@ describe("POST /api/v1/auth/reset-password", () => {
 
     createdEmails.push(email);
 
-    const { data, error } = await admin
-      .from("users")
-      .insert({
-        first_name: firstName,
-        last_name: "Silva",
-        email,
-        password_hash: oldPasswordHash,
-        email_confirmed_at: new Date().toISOString(),
-      })
-      .select("id")
-      .single();
+    const { id } = await insertUser({
+      firstName,
+      lastName: "Silva",
+      email,
+      passwordHash: oldPasswordHash,
+      emailConfirmedAt: new Date(),
+    });
 
-    expect(error).toBeNull();
-
-    return { email, userId: data?.id as string };
+    return { email, userId: id };
   }
 
   /** Stores a token (any type, any expiry) for the user and returns the raw value of the link. */
@@ -80,55 +75,46 @@ describe("POST /api/v1/auth/reset-password", () => {
     userId: string,
     type: "email_confirmation" | "password_reset" = "password_reset",
     expiresInMs = HOUR_MS,
-    usedAt: string | null = null,
+    usedAt: Date | null = null,
   ) {
     const token = newToken();
-    const { error } = await admin.from("auth_tokens").insert({
-      user_id: userId,
-      type,
-      token_hash: sha256(token),
-      expires_at: new Date(Date.now() + expiresInMs).toISOString(),
-      used_at: usedAt,
-    });
 
-    expect(error).toBeNull();
+    await insertToken({
+      userId,
+      type,
+      tokenHash: sha256(token),
+      expiresAt: new Date(Date.now() + expiresInMs),
+      usedAt,
+    });
 
     return token;
   }
 
   async function passwordHashOf(userId: string): Promise<string> {
-    const { data } = await admin.from("users").select("password_hash").eq("id", userId).single();
+    const user = await findUserById(userId);
 
-    return (data as { password_hash: string }).password_hash;
+    return user?.password_hash as string;
   }
 
   async function tokensOf(userId: string, type = "password_reset") {
-    const { data } = await admin
-      .from("auth_tokens")
-      .select("*")
-      .eq("user_id", userId)
-      .eq("type", type)
-      .order("token_hash");
-
-    return data ?? [];
+    return listTokensOfUser(userId, type);
   }
 
   async function snapshot(userId: string) {
-    const { data: tokens } = await admin
-      .from("auth_tokens")
-      .select("*")
-      .eq("user_id", userId)
-      .order("token_hash");
+    const tokens = await query(
+      "select * from public.auth_tokens where user_id = $1 order by token_hash",
+      [userId],
+    );
 
     return JSON.stringify({
       hash: await passwordHashOf(userId),
-      tokens,
-      sessions: await sessionsOf(admin, userId),
+      tokens: tokens.rows,
+      sessions: await sessionsOf(userId),
     });
   }
 
   const activeSessions = async (userId: string) =>
-    (await sessionsOf(admin, userId)).filter((session) => session.revoked_at === null);
+    (await sessionsOf(userId)).filter((session) => session.revoked_at === null);
 
   const reset = (body: Record<string, unknown>, server: INestApplication = app): request.Test =>
     request(server.getHttpServer()).post(RESET_PATH).send(body);
@@ -140,7 +126,7 @@ describe("POST /api/v1/auth/reset-password", () => {
     request(app.getHttpServer()).post(SIGN_IN_PATH).send({ email, password });
 
   beforeAll(async () => {
-    await assertMigrationsApplied(admin);
+    await assertMigrationsApplied();
     oldPasswordHash = await argon2.hash(OLD_PASSWORD, { type: argon2.argon2id });
 
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
@@ -152,7 +138,7 @@ describe("POST /api/v1/auth/reset-password", () => {
 
   afterAll(async () => {
     await app.close();
-    await deleteUsersByEmail(admin, createdEmails);
+    await deleteUsersByEmail(createdEmails);
   });
 
   beforeEach(() => {
@@ -212,18 +198,18 @@ describe("POST /api/v1/auth/reset-password", () => {
 
       await resetWith(await addToken(userId));
 
-      expect(await sessionsOf(admin, userId)).toEqual([]);
+      expect(await sessionsOf(userId)).toEqual([]);
     });
 
     it("does not change the confirmation of the account", async () => {
       const { userId } = await createAccount("r1-confirmed");
-      const before = await admin.from("users").select("email_confirmed_at").eq("id", userId);
+      const before = (await findUserById(userId))?.email_confirmed_at;
 
       await resetWith(await addToken(userId));
 
-      const after = await admin.from("users").select("email_confirmed_at").eq("id", userId);
+      const after = (await findUserById(userId))?.email_confirmed_at;
 
-      expect(after.data).toEqual(before.data);
+      expect(after).toEqual(before);
     });
   });
 
@@ -296,7 +282,7 @@ describe("POST /api/v1/auth/reset-password", () => {
       const bad = {
         unknown: newToken(),
         expired: await addToken(userId, "password_reset", -1_000),
-        used: await addToken(userId, "password_reset", HOUR_MS, new Date().toISOString()),
+        used: await addToken(userId, "password_reset", HOUR_MS, new Date()),
         wrongType: await addToken(userId, "email_confirmation", 24 * HOUR_MS),
       };
       const before = await snapshot(userId);
@@ -373,7 +359,7 @@ describe("POST /api/v1/auth/reset-password", () => {
 
       expect(after.status).toBe(401);
       expect(await activeSessions(userId)).toEqual([]);
-      expect((await sessionsOf(admin, userId))[0]?.revoked_at).not.toBeNull();
+      expect((await sessionsOf(userId))[0]?.revoked_at).not.toBeNull();
     });
 
     it("does not touch the sessions of other users", async () => {
@@ -541,40 +527,16 @@ describe("POST /api/v1/auth/reset-password", () => {
   });
 
   describe("auth_reset_password", () => {
-    const params = (tokenHash: string) => ({ p_token_hash: tokenHash, p_password_hash: "x" });
-
-    it.each(["anon", "authenticated"] as const)(
-      "cannot be called through PostgREST as the %s role",
-      async (role) => {
-        const { userId } = await createAccount(`rpc-${role}`);
-        const token = await addToken(userId);
-        const response = await restRequest("rpc/auth_reset_password", signRoleToken(role), {
-          method: "POST",
-          body: JSON.stringify(params(sha256(token))),
-        });
-
-        expect(response.status).toBeGreaterThanOrEqual(400);
-        expect((await tokensOf(userId))[0]?.used_at).toBeNull();
-        expect(await passwordHashOf(userId)).toBe(oldPasswordHash);
-      },
-    );
-
     it("returns the owner for a valid token and no row otherwise", async () => {
       const { email, userId } = await createAccount("rpc-owner", "Carla");
       const token = await addToken(userId);
-      const done = await admin.rpc("auth_reset_password", {
-        p_token_hash: sha256(token),
-        p_password_hash: "$argon2id$replaced",
-      });
-      const again = await admin.rpc("auth_reset_password", {
-        p_token_hash: sha256(token),
-        p_password_hash: "$argon2id$replaced-again",
-      });
-      const unknown = await admin.rpc("auth_reset_password", params(sha256(randomUUID())));
+      const done = await resetPassword(sha256(token), "$argon2id$replaced");
+      const again = await resetPassword(sha256(token), "$argon2id$replaced-again");
+      const unknown = await resetPassword(sha256(randomUUID()), "$argon2id$replaced");
 
-      expect(done.data).toEqual([{ user_id: userId, first_name: "Carla", email }]);
-      expect(again.data).toEqual([]);
-      expect(unknown.data).toEqual([]);
+      expect(done).toEqual([{ user_id: userId, first_name: "Carla", email }]);
+      expect(again).toEqual([]);
+      expect(unknown).toEqual([]);
       expect(await passwordHashOf(userId)).toBe("$argon2id$replaced");
     });
   });

@@ -7,7 +7,7 @@
 // mais rotas inexistentes (404), preflight CORS (OPTIONS) e rotas fechadas sem sessao (401).
 //
 // Nao rode este arquivo contra a API de dev: use `bun run load <perfil>`, que sobe uma API isolada
-// com Supabase local, e-mail capturado e TRUST_PROXY=true. Perfis: smoke, load, stress.
+// com Postgres local, e-mail capturado e TRUST_PROXY=true. Perfis: smoke, load, stress.
 import http from "k6/http";
 import { check } from "k6";
 import { API } from "./lib/client.js";

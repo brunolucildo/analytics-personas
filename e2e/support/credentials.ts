@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { insertUser } from "./database";
 import { E2E_SESSION_EMAIL_PREFIX } from "./global-teardown";
 
 /** Password every user seeded by `seedUserWithPassword` has (a test-only value, never a real secret). */
@@ -24,30 +25,14 @@ export async function seedUserWithPassword(
   label: string,
   { confirmed = true, firstName = "Ana" }: { confirmed?: boolean; firstName?: string } = {},
 ): Promise<SeededCredentials> {
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY as string;
   const email = `${E2E_SESSION_EMAIL_PREFIX}${label}-${randomUUID()}@example.test`;
-  const response = await fetch(`${process.env.SUPABASE_URL}/rest/v1/users`, {
-    method: "POST",
-    headers: {
-      apikey: key,
-      authorization: `Bearer ${key}`,
-      "content-type": "application/json",
-      prefer: "return=representation",
-    },
-    body: JSON.stringify({
-      first_name: firstName,
-      last_name: "Silva",
-      email,
-      password_hash: SEEDED_PASSWORD_HASH,
-      email_confirmed_at: confirmed ? new Date().toISOString() : null,
-    }),
+  const id = await insertUser({
+    firstName,
+    lastName: "Silva",
+    email,
+    passwordHash: SEEDED_PASSWORD_HASH,
+    emailConfirmedAt: confirmed ? new Date() : null,
   });
-  const rows = (await response.json()) as Array<{ id: string }>;
-  const id = rows[0]?.id;
-
-  if (!response.ok || id === undefined) {
-    throw new Error("Could not seed a user: is the local Supabase up with the migrations applied?");
-  }
 
   return { id, firstName, email, password: SEEDED_PASSWORD };
 }

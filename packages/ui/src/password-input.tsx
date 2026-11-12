@@ -85,7 +85,7 @@ export function PasswordInput({
         aria-pressed={visible}
         aria-controls={inputId}
         onClick={() => setVisible((current) => !current)}
-        className="absolute top-0 right-0 rounded-l-none"
+        className="absolute top-0 right-0 rounded-l-none bg-clip-padding"
       >
         <PixelEye struck={visible} />
       </Button>

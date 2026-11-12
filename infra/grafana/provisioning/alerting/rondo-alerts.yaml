@@ -509,7 +509,7 @@ groups:
         for: "0s"
         annotations:
           summary: "Menos de metade dos sign-ins nos últimos 15 minutos deu certo"
-          description: "Com ao menos 10 tentativas. Pode ser ataque de credenciais, Supabase fora ou bug no login. Veja as falhas por motivo."
+          description: "Com ao menos 10 tentativas. Pode ser ataque de credenciais, banco fora ou bug no login. Veja as falhas por motivo."
         labels:
           severity: "warning"
           service: "rondo-api"
@@ -625,129 +625,12 @@ groups:
           service: "rondo-api"
         isPaused: false
   - orgId: 1
-    name: "rondo-dependencias"
-    folder: "Rondo"
-    interval: "1m"
-    rules:
-      - uid: "rondo-supabase-lento"
-        title: "Supabase lento (p95 > 2 s)"
-        condition: "C"
-        data:
-          - refId: "A"
-            relativeTimeRange:
-              from: 600
-              to: 0
-            datasourceUid: "mimir"
-            model:
-              refId: "A"
-              datasource:
-                type: "prometheus"
-                uid: "mimir"
-              expr: 'histogram_quantile(0.95, sum by (le) (rate(http_client_request_duration_seconds_bucket{job="rondo-api",server_address=~".*supabase.*"}[5m])))'
-              instant: true
-              range: false
-              editorMode: "code"
-              intervalMs: 1000
-              maxDataPoints: 43200
-          - refId: "B"
-            datasourceUid: "__expr__"
-            model:
-              refId: "B"
-              type: "reduce"
-              expression: "A"
-              reducer: "last"
-              settings:
-                mode: "dropNN"
-              datasource:
-                type: "__expr__"
-                uid: "__expr__"
-          - refId: "C"
-            datasourceUid: "__expr__"
-            model:
-              refId: "C"
-              type: "threshold"
-              expression: "B"
-              conditions:
-                - evaluator:
-                    type: "gt"
-                    params:
-                      - 2
-              datasource:
-                type: "__expr__"
-                uid: "__expr__"
-        noDataState: "OK"
-        execErrState: "Error"
-        for: "5m"
-        annotations:
-          summary: "As chamadas HTTP ao Supabase estão lentas"
-          description: "p95 acima de 2 s por 5 minutos. As rotas de auth herdam essa latência."
-        labels:
-          severity: "warning"
-          service: "rondo-api"
-        isPaused: false
-      - uid: "rondo-supabase-erros"
-        title: "Supabase com erros (> 5%)"
-        condition: "C"
-        data:
-          - refId: "A"
-            relativeTimeRange:
-              from: 600
-              to: 0
-            datasourceUid: "mimir"
-            model:
-              refId: "A"
-              datasource:
-                type: "prometheus"
-                uid: "mimir"
-              expr: '(sum(rate(http_client_request_duration_seconds_count{job="rondo-api",server_address=~".*supabase.*",http_response_status_code=~"[45].."}[5m])) or vector(0)) / sum(rate(http_client_request_duration_seconds_count{job="rondo-api",server_address=~".*supabase.*"}[5m]))'
-              instant: true
-              range: false
-              editorMode: "code"
-              intervalMs: 1000
-              maxDataPoints: 43200
-          - refId: "B"
-            datasourceUid: "__expr__"
-            model:
-              refId: "B"
-              type: "reduce"
-              expression: "A"
-              reducer: "last"
-              settings:
-                mode: "dropNN"
-              datasource:
-                type: "__expr__"
-                uid: "__expr__"
-          - refId: "C"
-            datasourceUid: "__expr__"
-            model:
-              refId: "C"
-              type: "threshold"
-              expression: "B"
-              conditions:
-                - evaluator:
-                    type: "gt"
-                    params:
-                      - 0.05
-              datasource:
-                type: "__expr__"
-                uid: "__expr__"
-        noDataState: "OK"
-        execErrState: "Error"
-        for: "5m"
-        annotations:
-          summary: "Mais de 5% das chamadas ao Supabase voltam com 4xx/5xx"
-          description: "Inclui 406 de consultas sem linha (normais). Se for só isso, ajuste o limite; senão, veja o banco."
-        labels:
-          severity: "warning"
-          service: "rondo-api"
-        isPaused: false
-  - orgId: 1
     name: "rondo-postgres"
     folder: "Rondo"
     interval: "1m"
     rules:
       - uid: "rondo-db-falha-operacao"
-        title: "Falha de operação no banco (5xx/rede)"
+        title: "Falha de operação no banco (infraestrutura)"
         condition: "C"
         data:
           - refId: "A"
@@ -796,7 +679,7 @@ groups:
         for: "0s"
         annotations:
           summary: "A API não conseguiu executar uma operação no Postgres"
-          description: "Erro do servidor (5xx) ou de rede numa query/RPC. Veja o log db_operation_failed e o trace."
+          description: "Falha de conexão ou erro de infraestrutura (SQLSTATE das classes 08, 53, 57 e 58) numa query ou função SQL. Veja o log db_operation_failed e o trace."
         labels:
           severity: "critical"
           service: "rondo-postgres"
@@ -908,7 +791,7 @@ groups:
         for: "2m"
         annotations:
           summary: "O Collector não consegue ler o Postgres"
-          description: "Nenhuma métrica do servidor Postgres nos últimos 3 minutos: banco fora, credencial errada ou Collector sem acesso à porta. Em ambiente local, dispara quando o Supabase local está parado."
+          description: "Nenhuma métrica do servidor Postgres nos últimos 3 minutos: banco fora, credencial errada ou Collector sem acesso à porta. Em ambiente local, dispara quando o Postgres local está parado."
         labels:
           severity: "critical"
           service: "rondo-postgres"

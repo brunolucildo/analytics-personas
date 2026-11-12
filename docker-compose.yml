@@ -1,6 +1,24 @@
 name: rondo
 
 services:
+  postgres:
+    image: postgres:17-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: rondo
+      POSTGRES_USER: rondo_migrator
+      POSTGRES_PASSWORD: rondo
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rondo_migrator -d rondo"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
   grafana:
     image: grafana/grafana:latest
     ports:
@@ -99,18 +117,16 @@ services:
       - "4318:4318"
       - "13133:13133"
     environment:
-      POSTGRES_ENDPOINT: ${POSTGRES_ENDPOINT:-host.docker.internal:54322}
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-    extra_hosts:
-      # Docker Desktop already resolves it; Linux needs this line to reach the Supabase database.
-      - "host.docker.internal:host-gateway"
+      POSTGRES_ENDPOINT: ${POSTGRES_ENDPOINT:-postgres:5432}
+      POSTGRES_USER: ${POSTGRES_USER:-rondo_app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rondo}
     volumes:
       - ./infra/otel/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
     depends_on:
       - loki
       - tempo
       - mimir
+      - postgres
     healthcheck:
       test: ["CMD", "/bin/busybox", "wget", "-q", "-O", "/dev/null", "http://localhost:13133/"]
       interval: 10s
@@ -119,6 +135,7 @@ services:
       start_period: 10s
 
 volumes:
+  postgres-data:
   grafana-data:
   loki-data:
   tempo-data:

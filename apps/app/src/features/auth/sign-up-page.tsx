@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { Button } from "@repo/ui/button";
 import { Input } from "@repo/ui/input";
 import { Label } from "@repo/ui/label";
+import { PasswordInput } from "@repo/ui/password-input";
 import { useState, type ChangeEvent, type FormEvent } from "react";
 import { describeSignUpFailure } from "./describe-sign-up-failure";
 import {
@@ -18,14 +19,26 @@ interface FieldConfig {
   label: string;
   type: "text" | "email" | "password";
   autoComplete: string;
+  /** Only for password fields: what the show/hide toggle reveals, used in its accessible name. */
+  visibilityLabel?: string;
 }
 
 const FIELDS: Record<SignUpField, FieldConfig> = {
   firstName: { label: "First name", type: "text", autoComplete: "given-name" },
   lastName: { label: "Last name", type: "text", autoComplete: "family-name" },
   email: { label: "Email", type: "email", autoComplete: "email" },
-  password: { label: "Password", type: "password", autoComplete: "new-password" },
-  confirmPassword: { label: "Confirm password", type: "password", autoComplete: "new-password" },
+  password: {
+    label: "Password",
+    type: "password",
+    autoComplete: "new-password",
+    visibilityLabel: "password",
+  },
+  confirmPassword: {
+    label: "Confirm password",
+    type: "password",
+    autoComplete: "new-password",
+    visibilityLabel: "password confirmation",
+  },
 };
 
 const CARD_CLASS = "border-2 border-border bg-card p-6 shadow-[4px_4px_0_0_var(--color-border)]";
@@ -149,18 +162,33 @@ export function SignUpPage() {
     return (
       <div key={name} className="space-y-2">
         <Label htmlFor={inputId}>{field.label}</Label>
-        <Input
-          id={inputId}
-          name={name}
-          type={field.type}
-          autoComplete={field.autoComplete}
-          value={values[name]}
-          onChange={handleChange}
-          readOnly={pending}
-          aria-invalid={error ? true : undefined}
-          aria-describedby={error ? errorId : undefined}
-          required
-        />
+        {field.type === "password" ? (
+          <PasswordInput
+            id={inputId}
+            name={name}
+            visibilityLabel={field.visibilityLabel}
+            autoComplete={field.autoComplete}
+            value={values[name]}
+            onChange={handleChange}
+            readOnly={pending}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? errorId : undefined}
+            required
+          />
+        ) : (
+          <Input
+            id={inputId}
+            name={name}
+            type={field.type}
+            autoComplete={field.autoComplete}
+            value={values[name]}
+            onChange={handleChange}
+            readOnly={pending}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? errorId : undefined}
+            required
+          />
+        )}
         {error ? (
           <p id={errorId} className="text-base font-bold text-destructive">
             {error}

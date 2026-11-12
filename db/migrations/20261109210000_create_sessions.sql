@@ -6,11 +6,9 @@
 -- partial unique index, and the issue function revokes the previous one first.
 --
 -- Security model (same as users and auth_tokens, see the 0004 migration):
---   * row level security is ON and there are NO policies;
---   * every privilege is revoked from `anon` and `authenticated`;
---   * only the API (service role, server side) reads and writes the table;
---   * the function called through RPC has `execute` revoked from public, anon and
---     authenticated, and granted to `service_role` only.
+--   * `sessions` belongs to `rondo_migrator`; the API connects as `rondo_app`;
+--   * `rondo_app` gets DML on the table and `execute` on the function;
+--   * there is no RLS, PostgREST or `anon`/`authenticated`/`service_role`.
 --
 -- Rollback (run manually, in this order; it signs everybody out):
 --   drop function if exists public.auth_issue_session(uuid, timestamptz);
@@ -31,9 +29,7 @@ create unique index if not exists sessions_user_id_active_key
   on public.sessions (user_id)
   where revoked_at is null;
 
-alter table public.sessions enable row level security;
-
-revoke all on table public.sessions from public, anon, authenticated;
+grant select, insert, update, delete on table public.sessions to rondo_app;
 
 -- Starts a new session for the user and revokes the active one, in one transaction.
 -- Returns the new session id with the user's public fields, or no row when the
@@ -72,6 +68,6 @@ end;
 $$;
 
 revoke all on function public.auth_issue_session(uuid, timestamptz)
-  from public, anon, authenticated;
+  from public;
 grant execute on function public.auth_issue_session(uuid, timestamptz)
-  to service_role;
+  to rondo_app;

@@ -54,7 +54,7 @@ Leia, nesta ordem: `AGENTS.md` da raiz, `.docs/AGENTS.md`, `.docs/ARCHITECTURE.m
    bun run check-types
    bun run test
    ```
-   Se o baseline já falhar, pare: não atribua a falha à refatoração. Se a refatoração tocar a API (caso padrão), a integração e o E2E também são obrigatórios; verifique Docker/Supabase:
+   Se o baseline já falhar, pare: não atribua a falha à refatoração. Se a refatoração tocar a API (caso padrão), a integração e o E2E também são obrigatórios; verifique o Docker e o Postgres local:
    ```bash
    docker info
    bun run infra:up
@@ -76,7 +76,7 @@ Leia, nesta ordem: `AGENTS.md` da raiz, `.docs/AGENTS.md`, `.docs/ARCHITECTURE.m
 | --- | --- | --- |
 | `domain` | Entidades, value objects, regras, erros, ports | Framework, HTTP, banco, SDK, camadas externas |
 | `application` | Um use case por fluxo, com um `execute`; serviços de capacidade reutilizáveis | HTTP, Nest, banco, `infrastructure`, `interface` |
-| `infrastructure` | Adaptadores dos ports (Supabase, Argon2, e-mail, HTTP) | Regra de negócio, `interface` |
+| `infrastructure` | Adaptadores dos ports (Postgres, Argon2, e-mail, HTTP) | Regra de negócio, `interface` |
 | `interface` | Um request handler por endpoint, DTOs, presenters, guards | Acesso a banco, `infrastructure` direto, regra de negócio |
 
 Layout, exemplo de handler/use case, regras de 1:1, comportamento preservado e exigências de ADR estão em [`references/target-architecture.md`](references/target-architecture.md). O auditor e o planner leem esse arquivo; o implementer também.
@@ -156,7 +156,7 @@ O Agente 4 roda, nesta ordem:
    node .claude/skills/refactor-slices/scripts/audit-slices.mjs --scope <scope> --strict
    ```
    Zero violação (ou só exceções documentadas no plano).
-2. **Contrato:** revisão de `git diff` para rotas, métodos, status, DTOs, erros, telemetria, rate limit, auth, SQL/RPC, e-mail e dependências. Nada pode mudar.
+2. **Contrato:** revisão de `git diff` para rotas, métodos, status, DTOs, erros, telemetria, rate limit, auth, SQL/funções SQL, e-mail e dependências. Nada pode mudar.
 3. **QA:**
    ```bash
    bun run lint

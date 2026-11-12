@@ -82,6 +82,29 @@ describe("sign-up page", () => {
     expect(within(screen.getByTestId("auth-layout")).getByRole("main")).toBeInTheDocument();
   });
 
+  it("shows and hides the password and its confirmation on their own, keeping the values", async () => {
+    renderSignUp();
+
+    const user = await fillForm();
+    const password = screen.getByLabelText("Password");
+    const confirmation = screen.getByLabelText("Confirm password");
+
+    await user.click(screen.getByRole("button", { name: "Show password" }));
+
+    expect(password).toHaveAttribute("type", "text");
+    expect(password).toHaveValue("correct horse battery");
+    expect(confirmation).toHaveAttribute("type", "password");
+
+    await user.click(screen.getByRole("button", { name: "Show password confirmation" }));
+
+    expect(confirmation).toHaveAttribute("type", "text");
+
+    await user.click(screen.getByRole("button", { name: "Hide password" }));
+
+    expect(password).toHaveAttribute("type", "password");
+    expect(confirmation).toHaveAttribute("type", "text");
+  });
+
   it("shows a mismatch error by the field before sending and does not call the API", async () => {
     renderSignUp();
 
