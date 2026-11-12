@@ -19,7 +19,7 @@ export interface StoredToken extends ConfirmationToken {
   userId: string;
 }
 
-/** In-memory `UserRepository` for unit tests: same contract as the Supabase one. */
+/** In-memory `UserRepository` for unit tests: same contract as the Postgres one. */
 export class InMemoryUserRepository implements UserRepository {
   readonly users: StoredUser[] = [];
   readonly tokens: StoredToken[] = [];

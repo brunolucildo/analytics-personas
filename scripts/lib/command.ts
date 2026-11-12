@@ -2,11 +2,12 @@ import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 export function rootPath(...parts: string[]) {
-  return join(import.meta.dir, "..", ...parts);
+  // This file lives in scripts/lib, so the repository root is two levels up.
+  return join(import.meta.dir, "..", "..", ...parts);
 }
 
 export function hasSqlMigrations() {
-  const directory = rootPath("supabase", "migrations");
+  const directory = rootPath("db", "migrations");
 
   if (!existsSync(directory)) {
     return false;
@@ -27,11 +28,12 @@ export function assertDocker() {
   }
 }
 
-export async function run(label: string, command: string[]) {
+export async function run(label: string, command: string[], env?: Record<string, string>) {
   console.log(`\n> ${label}`);
 
   const child = Bun.spawn(command, {
     cwd: rootPath(),
+    env: { ...process.env, ...env },
     stdio: ["inherit", "inherit", "inherit"],
   });
   const exitCode = await child.exited;
@@ -43,8 +45,4 @@ export async function run(label: string, command: string[]) {
   }
 
   return exitCode;
-}
-
-export function supabaseCommand(...args: string[]) {
-  return [process.execPath, "x", "supabase", ...args];
 }

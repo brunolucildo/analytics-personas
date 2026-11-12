@@ -145,6 +145,21 @@ describe("provisioned Grafana dashboards", () => {
     }
   });
 
+  it("has no reference to Supabase or PostgREST and covers the database through the pool", () => {
+    const dashboard = JSON.stringify(loadDashboard("api-observability.json"));
+    const alerts = readFileSync(join(GRAFANA, "provisioning/alerting/rondo-alerts.yaml"), "utf8");
+
+    for (const forbidden of [/supabase/i, /postgrest/i, /server_address=~\\?"\.\*supabase/i]) {
+      expect(dashboard).not.toMatch(forbidden);
+      expect(alerts).not.toMatch(forbidden);
+    }
+
+    expect(alerts).not.toContain("rondo-supabase");
+    expect(dashboard).toContain('job=\\"rondo-postgres\\"');
+    // The pool spans carry the SQLSTATE as `error.type`, not an HTTP status.
+    expect(dashboard).not.toContain("db.response.status_code");
+  });
+
   it("never selects span attributes that carry personal data", () => {
     const dashboard = JSON.stringify(loadDashboard("api-observability.json"));
 

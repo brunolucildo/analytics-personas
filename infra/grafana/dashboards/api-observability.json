@@ -1,7 +1,7 @@
 {
   "uid": "rondo-api-observability",
   "title": "Rondo — Observabilidade da API",
-  "description": "Visão única da API: saúde, tráfego, latência por endpoint, erros, autenticação, banco (Supabase), e-mail, runtime Node, logs e traces.",
+  "description": "Visão única da API: saúde, tráfego, latência por endpoint, erros, autenticação, banco (Postgres), e-mail, runtime Node, logs e traces.",
   "tags": ["rondo", "api", "observabilidade"],
   "timezone": "browser",
   "schemaVersion": 39,
@@ -733,7 +733,7 @@
     {
       "type": "stat",
       "title": "Sucesso do sign-in (período)",
-      "description": "Tentativas de sign-in concluídas com sucesso (contagem exata pelos logs de auth). Queda brusca = ataque de credenciais, Supabase fora ou bug de login.",
+      "description": "Tentativas de sign-in concluídas com sucesso (contagem exata pelos logs de auth). Queda brusca = ataque de credenciais, banco fora ou bug de login.",
       "datasource": {
         "type": "loki",
         "uid": "loki"
@@ -2389,7 +2389,7 @@
     {
       "type": "table",
       "title": "Traces lentos (> 1 s, últimos)",
-      "description": "Requisições que passaram de 1 segundo. Abra o trace para ver em qual chamada (Supabase, e-mail...) o tempo foi gasto.",
+      "description": "Requisições que passaram de 1 segundo. Abra o trace para ver em qual chamada (banco, e-mail...) o tempo foi gasto.",
       "datasource": {
         "type": "tempo",
         "uid": "tempo"
@@ -2731,7 +2731,7 @@
     {
       "type": "timeseries",
       "title": "Duração p95 por operação",
-      "description": "Tempo até a API responder cada operação de auth (inclui chamadas ao Supabase e envio de e-mail).",
+      "description": "Tempo até a API responder cada operação de auth (inclui consultas ao banco e envio de e-mail).",
       "datasource": {
         "type": "prometheus",
         "uid": "mimir"
@@ -3191,7 +3191,7 @@
       "title": "Como ler esta seção",
       "options": {
         "mode": "markdown",
-        "content": "Duas visões do mesmo banco. **API → banco** (operações, latência e erros): o que a API pede e quanto demora, por tabela e por função SQL, medido na API (`db.client.operation.duration`). **Servidor Postgres** (conexões, transações, locks, cache, tamanho): coletado direto do banco pelo Collector (receiver `postgresql`). O servidor monitorado é o Supabase **local** (porta 54322); se a API apontar para um projeto na nuvem, a visão API → banco mostra o tráfego dele, mas a do servidor continua sendo a do banco local. Status **406** é normal: é o `maybeSingle()` sem linha. Tabelas e funções internas do Supabase (auth, storage, realtime) ficam fora dos painéis por tabela; só `public` aparece."
+        "content": "Duas visões do mesmo banco. **API → banco** (operações, latência e erros): o que a API pede e quanto demora, por tabela e por função SQL, medido na API (`db.client.operation.duration`). **Servidor Postgres** (conexões, transações, locks, cache, tamanho): coletado direto do banco pelo Collector (receiver `postgresql`). O servidor monitorado é o Postgres do Compose (`postgres:5432`, banco `rondo`); se a API apontar para outro banco, a visão API → banco mostra o tráfego dele, mas a do servidor continua sendo a do banco local. Só o schema `public` aparece nos painéis por tabela."
       },
       "transparent": false,
       "id": 42,
@@ -3267,7 +3267,7 @@
     {
       "type": "stat",
       "title": "Latência p95 API → banco",
-      "description": "95% das operações responderam em até este tempo (da API até os headers da resposta).",
+      "description": "95% das operações responderam em até este tempo (da API até a resposta do banco, inclui a espera por uma conexão do pool).",
       "datasource": {
         "type": "prometheus",
         "uid": "mimir"
@@ -3336,8 +3336,8 @@
     },
     {
       "type": "stat",
-      "title": "Falhas de banco (5xx/rede)",
-      "description": "Operações que falharam por erro do servidor ou de rede (contagem exata pelos logs). Deve ser zero.",
+      "title": "Falhas de banco (infraestrutura)",
+      "description": "Operações que falharam por conexão ou erro de infraestrutura do Postgres (contagem exata pelos logs). Violações de unicidade e de check não contam. Deve ser zero.",
       "datasource": {
         "type": "loki",
         "uid": "loki"
@@ -3402,7 +3402,7 @@
     {
       "type": "stat",
       "title": "Conexões em uso",
-      "description": "Conexões abertas sobre o máximo do Postgres (inclui os serviços internos do Supabase). Perto de 100% = novas conexões recusadas.",
+      "description": "Conexões abertas sobre o máximo do Postgres. Perto de 100% = novas conexões recusadas.",
       "datasource": {
         "type": "prometheus",
         "uid": "mimir"
@@ -3678,7 +3678,7 @@
     {
       "type": "stat",
       "title": "Tamanho do banco",
-      "description": "Tamanho total do banco (inclui os schemas do Supabase).",
+      "description": "Tamanho total do banco `rondo`.",
       "datasource": {
         "type": "prometheus",
         "uid": "mimir"
@@ -3888,8 +3888,8 @@
     },
     {
       "type": "timeseries",
-      "title": "Respostas de erro por status",
-      "description": "Status 4xx/5xx e falhas de rede (network). 406 = consulta sem linha (normal); 409 = violação de unicidade; 5xx e network = falha real.",
+      "title": "Erros por SQLSTATE",
+      "description": "SQLSTATE do erro e `connection` (falha de conexão ou timeout do pool). 23505 = violação de unicidade (esperada em cadastro duplicado); classes 08, 53, 57, 58 e `connection` = falha real de infraestrutura.",
       "datasource": {
         "type": "prometheus",
         "uid": "mimir"
@@ -4801,7 +4801,7 @@
             "uid": "tempo"
           },
           "queryType": "traceql",
-          "query": "{ span.db.system.name = \"postgresql\" } | select(span.db.operation.name, span.db.collection.name, span.db.stored_procedure.name, span.db.response.status_code)",
+          "query": "{ span.db.system.name = \"postgresql\" } | select(span.db.operation.name, span.db.collection.name, span.db.stored_procedure.name, span.error.type)",
           "limit": 20,
           "tableType": "traces"
         }
@@ -4849,7 +4849,7 @@
             "uid": "tempo"
           },
           "queryType": "traceql",
-          "query": "{ span.db.system.name = \"postgresql\" && (duration > 500ms || status = error) } | select(span.db.operation.name, span.db.collection.name, span.db.stored_procedure.name, span.db.response.status_code)",
+          "query": "{ span.db.system.name = \"postgresql\" && (duration > 500ms || status = error) } | select(span.db.operation.name, span.db.collection.name, span.db.stored_procedure.name, span.error.type)",
           "limit": 20,
           "tableType": "traces"
         }
@@ -4884,7 +4884,7 @@
     {
       "id": 65,
       "type": "row",
-      "title": "Dependências externas: Supabase (API HTTP) e e-mail",
+      "title": "Dependências externas: e-mail",
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -4899,7 +4899,7 @@
       "title": "Como ler esta seção",
       "options": {
         "mode": "markdown",
-        "content": "Chamadas de **saída** da API vistas como HTTP (instrumentação do undici): o Supabase (PostgREST, que fala com o Postgres) e o provedor de e-mail (hoje Mailtrap). Aqui está a latência de rede e de borda de cada serviço; o que o Postgres faz por dentro (queries, conexões, locks) está na seção **Banco de dados: Postgres**."
+        "content": "Chamadas de **saída** da API vistas como HTTP (instrumentação do undici): hoje, o provedor de e-mail (Mailtrap). Aqui está a latência de rede e de borda do serviço; o acesso ao Postgres não passa por HTTP e está na seção **Banco de dados: Postgres**."
       },
       "transparent": false,
       "id": 66,
@@ -4911,273 +4911,9 @@
       }
     },
     {
-      "type": "stat",
-      "title": "Supabase: p95 (período)",
-      "description": "Latência p95 das chamadas HTTP ao Supabase (inclui rede e PostgREST). Costuma dominar a latência das rotas de auth.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "mimir"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "mimir"
-          },
-          "expr": "histogram_quantile(0.95, sum by (le) (increase(http_client_request_duration_seconds_bucket{job=\"rondo-api\",server_address=~\".*supabase.*\"}[$__range])))",
-          "legendFormat": "__auto",
-          "instant": true,
-          "range": false
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "decimals": 3,
-          "noValue": "sem dados",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "#EAB839",
-                "value": 0.5
-              },
-              {
-                "color": "red",
-                "value": 1.5
-              }
-            ]
-          },
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": []
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "background",
-        "graphMode": "none",
-        "textMode": "value",
-        "justifyMode": "center",
-        "orientation": "auto"
-      },
-      "id": 67,
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 0,
-        "y": 171
-      }
-    },
-    {
-      "type": "stat",
-      "title": "Supabase: erros (período)",
-      "description": "Respostas 4xx/5xx do Supabase sobre o total de chamadas. Falha de rede sem resposta não entra aqui: veja os traces com erro.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "mimir"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "mimir"
-          },
-          "expr": "(sum(increase(http_client_request_duration_seconds_count{job=\"rondo-api\",server_address=~\".*supabase.*\",http_response_status_code=~\"[45]..\"}[$__range])) or vector(0)) / sum(increase(http_client_request_duration_seconds_count{job=\"rondo-api\",server_address=~\".*supabase.*\"}[$__range]))",
-          "legendFormat": "__auto",
-          "instant": true,
-          "range": false
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percentunit",
-          "decimals": 1,
-          "noValue": "sem chamadas",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "#EAB839",
-                "value": 0.02
-              },
-              {
-                "color": "red",
-                "value": 0.1
-              }
-            ]
-          },
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": []
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "background",
-        "graphMode": "none",
-        "textMode": "value",
-        "justifyMode": "center",
-        "orientation": "auto"
-      },
-      "id": 68,
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 6,
-        "y": 171
-      }
-    },
-    {
-      "type": "stat",
-      "title": "Supabase: chamadas (período)",
-      "description": "Quantas vezes a API consultou o Supabase.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "mimir"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "mimir"
-          },
-          "expr": "sum(increase(http_client_request_duration_seconds_count{job=\"rondo-api\",server_address=~\".*supabase.*\"}[$__range]))",
-          "legendFormat": "__auto",
-          "instant": true,
-          "range": false
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "decimals": 0,
-          "noValue": "0",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": []
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "value",
-        "graphMode": "none",
-        "textMode": "value",
-        "justifyMode": "center",
-        "orientation": "auto"
-      },
-      "id": 69,
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 12,
-        "y": 171
-      }
-    },
-    {
-      "type": "stat",
-      "title": "Chamadas ao Supabase por requisição",
-      "description": "Média de idas ao banco por requisição de negócio. Se subir sem mudança de código, há consulta repetida (N+1).",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "mimir"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "mimir"
-          },
-          "expr": "sum(increase(http_client_request_duration_seconds_count{job=\"rondo-api\",server_address=~\".*supabase.*\"}[$__range])) / sum(increase(http_server_request_duration_seconds_count{job=\"rondo-api\",http_route!~\"unmatched|/api/v1/health\"}[$__range]))",
-          "legendFormat": "__auto",
-          "instant": true,
-          "range": false
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "decimals": 2,
-          "noValue": "sem dados",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": []
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "value",
-        "graphMode": "none",
-        "textMode": "value",
-        "justifyMode": "center",
-        "orientation": "auto"
-      },
-      "id": 70,
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 18,
-        "y": 171
-      }
-    },
-    {
       "type": "timeseries",
       "title": "Chamadas por segundo, por dependência",
-      "description": "Tráfego de saída por host (Supabase, provedor de e-mail).",
+      "description": "Tráfego de saída por host (provedor de e-mail).",
       "datasource": {
         "type": "prometheus",
         "uid": "mimir"
@@ -5245,7 +4981,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 175
+        "y": 171
       }
     },
     {
@@ -5320,7 +5056,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 175
+        "y": 171
       }
     },
     {
@@ -5394,222 +5130,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 175
-      }
-    },
-    {
-      "type": "timeseries",
-      "title": "Supabase: latência p50 / p95 / p99",
-      "description": "Tempo do banco/autenticação do ponto de vista da API.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "mimir"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "mimir"
-          },
-          "expr": "histogram_quantile(0.5, sum by (le) (rate(http_client_request_duration_seconds_bucket{job=\"rondo-api\",server_address=~\".*supabase.*\"}[$__rate_interval])))",
-          "legendFormat": "p50",
-          "range": true
-        },
-        {
-          "refId": "B",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "mimir"
-          },
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_client_request_duration_seconds_bucket{job=\"rondo-api\",server_address=~\".*supabase.*\"}[$__rate_interval])))",
-          "legendFormat": "p95",
-          "range": true
-        },
-        {
-          "refId": "C",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "mimir"
-          },
-          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_client_request_duration_seconds_bucket{job=\"rondo-api\",server_address=~\".*supabase.*\"}[$__rate_interval])))",
-          "legendFormat": "p99",
-          "range": true
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "decimals": 3,
-          "min": 0,
-          "noValue": "sem dados",
-          "color": {
-            "mode": "palette-classic"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 1,
-            "fillOpacity": 12,
-            "showPoints": "never",
-            "spanNulls": true,
-            "stacking": {
-              "mode": "none",
-              "group": "A"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "p50"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "green"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "p95"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "#EAB839"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "p99"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "red"
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true,
-          "calcs": []
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "id": 74,
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 183
-      }
-    },
-    {
-      "type": "timeseries",
-      "title": "Supabase: chamadas por método e status",
-      "description": "GET = leituras, POST = inserts/ações, PATCH = updates (PostgREST/GoTrue).",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "mimir"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "mimir"
-          },
-          "expr": "sum by (http_request_method, http_response_status_code) (rate(http_client_request_duration_seconds_count{job=\"rondo-api\",server_address=~\".*supabase.*\"}[$__rate_interval]))",
-          "legendFormat": "{{http_request_method}} {{http_response_status_code}}",
-          "range": true
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "reqps",
-          "decimals": 3,
-          "noValue": "sem dados",
-          "color": {
-            "mode": "palette-classic"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 1,
-            "fillOpacity": 30,
-            "showPoints": "never",
-            "spanNulls": true,
-            "stacking": {
-              "mode": "normal",
-              "group": "A"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "showLegend": true,
-          "calcs": ["lastNotNull", "max"]
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "id": 75,
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 183
+        "y": 171
       }
     },
     {
@@ -5657,7 +5178,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 191
+        "y": 179
       }
     },
     {
@@ -5731,7 +5252,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 199
+        "y": 187
       }
     },
     {
@@ -5806,7 +5327,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 199
+        "y": 187
       }
     },
     {
@@ -5880,7 +5401,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 199
+        "y": 187
       }
     },
     {
@@ -5892,7 +5413,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 207
+        "y": 195
       },
       "panels": []
     },
@@ -5972,7 +5493,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 208
+        "y": 196
       }
     },
     {
@@ -6113,7 +5634,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 208
+        "y": 196
       }
     },
     {
@@ -6187,7 +5708,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 208
+        "y": 196
       }
     },
     {
@@ -6262,7 +5783,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 216
+        "y": 204
       }
     },
     {
@@ -6337,7 +5858,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 216
+        "y": 204
       }
     },
     {
@@ -6412,7 +5933,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 216
+        "y": 204
       }
     },
     {
@@ -6424,7 +5945,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 224
+        "y": 212
       },
       "panels": []
     },
@@ -6560,7 +6081,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 225
+        "y": 213
       }
     },
     {
@@ -6634,7 +6155,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 225
+        "y": 213
       }
     },
     {
@@ -6708,7 +6229,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 233
+        "y": 221
       }
     },
     {
@@ -6783,7 +6304,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 233
+        "y": 221
       }
     },
     {
@@ -6823,7 +6344,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 233
+        "y": 221
       }
     },
     {
@@ -6863,7 +6384,7 @@
         "h": 13,
         "w": 24,
         "x": 0,
-        "y": 241
+        "y": 229
       }
     },
     {
@@ -6875,7 +6396,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 254
+        "y": 242
       },
       "panels": []
     },
@@ -6892,7 +6413,7 @@
         "h": 4,
         "w": 24,
         "x": 0,
-        "y": 255
+        "y": 243
       }
     },
     {
@@ -6954,7 +6475,7 @@
         "h": 4,
         "w": 4,
         "x": 0,
-        "y": 259
+        "y": 247
       }
     },
     {
@@ -7016,7 +6537,7 @@
         "h": 4,
         "w": 4,
         "x": 4,
-        "y": 259
+        "y": 247
       }
     },
     {
@@ -7078,7 +6599,7 @@
         "h": 4,
         "w": 4,
         "x": 8,
-        "y": 259
+        "y": 247
       }
     },
     {
@@ -7148,7 +6669,7 @@
         "h": 4,
         "w": 4,
         "x": 12,
-        "y": 259
+        "y": 247
       }
     },
     {
@@ -7218,7 +6739,7 @@
         "h": 4,
         "w": 4,
         "x": 16,
-        "y": 259
+        "y": 247
       }
     },
     {
@@ -7288,7 +6809,7 @@
         "h": 4,
         "w": 4,
         "x": 20,
-        "y": 259
+        "y": 247
       }
     },
     {
@@ -7404,7 +6925,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 263
+        "y": 251
       }
     },
     {
@@ -7479,7 +7000,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 263
+        "y": 251
       }
     },
     {
@@ -7553,7 +7074,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 271
+        "y": 259
       }
     },
     {
@@ -7627,7 +7148,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 271
+        "y": 259
       }
     },
     {
@@ -7743,7 +7264,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 271
+        "y": 259
       }
     },
     {
@@ -7859,7 +7380,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 279
+        "y": 267
       }
     },
     {
@@ -7960,7 +7481,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 279
+        "y": 267
       }
     }
   ]

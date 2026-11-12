@@ -1,10 +1,10 @@
 import { type EmailConfig, parseEmailConfig } from "../modules/email";
 import { MIN_JWT_SECRET_LENGTH } from "./auth-secret";
+import { parseDatabaseUrl } from "./database";
 
 export interface Environment {
-  supabaseUrl: string;
-  supabaseAnonKey: string;
-  supabaseServiceRoleKey: string;
+  /** Postgres connection URL of the API (`rondo_app`). Never logged or put in the bundle. */
+  databaseUrl: string;
   appUrl: string;
   apiPort: number;
   otelEndpoint: string;
@@ -19,12 +19,7 @@ export interface Environment {
   authHashQueueLimit: number;
 }
 
-const REQUIRED_VARIABLES = [
-  "SUPABASE_URL",
-  "SUPABASE_ANON_KEY",
-  "SUPABASE_SERVICE_ROLE_KEY",
-  "APP_URL",
-] as const;
+const REQUIRED_VARIABLES = ["DATABASE_URL", "APP_URL"] as const;
 
 function parseAppOrigin(value: string): string {
   try {
@@ -111,7 +106,7 @@ export function validateEnvironment(env: Record<string, string | undefined>): En
     throw new Error(
       `Missing required environment variables: ${missing.join(", ")}. ` +
         "Copy .env.example to .env at the repository root and fill in the values " +
-        "(Supabase keys come from `bunx supabase status`).",
+        "(`DATABASE_URL` comes from `bun run infra:up`).",
     );
   }
 
@@ -122,9 +117,7 @@ export function validateEnvironment(env: Record<string, string | undefined>): En
   }
 
   return {
-    supabaseUrl: env.SUPABASE_URL as string,
-    supabaseAnonKey: env.SUPABASE_ANON_KEY as string,
-    supabaseServiceRoleKey: env.SUPABASE_SERVICE_ROLE_KEY as string,
+    databaseUrl: parseDatabaseUrl(env.DATABASE_URL),
     // Presence is checked above, so the value is a string here.
     appUrl: parseAppOrigin(env.APP_URL as string),
     apiPort,

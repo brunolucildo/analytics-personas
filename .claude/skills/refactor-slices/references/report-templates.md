@@ -122,7 +122,7 @@ Use o template de `.docs/RULES.md` §4 e acrescente:
 - [ ] Telemetria (operação, labels, motivos)
 - [ ] Rate limit (políticas e chaves)
 - [ ] Auth (`@Public`, guard, sessão)
-- [ ] SQL, RPC, migrations e permissões
+- [ ] SQL, funções SQL, migrations e permissões
 - [ ] E-mail (template, assunto, conteúdo)
 - [ ] Dependências externas
 
@@ -206,7 +206,7 @@ Use o template de `.docs/RULES.md` §4 e acrescente:
 | Telemetria | Não | ... |
 | Rate limit | Não | ... |
 | Auth | Não | ... |
-| SQL/RPC | Não | ... |
+| SQL/funções SQL | Não | ... |
 | E-mail | Não | ... |
 
 ## Gates de QA

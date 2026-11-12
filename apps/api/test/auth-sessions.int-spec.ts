@@ -1,5 +1,4 @@
 import { Controller, Get, type INestApplication } from "@nestjs/common";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { Test } from "@nestjs/testing";
 import { decodeJwt, SignJWT } from "jose";
 import request from "supertest";
@@ -15,7 +14,7 @@ import {
 } from "../src/modules/rate-limit";
 import { resetRateLimitStore } from "./support/rate-limit";
 import { seedConfirmedUser, sessionsOf, type SeededUser } from "./support/sessions";
-import { assertMigrationsApplied, createAdminClient, deleteUsersByEmail } from "./support/supabase";
+import { assertMigrationsApplied, deleteUsersByEmail, query } from "./support/database";
 
 const SESSION_PATH = "/api/v1/auth/session";
 const SECRET = process.env.AUTH_JWT_SECRET as string;
@@ -38,13 +37,12 @@ class ClosedProbeController {
 const bearer = (token: string) => ({ authorization: `Bearer ${token}` });
 
 describe("sessions and the route guard", () => {
-  const admin: SupabaseClient = createAdminClient();
   const createdEmails: string[] = [];
   let app: INestApplication;
   let sessions: SessionService;
 
   async function newUser(label: string, names?: { firstName: string; lastName: string }) {
-    const user = await seedConfirmedUser(admin, label, names);
+    const user = await seedConfirmedUser(label, names);
 
     createdEmails.push(user.email);
     return user;
@@ -68,7 +66,7 @@ describe("sessions and the route guard", () => {
   }
 
   beforeAll(async () => {
-    await assertMigrationsApplied(admin);
+    await assertMigrationsApplied();
 
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
@@ -89,7 +87,7 @@ describe("sessions and the route guard", () => {
 
   afterAll(async () => {
     await app.close();
-    await deleteUsersByEmail(admin, createdEmails);
+    await deleteUsersByEmail(createdEmails);
   });
 
   beforeEach(() => {
@@ -102,7 +100,7 @@ describe("sessions and the route guard", () => {
       const before = Date.now();
       const issued = await sessions.issue(user.id);
       const claims = decodeJwt(issued.accessToken);
-      const rows = await sessionsOf(admin, user.id);
+      const rows = await sessionsOf(user.id);
 
       expect(issued.user).toEqual({
         id: user.id,
@@ -123,7 +121,7 @@ describe("sessions and the route guard", () => {
       const user = await newUser("issue-twice");
       const first = await sessions.issue(user.id);
       const second = await sessions.issue(user.id);
-      const rows = await sessionsOf(admin, user.id);
+      const rows = await sessionsOf(user.id);
 
       expect(rows).toHaveLength(2);
       expect(rows.filter((row) => row.revoked_at === null).map((row) => row.id)).toEqual([
@@ -136,7 +134,7 @@ describe("sessions and the route guard", () => {
     it("never leaves two active sessions when issues run at the same time", async () => {
       const user = await newUser("issue-race");
       const results = await Promise.all(Array.from({ length: 6 }, () => sessions.issue(user.id)));
-      const rows = await sessionsOf(admin, user.id);
+      const rows = await sessionsOf(user.id);
       const active = rows.filter((row) => row.revoked_at === null);
 
       expect(rows).toHaveLength(6);
@@ -156,7 +154,7 @@ describe("sessions and the route guard", () => {
       await sessions.revoke(String(decodeJwt(issued.accessToken).sid));
 
       expect(await sessions.authenticate(issued.accessToken)).toBeNull();
-      expect((await sessionsOf(admin, user.id))[0]?.revoked_at).not.toBeNull();
+      expect((await sessionsOf(user.id))[0]?.revoked_at).not.toBeNull();
     });
 
     it("fails for a user that does not exist", async () => {
@@ -306,10 +304,10 @@ describe("sessions and the route guard", () => {
         const expired = await newUser("bad-tokens-expired");
         const { accessToken } = await sessions.issue(expired.id);
 
-        await admin
-          .from("sessions")
-          .update({ expires_at: new Date(Date.now() - 1000).toISOString() })
-          .eq("user_id", expired.id);
+        await query("update public.sessions set expires_at = $1 where user_id = $2", [
+          new Date(Date.now() - 1000),
+          expired.id,
+        ]);
 
         const response = await request(app.getHttpServer())
           .get(SESSION_PATH)
@@ -323,7 +321,7 @@ describe("sessions and the route guard", () => {
         const gone = await newUser("bad-tokens-deleted");
         const { accessToken } = await sessions.issue(gone.id);
 
-        await deleteUsersByEmail(admin, [gone.email]);
+        await deleteUsersByEmail([gone.email]);
 
         const response = await request(app.getHttpServer())
           .get(SESSION_PATH)

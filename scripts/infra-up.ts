@@ -1,29 +1,27 @@
-import { assertDocker, run, supabaseCommand } from "./lib/command";
+import { assertDocker, run } from "./lib/command";
+import { databaseUrlFromEnv, isLocalHost, parseDatabaseUrl } from "./lib/database";
 
 assertDocker();
 
-const supabaseCode = await run("supabase start (API local em 54321)", supabaseCommand("start"));
+const target = parseDatabaseUrl(databaseUrlFromEnv());
 
-if (supabaseCode !== 0) {
-  console.error("Supabase local nao subiu. Verifique Docker e o config.toml em supabase/.");
-  process.exit(1);
-}
+const endpoint = `${isLocalHost(target.host) ? "postgres" : target.host}:${target.port}`;
 
-const composeCode = await run("docker compose up (Grafana, Loki, Tempo, Mimir, OTel Collector)", [
-  "docker",
-  "compose",
-  "up",
-  "-d",
-  "--build",
-  "--wait",
-  "--wait-timeout",
-  "300",
-]);
+const composeCode = await run(
+  "docker compose up (Postgres, Grafana, Loki, Tempo, Mimir, OTel Collector)",
+  ["docker", "compose", "up", "-d", "--build", "--wait", "--wait-timeout", "300"],
+  {
+    POSTGRES_ENDPOINT: endpoint,
+    POSTGRES_USER: target.username,
+    POSTGRES_PASSWORD: target.password,
+  },
+);
 
 if (composeCode !== 0) {
   console.error(
-    "Grafana LGTM falhou. O Supabase local continua rodando. " +
-      "Inspecione com `docker compose ps` e `docker compose logs`; use `bun run infra:down` para parar tudo.",
+    "Infra incompleta. Os containers que subiram continuam rodando. " +
+      "Inspecione com `docker compose ps` e `docker compose logs`; use `bun run infra:down` para parar tudo. " +
+      "Se a porta 5432 estiver ocupada por outro Postgres, pare o servico ou ajuste a porta e a DATABASE_URL.",
   );
   process.exit(1);
 }
@@ -32,7 +30,7 @@ console.log(
   [
     "",
     "Infra pronta:",
-    "- Supabase API: http://127.0.0.1:54321",
+    `- Postgres:     postgres://${target.username}@localhost:${target.port}/${target.database}`,
     "- Grafana:      http://localhost:3000 (admin/admin)",
     "- OTLP HTTP:    http://localhost:4318",
     "",

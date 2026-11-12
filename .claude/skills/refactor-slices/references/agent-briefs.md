@@ -176,7 +176,7 @@ Regras que valem para todos os agentes:
    node .claude/skills/refactor-slices/scripts/audit-slices.mjs --scope <SCOPE> --strict
    ```
    Zero violação é o esperado. Exceções documentadas no plano não contam; registre cada uma.
-2. **Gate de contrato:** revise `git diff` procurando mudança em rota, método, status, DTO, código/mensagem de erro, telemetria, rate limit, auth, SQL/RPC, e-mail ou dependência. Se houver, é falha.
+2. **Gate de contrato:** revise `git diff` procurando mudança em rota, método, status, DTO, código/mensagem de erro, telemetria, rate limit, auth, SQL/funções SQL, e-mail ou dependência. Se houver, é falha.
 3. **Gates de QA**, na ordem de `.docs/QA.md` §3:
    ```bash
    bun run lint

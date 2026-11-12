@@ -1,5 +1,4 @@
 import type { INestApplication } from "@nestjs/common";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { Test } from "@nestjs/testing";
 import { decodeJwt } from "jose";
 import request from "supertest";
@@ -9,7 +8,7 @@ import { configureApp } from "../src/bootstrap";
 import { SessionService } from "../src/modules/auth/application/services/session.service";
 import { resetRateLimitStore } from "./support/rate-limit";
 import { seedConfirmedUser, sessionsOf } from "./support/sessions";
-import { assertMigrationsApplied, createAdminClient, deleteUsersByEmail } from "./support/supabase";
+import { assertMigrationsApplied, deleteUsersByEmail } from "./support/database";
 
 const SIGN_OUT_PATH = "/api/v1/auth/sign-out";
 const SESSION_PATH = "/api/v1/auth/session";
@@ -17,20 +16,19 @@ const SESSION_PATH = "/api/v1/auth/session";
 const bearer = (token: string) => ({ authorization: `Bearer ${token}` });
 
 describe("POST /api/v1/auth/sign-out", () => {
-  const admin: SupabaseClient = createAdminClient();
   const createdEmails: string[] = [];
   let app: INestApplication;
   let sessions: SessionService;
 
   async function newUser(label: string) {
-    const user = await seedConfirmedUser(admin, label);
+    const user = await seedConfirmedUser(label);
 
     createdEmails.push(user.email);
     return user;
   }
 
   beforeAll(async () => {
-    await assertMigrationsApplied(admin);
+    await assertMigrationsApplied();
 
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
 
@@ -42,7 +40,7 @@ describe("POST /api/v1/auth/sign-out", () => {
 
   afterAll(async () => {
     await app.close();
-    await deleteUsersByEmail(admin, createdEmails);
+    await deleteUsersByEmail(createdEmails);
   });
 
   beforeEach(() => {
@@ -63,7 +61,7 @@ describe("POST /api/v1/auth/sign-out", () => {
       expect(response.text).toBe("");
       expect(response.body).toEqual({});
 
-      const rows = await sessionsOf(admin, user.id);
+      const rows = await sessionsOf(user.id);
 
       expect(rows).toHaveLength(1);
       expect(rows[0]?.id).toBe(decodeJwt(accessToken).sid);
@@ -99,7 +97,7 @@ describe("POST /api/v1/auth/sign-out", () => {
 
       expect((await http.get(SESSION_PATH).set(bearer(second.accessToken))).status).toBe(200);
       expect(
-        (await sessionsOf(admin, user.id)).filter((row) => row.revoked_at === null),
+        (await sessionsOf(user.id)).filter((row) => row.revoked_at === null),
       ).toHaveLength(1);
     });
   });
@@ -134,7 +132,7 @@ describe("POST /api/v1/auth/sign-out", () => {
 
       expect((await http.post(SIGN_OUT_PATH).set(bearer(anaSession.accessToken))).status).toBe(204);
 
-      const biaRows = await sessionsOf(admin, bia.id);
+      const biaRows = await sessionsOf(bia.id);
 
       expect(biaRows).toHaveLength(1);
       expect(biaRows[0]?.revoked_at).toBeNull();

@@ -1,12 +1,9 @@
 -- 0004-auth-sign-up: users, auth_tokens and the transactional sign-up function.
 --
--- Security model: these tables hold password hashes and token hashes, and the
--- `public` schema is reachable through PostgREST with the `anon` key. So:
---   * row level security is ON and there are NO policies;
---   * every privilege is revoked from `anon` and `authenticated`;
---   * only the API (service role, server side) reads and writes them;
---   * functions called through RPC have `execute` revoked from public, anon and
---     authenticated, and granted to `service_role` only.
+-- Security model: these tables hold password hashes and token hashes. The schema
+-- is owned by `rondo_migrator` (DDL); the API connects as `rondo_app`, which gets
+-- DML on the tables and `execute` on the SQL functions, and nothing else. There
+-- is no PostgREST, no RLS and no `anon`/`authenticated`/`service_role`.
 --
 -- Rollback (run manually, in this order; it deletes every account):
 --   drop function if exists public.auth_sign_up(text, text, text, text, text, timestamptz);
@@ -44,11 +41,8 @@ create table if not exists public.auth_tokens (
 -- Lookups and clean-up by owner and kind (resend confirmation, forgot password).
 create index if not exists auth_tokens_user_id_type_idx on public.auth_tokens (user_id, type);
 
-alter table public.users enable row level security;
-alter table public.auth_tokens enable row level security;
-
-revoke all on table public.users from public, anon, authenticated;
-revoke all on table public.auth_tokens from public, anon, authenticated;
+grant select, insert, update, delete on table public.users to rondo_app;
+grant select, insert, update, delete on table public.auth_tokens to rondo_app;
 
 create or replace function public.set_updated_at()
 returns trigger
@@ -101,8 +95,10 @@ begin
 end;
 $$;
 
-revoke all on function public.set_updated_at() from public, anon, authenticated;
+revoke all on function public.set_updated_at() from public;
+grant execute on function public.set_updated_at() to rondo_app;
+
 revoke all on function public.auth_sign_up(text, text, text, text, text, timestamptz)
-  from public, anon, authenticated;
+  from public;
 grant execute on function public.auth_sign_up(text, text, text, text, text, timestamptz)
-  to service_role;
+  to rondo_app;

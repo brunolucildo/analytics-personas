@@ -6,14 +6,15 @@ Plataforma para criar e operar _experts_: agentes de IA especializados em funç�
 
 ## Estrutura
 
-| Caminho                      | O que é                                            | Porta        |
-| ---------------------------- | -------------------------------------------------- | ------------ |
-| `apps/app`                   | Cliente de produto (React + Vite)                  | 5173         |
-| `apps/api`                   | API (Nest.js)                                      | 3002         |
-| `apps/docs`                  | Site de documentação (Next.js)                     | 3001         |
-| `packages/ui`                | Design system (`@repo/ui`: Tailwind + shadcn)      | —            |
-| `packages/typescript-config` | tsconfigs compartilhados                           | —            |
-| `supabase/`, `infra/`        | Supabase local e Grafana LGTM (Loki, Tempo, Mimir) | 54321 / 3000 |
+| Caminho                      | O que é                                             | Porta       |
+| ---------------------------- | --------------------------------------------------- | ----------- |
+| `apps/app`                   | Cliente de produto (React + Vite)                   | 5173        |
+| `apps/api`                   | API (Nest.js)                                       | 3002        |
+| `apps/docs`                  | Site de documentação (Next.js)                      | 3001        |
+| `packages/ui`                | Design system (`@repo/ui`: Tailwind + shadcn)       | —           |
+| `packages/typescript-config` | tsconfigs compartilhados                            | —           |
+| `db/`                        | Migrations SQL e roles do Postgres local            | 5432        |
+| `infra/`                     | Grafana LGTM (Loki, Tempo, Mimir) e OTel Collector  | 3000        |
 
 ## Começando
 
@@ -21,9 +22,9 @@ Requer Bun 1.4.4, Node.js >= 24 e Docker em execução (para a infra local).
 
 ```bash
 bun install
-cp .env.example .env     # preencha as chaves com `bunx supabase status -o env`
-bun run infra:up
-bun run db:migrate
+cp .env.example .env     # DATABASE_URL e DATABASE_MIGRATOR_URL já apontam para o Postgres local
+bun run infra:up         # Postgres + Grafana LGTM
+bun run db:migrate       # aplica db/migrations (idempotente)
 bun run dev
 ```
 
@@ -36,7 +37,9 @@ bun run dev
 | `bun run check-types`                            | `tsc --noEmit` em todos os workspaces   |
 | `bun run build`                                  | Build de produção                       |
 | `bun run test` / `test:integration` / `test:e2e` | Vitest, Supertest e Playwright          |
-| `bun run infra:up` / `infra:down`                | Supabase local + Grafana LGTM           |
+| `bun run infra:up` / `infra:down`                | Postgres local + Grafana LGTM           |
+| `bun run infra:reset`                            | Apaga o volume do Postgres e sobe de novo |
+| `bun run db:migrate`                             | Aplica as migrations de `db/migrations` |
 
 Na primeira execução do E2E, rode `bunx playwright install`. Gates, checklist e baseline completos estão em [`.docs/QA.md`](.docs/QA.md).
 

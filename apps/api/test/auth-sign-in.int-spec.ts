@@ -1,5 +1,4 @@
 import type { INestApplication } from "@nestjs/common";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { Test } from "@nestjs/testing";
 import argon2 from "argon2";
 import request from "supertest";
@@ -17,10 +16,10 @@ import { resetRateLimitStore } from "./support/rate-limit";
 import { sessionsOf } from "./support/sessions";
 import {
   assertMigrationsApplied,
-  createAdminClient,
   deleteUsersByEmail,
+  insertUser,
   uniqueEmail,
-} from "./support/supabase";
+} from "./support/database";
 
 const PATH = "/api/v1/auth/sign-in";
 const SESSION_PATH = "/api/v1/auth/session";
@@ -28,7 +27,6 @@ const PASSWORD = "correct horse battery";
 const HEADERS_THAT_MAY_DIFFER = new Set(["date", "x-request-id", "etag"]);
 
 describe("POST /api/v1/auth/sign-in", () => {
-  const admin: SupabaseClient = createAdminClient();
   const createdEmails: string[] = [];
   let app: INestApplication;
   let passwordHash: string;
@@ -39,28 +37,22 @@ describe("POST /api/v1/auth/sign-in", () => {
 
     createdEmails.push(email);
 
-    const { data, error } = await admin
-      .from("users")
-      .insert({
-        first_name: firstName,
-        last_name: "Silva",
-        email,
-        password_hash: passwordHash,
-        email_confirmed_at: confirmed ? new Date().toISOString() : null,
-      })
-      .select("id")
-      .single();
+    const { id } = await insertUser({
+      firstName,
+      lastName: "Silva",
+      email,
+      passwordHash,
+      emailConfirmedAt: confirmed ? new Date() : null,
+    });
 
-    expect(error).toBeNull();
-
-    return { email, userId: data?.id as string };
+    return { email, userId: id };
   }
 
   const signIn = (email: string, password = PASSWORD, server: INestApplication = app) =>
     request(server.getHttpServer()).post(PATH).send({ email, password });
 
   const activeSessions = async (userId: string) =>
-    (await sessionsOf(admin, userId)).filter((session) => session.revoked_at === null);
+    (await sessionsOf(userId)).filter((session) => session.revoked_at === null);
 
   const comparable = (response: request.Response) =>
     JSON.stringify(
@@ -70,7 +62,7 @@ describe("POST /api/v1/auth/sign-in", () => {
     );
 
   beforeAll(async () => {
-    await assertMigrationsApplied(admin);
+    await assertMigrationsApplied();
     passwordHash = await argon2.hash(PASSWORD, { type: argon2.argon2id });
 
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
@@ -82,7 +74,7 @@ describe("POST /api/v1/auth/sign-in", () => {
 
   afterAll(async () => {
     await app.close();
-    await deleteUsersByEmail(admin, createdEmails);
+    await deleteUsersByEmail(createdEmails);
   });
 
   beforeEach(() => {
@@ -161,7 +153,7 @@ describe("POST /api/v1/auth/sign-in", () => {
 
       expect(wrong.text).toBe(unknown.text);
       expect(comparable(wrong)).toBe(comparable(unknown));
-      expect(await sessionsOf(admin, userId)).toEqual([]);
+      expect(await sessionsOf(userId)).toEqual([]);
     });
 
     it("also verifies a hash for an unknown e-mail (comparable work, so comparable time)", async () => {
@@ -218,7 +210,7 @@ describe("POST /api/v1/auth/sign-in", () => {
 
       expect(response.status).toBe(403);
       expect(response.body.error.code).toBe("EMAIL_NOT_CONFIRMED");
-      expect(await sessionsOf(admin, userId)).toEqual([]);
+      expect(await sessionsOf(userId)).toEqual([]);
 
       await app.get(EmailService).drain();
       expect(getCapturedEmails({ to: email })).toEqual([]);
@@ -366,7 +358,7 @@ describe("POST /api/v1/auth/sign-in", () => {
       expect(blocked.status).toBe(429);
       expect(blocked.body.error.code).toBe("RATE_LIMITED");
       expect(Number(blocked.headers["retry-after"])).toBeGreaterThanOrEqual(1);
-      expect(await sessionsOf(admin, userId)).toEqual([]);
+      expect(await sessionsOf(userId)).toEqual([]);
     });
 
     it("counts each e-mail separately for the same IP", async () => {

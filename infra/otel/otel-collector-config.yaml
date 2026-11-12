@@ -9,17 +9,17 @@ receivers:
         endpoint: 0.0.0.0:4317
       http:
         endpoint: 0.0.0.0:4318
-  # Postgres server metrics (connections, transactions, locks, cache, size). Defaults point at the
-  # local Supabase database (`supabase/config.toml`: port 54322, user `postgres`) through the
-  # Docker host. For another database set POSTGRES_ENDPOINT, POSTGRES_USER and POSTGRES_PASSWORD
-  # (ideally a user with the `pg_monitor` role, never the superuser) in the environment.
+  # Postgres server metrics (connections, transactions, locks, cache, size). The Compose file
+  # passes POSTGRES_ENDPOINT, POSTGRES_USER and POSTGRES_PASSWORD, which `bun run infra:up` derives
+  # from DATABASE_URL (a local host becomes the `postgres` service). The user is `rondo_app`, which
+  # holds `pg_monitor` (statistics views only, no table data); never point this at a superuser.
   postgresql:
-    endpoint: ${env:POSTGRES_ENDPOINT:-host.docker.internal:54322}
+    endpoint: ${env:POSTGRES_ENDPOINT}
     transport: tcp
-    username: ${env:POSTGRES_USER:-postgres}
-    password: ${env:POSTGRES_PASSWORD:-postgres}
+    username: ${env:POSTGRES_USER}
+    password: ${env:POSTGRES_PASSWORD}
     databases:
-      - postgres
+      - rondo
     collection_interval: 15s
     tls:
       insecure: true

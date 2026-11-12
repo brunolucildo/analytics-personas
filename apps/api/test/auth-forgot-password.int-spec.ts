@@ -1,6 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { INestApplication } from "@nestjs/common";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { Test } from "@nestjs/testing";
 import request from "supertest";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -16,12 +15,13 @@ import { baseLogger } from "../src/observability/logger";
 import { resetRateLimitStore } from "./support/rate-limit";
 import {
   assertMigrationsApplied,
-  createAdminClient,
   deleteUsersByEmail,
-  restRequest,
-  signRoleToken,
+  listTokensOfUser,
+  query,
+  requestPasswordReset,
+  signUp,
   uniqueEmail,
-} from "./support/supabase";
+} from "./support/database";
 
 const PATH = "/api/v1/auth/forgot-password";
 const HOUR_MS = 60 * 60 * 1000;
@@ -36,7 +36,6 @@ function tokenHash(): string {
 }
 
 describe("POST /api/v1/auth/forgot-password", () => {
-  const admin: SupabaseClient = createAdminClient();
   const createdEmails: string[] = [];
   let app: INestApplication;
 
@@ -50,46 +49,37 @@ describe("POST /api/v1/auth/forgot-password", () => {
   /** Creates an account through the sign-up function; `confirmed` sets `email_confirmed_at`. */
   async function createAccount(label: string, confirmed: boolean, firstName = "Ana") {
     const email = newEmail(label);
-    const { data: userId, error } = await admin.rpc("auth_sign_up", {
-      p_first_name: firstName,
-      p_last_name: "Silva",
-      p_email: email,
-      p_password_hash: "$argon2id$v=19$m=65536,t=3,p=4$placeholder$placeholder",
-      p_token_hash: tokenHash(),
-      p_token_expires_at: new Date(Date.now() + 24 * HOUR_MS).toISOString(),
+    const userId = await signUp({
+      firstName,
+      lastName: "Silva",
+      email,
+      passwordHash: "$argon2id$v=19$m=65536,t=3,p=4$placeholder$placeholder",
+      tokenHash: tokenHash(),
+      tokenExpiresAt: new Date(Date.now() + 24 * HOUR_MS),
     });
 
-    expect(error).toBeNull();
+    expect(userId).not.toBeNull();
 
     if (confirmed) {
-      await admin
-        .from("users")
-        .update({ email_confirmed_at: new Date().toISOString() })
-        .eq("id", userId);
+      await query("update public.users set email_confirmed_at = $1 where id = $2", [
+        new Date(),
+        userId,
+      ]);
     }
 
     return { email, userId: userId as string };
   }
 
   async function resetTokens(userId: string) {
-    const { data } = await admin
-      .from("auth_tokens")
-      .select("*")
-      .eq("user_id", userId)
-      .eq("type", "password_reset")
-      .order("created_at", { ascending: true });
-
-    return data ?? [];
+    return listTokensOfUser(userId, "password_reset");
   }
 
   async function allTokens(userId: string) {
-    const { data } = await admin.from("auth_tokens").select("*").eq("user_id", userId);
-
-    return data ?? [];
+    return listTokensOfUser(userId);
   }
 
   beforeAll(async () => {
-    await assertMigrationsApplied(admin);
+    await assertMigrationsApplied();
 
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
 
@@ -100,7 +90,7 @@ describe("POST /api/v1/auth/forgot-password", () => {
 
   afterAll(async () => {
     await app.close();
-    await deleteUsersByEmail(admin, createdEmails);
+    await deleteUsersByEmail(createdEmails);
   });
 
   beforeEach(() => {
@@ -208,7 +198,7 @@ describe("POST /api/v1/auth/forgot-password", () => {
       expect(tokens).toHaveLength(1);
 
       const stored = tokens[0];
-      const expiresIn = new Date(stored?.expires_at).getTime() - before;
+      const expiresIn = (stored?.expires_at.getTime() ?? 0) - before;
 
       expect(stored?.token_hash).toBe(sha256(token as string));
       expect(JSON.stringify(stored)).not.toContain(token as string);
@@ -394,37 +384,20 @@ describe("POST /api/v1/auth/forgot-password", () => {
   });
 
   describe("auth_request_password_reset permissions", () => {
-    const params = (email: string) => ({
-      p_email: email,
-      p_token_hash: tokenHash(),
-      p_token_expires_at: new Date(Date.now() + HOUR_MS).toISOString(),
-    });
-
-    it.each(["anon", "authenticated"] as const)(
-      "cannot be called through PostgREST as the %s role",
-      async (role) => {
-        const { email, userId } = await createAccount(`rpc-${role}`, true);
-        const response = await restRequest("rpc/auth_request_password_reset", signRoleToken(role), {
-          method: "POST",
-          body: JSON.stringify(params(email)),
-        });
-
-        expect(response.status).toBeGreaterThanOrEqual(400);
-        expect(await resetTokens(userId)).toEqual([]);
-      },
-    );
+    const requestReset = (email: string) =>
+      requestPasswordReset(email, tokenHash(), new Date(Date.now() + HOUR_MS));
 
     it("returns the first name for a confirmed account and null otherwise", async () => {
       const confirmed = await createAccount("rpc-confirmed", true, "Carla");
       const unconfirmed = await createAccount("rpc-unconfirmed", false);
 
-      const done = await admin.rpc("auth_request_password_reset", params(confirmed.email));
-      const skipped = await admin.rpc("auth_request_password_reset", params(unconfirmed.email));
-      const unknown = await admin.rpc("auth_request_password_reset", params(newEmail("rpc-x")));
+      const done = await requestReset(confirmed.email);
+      const skipped = await requestReset(unconfirmed.email);
+      const unknown = await requestReset(newEmail("rpc-x"));
 
-      expect(done.data).toBe("Carla");
-      expect(skipped.data).toBeNull();
-      expect(unknown.data).toBeNull();
+      expect(done).toBe("Carla");
+      expect(skipped).toBeNull();
+      expect(unknown).toBeNull();
       expect(await resetTokens(unconfirmed.userId)).toEqual([]);
     });
   });

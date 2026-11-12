@@ -1,6 +1,6 @@
-process.env.SUPABASE_URL ??= "http://127.0.0.1:54321";
-process.env.SUPABASE_ANON_KEY ??= "test-anon-key";
-process.env.SUPABASE_SERVICE_ROLE_KEY ??= "test-service-role-key";
+import { LOCAL_DATABASE_URL } from "./support/local-database-url";
+
+process.env.DATABASE_URL ??= LOCAL_DATABASE_URL;
 process.env.APP_URL ??= "http://localhost:5173";
 process.env.EMAIL_PROVIDER ??= "capture";
 process.env.EMAIL_FROM ??= "Rondo <no-reply@rondo.local>";

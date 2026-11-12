@@ -31,11 +31,11 @@ Execute a spec `.specs/<NNNN>-<slug>.md` com a skill `implement-me` (carregue-a 
 - **Não edite** o mapa do épico (`.plans/*-breakdown.md`) nem índices de ADR: o orquestador cuida. Atualize só o status da SUA spec e do SEU plano.
 - **ADR:** se precisar de um, crie `.adrs/XXXX-<NNNN>-<titulo>.md` (o prefixo `XXXX` é provisório; o orquestador renumera). Use o template de `.docs/RULES.md`.
 - **Dependências novas:** só com justificativa no relatório; o `bun.lock` do seu commit é o que sair de `bun install`.
-- **Gates:** `bun run lint`, `bun run check-types`, `bun run build` no seu worktree, livremente. Qualquer coisa que use Supabase/banco, suba API ou SPA em porta fixa, ou rode `test:integration` / `test:e2e` / migrations só sob o LOCK DE INFRA:
+- **Gates:** `bun run lint`, `bun run check-types`, `bun run build` no seu worktree, livremente. Qualquer coisa que use o Postgres local (`db:migrate`, testes que semeiam por SQL), suba API ou SPA em porta fixa, ou rode `test:integration` / `test:e2e` / migrations só sob o LOCK DE INFRA:
   - adquirir: `mkdir "<RUN_DIR>/infra.lock"` (falha se já existir). Se falhar, espere 30 s e tente de novo, por até 20 min; depois disso, status `blocked`.
   - ao adquirir, grave `<RUN_DIR>/infra.lock/owner` com `<NNNN> <data-hora>`.
   - libere SEMPRE ao terminar, inclusive em erro: `rmdir` do diretório (apague `owner` antes).
-  - Docker/Supabase fora do ar: não suba por conta própria; status `blocked` com o comando necessário.
+  - Docker/Postgres fora do ar: não suba por conta própria; status `blocked` com o comando necessário.
 - **Commit e push:** último passo, com a skill `commit-and-push` (contexto: `<NNNN>-<slug>`), na SUA branch. Só depois de os gates obrigatórios passarem. Gate pré-existente fora do escopo (baseline em `.docs/QA.md`) não bloqueia, mas precisa de evidência. Se o commit ou o push parar, registre o motivo; não contorne.
 - **Honestidade:** nunca declare comando que não executou nem teste que não rodou. Cole a saída real (resumida) no relatório.
 

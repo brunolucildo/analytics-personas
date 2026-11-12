@@ -26,7 +26,7 @@ const LAYERS = ["domain", "application", "infrastructure", "interface"];
 
 const FRAMEWORK_PACKAGES = [
   "@nestjs/",
-  "@supabase/",
+  "pg",
   "@opentelemetry/",
   "argon2",
   "class-transformer",

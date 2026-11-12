@@ -16,7 +16,7 @@ export interface FakeConfirmationToken extends ConfirmationToken {
   used: boolean;
 }
 
-/** In-memory `ConfirmationRepository` for unit tests: same contract as the Supabase one. */
+/** In-memory `ConfirmationRepository` for unit tests: same contract as the Postgres one. */
 export class InMemoryConfirmationRepository implements ConfirmationRepository {
   readonly tokens: FakeConfirmationToken[] = [];
 

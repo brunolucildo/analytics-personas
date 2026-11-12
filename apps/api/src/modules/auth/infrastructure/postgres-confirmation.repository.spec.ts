@@ -1,38 +1,46 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { QueryResult, QueryResultRow } from "pg";
 import { describe, expect, it, vi } from "vitest";
+import type { DatabaseClient } from "../../../observability/db-telemetry";
 import { DataAccessError } from "./data-access-error";
-import { SupabaseConfirmationRepository } from "./supabase-confirmation.repository";
+import { PostgresConfirmationRepository } from "./postgres-confirmation.repository";
 
 const TOKEN = { tokenHash: "abc123", expiresAt: new Date("2026-11-10T12:00:00.000Z") };
 
-function repositoryWith(response: {
-  data: unknown;
-  error: { code?: string; message: string } | null;
-}) {
-  const rpc = vi.fn().mockResolvedValue(response);
-  const repository = new SupabaseConfirmationRepository({ rpc } as unknown as SupabaseClient);
+function repositoryWith(response: { rows: unknown[] } | { error: unknown }) {
+  const query = vi.fn();
 
-  return { repository, rpc };
+  if ("error" in response) {
+    query.mockRejectedValue(response.error);
+  } else {
+    query.mockResolvedValue({ rows: response.rows } as QueryResult<QueryResultRow>);
+  }
+
+  const database = { query, end: vi.fn() } as unknown as DatabaseClient;
+
+  return { repository: new PostgresConfirmationRepository(database), query };
 }
 
-describe("SupabaseConfirmationRepository.confirmByTokenHash", () => {
+describe("PostgresConfirmationRepository.confirmByTokenHash", () => {
   it("calls auth_confirm_account with the token hash and returns the user id", async () => {
-    const { repository, rpc } = repositoryWith({ data: "user-1", error: null });
+    const { repository, query } = repositoryWith({ rows: [{ user_id: "user-1" }] });
 
     await expect(repository.confirmByTokenHash("abc123")).resolves.toBe("user-1");
-    expect(rpc).toHaveBeenCalledWith("auth_confirm_account", { p_token_hash: "abc123" });
+    expect(query).toHaveBeenCalledWith(
+      { operation: "rpc", procedure: "auth_confirm_account" },
+      "select public.auth_confirm_account($1) as user_id",
+      ["abc123"],
+    );
   });
 
   it("resolves null when the function found no usable token", async () => {
-    const { repository } = repositoryWith({ data: null, error: null });
+    const { repository } = repositoryWith({ rows: [{ user_id: null }] });
 
     await expect(repository.confirmByTokenHash("abc123")).resolves.toBeNull();
   });
 
   it("throws a DataAccessError that keeps the code but not the database message", async () => {
     const { repository } = repositoryWith({
-      data: null,
-      error: { code: "XX000", message: "failure for abc123" },
+      error: Object.assign(new Error("failure for abc123"), { code: "XX000" }),
     });
 
     const failure = await repository.confirmByTokenHash("abc123").catch((error: unknown) => error);
@@ -43,7 +51,7 @@ describe("SupabaseConfirmationRepository.confirmByTokenHash", () => {
   });
 
   it("rejects a result that is neither null nor an id", async () => {
-    const { repository } = repositoryWith({ data: { oops: true }, error: null });
+    const { repository } = repositoryWith({ rows: [{ user_id: { oops: true } }] });
 
     await expect(repository.confirmByTokenHash("abc123")).rejects.toMatchObject({
       code: "UNEXPECTED_RESULT",
@@ -51,22 +59,22 @@ describe("SupabaseConfirmationRepository.confirmByTokenHash", () => {
   });
 });
 
-describe("SupabaseConfirmationRepository.renewForUnconfirmedUser", () => {
+describe("PostgresConfirmationRepository.renewForUnconfirmedUser", () => {
   it("calls auth_resend_confirmation with the e-mail, the token hash and the ISO expiry", async () => {
-    const { repository, rpc } = repositoryWith({ data: "Ana", error: null });
+    const { repository, query } = repositoryWith({ rows: [{ first_name: "Ana" }] });
 
     const result = await repository.renewForUnconfirmedUser("ana@example.test", TOKEN);
 
     expect(result).toEqual({ status: "created", firstName: "Ana" });
-    expect(rpc).toHaveBeenCalledWith("auth_resend_confirmation", {
-      p_email: "ana@example.test",
-      p_token_hash: "abc123",
-      p_token_expires_at: "2026-11-10T12:00:00.000Z",
-    });
+    expect(query).toHaveBeenCalledWith(
+      { operation: "rpc", procedure: "auth_resend_confirmation" },
+      "select public.auth_resend_confirmation($1, $2, $3) as first_name",
+      ["ana@example.test", "abc123", "2026-11-10T12:00:00.000Z"],
+    );
   });
 
   it("maps a null result to no_action", async () => {
-    const { repository } = repositoryWith({ data: null, error: null });
+    const { repository } = repositoryWith({ rows: [{ first_name: null }] });
 
     await expect(repository.renewForUnconfirmedUser("ana@example.test", TOKEN)).resolves.toEqual({
       status: "no_action",
@@ -75,8 +83,7 @@ describe("SupabaseConfirmationRepository.renewForUnconfirmedUser", () => {
 
   it("throws a DataAccessError without the e-mail", async () => {
     const { repository } = repositoryWith({
-      data: null,
-      error: { code: "XX000", message: "failure for ana@example.test" },
+      error: Object.assign(new Error("failure for ana@example.test"), { code: "XX000" }),
     });
 
     const failure = await repository
@@ -89,7 +96,7 @@ describe("SupabaseConfirmationRepository.renewForUnconfirmedUser", () => {
   });
 
   it("rejects a result that is neither null nor a name", async () => {
-    const { repository } = repositoryWith({ data: 42, error: null });
+    const { repository } = repositoryWith({ rows: [{ first_name: 42 }] });
 
     await expect(
       repository.renewForUnconfirmedUser("ana@example.test", TOKEN),

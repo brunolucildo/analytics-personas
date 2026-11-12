@@ -9,9 +9,7 @@ import { EmailModule, EmailService, html, renderEmailLayout } from "../src/modul
 import { clearCapturedEmails, getCapturedEmails } from "../src/modules/email/testing";
 
 const baseEnv = {
-  SUPABASE_URL: "http://127.0.0.1:54321",
-  SUPABASE_ANON_KEY: "test-anon-key",
-  SUPABASE_SERVICE_ROLE_KEY: "test-service-role-key",
+  DATABASE_URL: "postgres://rondo_app:rondo@localhost:5432/rondo",
   APP_URL: "http://localhost:5173",
   AUTH_JWT_SECRET: "test-only-jwt-secret-0123456789-abcdefghij",
 };

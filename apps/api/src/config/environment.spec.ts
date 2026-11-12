@@ -2,9 +2,7 @@ import { describe, expect, it } from "vitest";
 import { validateEnvironment } from "./environment";
 
 const validEnv = {
-  SUPABASE_URL: "http://127.0.0.1:54321",
-  SUPABASE_ANON_KEY: "anon",
-  SUPABASE_SERVICE_ROLE_KEY: "service",
+  DATABASE_URL: "postgres://rondo_app:rondo@localhost:5432/rondo",
   APP_URL: "http://localhost:5173",
   EMAIL_PROVIDER: "capture",
   EMAIL_FROM: "Rondo <no-reply@rondo.local>",
@@ -92,8 +90,37 @@ describe("validateEnvironment", () => {
     );
   });
 
-  it("still requires the Supabase variables", () => {
-    expect(() => validateEnvironment({ APP_URL: validEnv.APP_URL })).toThrowError(/SUPABASE_URL/);
+  it("exposes the database URL without changing it", () => {
+    expect(validateEnvironment(validEnv).databaseUrl).toBe(validEnv.DATABASE_URL);
+  });
+
+  it("fails naming DATABASE_URL when it is missing", () => {
+    const { DATABASE_URL: _removed, ...withoutDatabase } = validEnv;
+
+    expect(() => validateEnvironment(withoutDatabase)).toThrowError(/DATABASE_URL/);
+  });
+
+  it.each([
+    "not-a-url",
+    "http://localhost:5432/rondo",
+    "mysql://rondo@localhost:3306/rondo",
+    "postgres://rondo_app:secret@localhost:5432",
+    "postgres:///rondo",
+  ])("fails naming DATABASE_URL when it is %s", (value) => {
+    expect(() => validateEnvironment({ ...validEnv, DATABASE_URL: value })).toThrowError(
+      /DATABASE_URL/,
+    );
+  });
+
+  it("never echoes the DATABASE_URL value when it is invalid", () => {
+    const secret = "super-secret-password-sentinel";
+
+    expect(() =>
+      validateEnvironment({ ...validEnv, DATABASE_URL: `mysql://user:${secret}@localhost/rondo` }),
+    ).toThrowError(/DATABASE_URL/);
+    expect(() =>
+      validateEnvironment({ ...validEnv, DATABASE_URL: `mysql://user:${secret}@localhost/rondo` }),
+    ).not.toThrowError(new RegExp(secret));
   });
 
   it("defaults TRUST_PROXY to false", () => {

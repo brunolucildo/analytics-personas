@@ -1,6 +1,5 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import type { INestApplication } from "@nestjs/common";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { Test } from "@nestjs/testing";
 import request from "supertest";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -17,12 +16,17 @@ import { resetRateLimitStore } from "./support/rate-limit";
 import { sessionsOf } from "./support/sessions";
 import {
   assertMigrationsApplied,
-  createAdminClient,
+  confirmAccount,
   deleteUsersByEmail,
-  restRequest,
-  signRoleToken,
+  findUserById,
+  insertToken,
+  listTokensOfUser,
+  query,
+  resendConfirmation,
+  signUp,
   uniqueEmail,
-} from "./support/supabase";
+  type TokenRow,
+} from "./support/database";
 
 const CONFIRM_PATH = "/api/v1/auth/confirm-account";
 const RESEND_PATH = "/api/v1/auth/resend-confirmation";
@@ -44,7 +48,6 @@ function newToken(): string {
 const bearer = (token: string) => ({ authorization: `Bearer ${token}` });
 
 describe("confirm account and resend confirmation", () => {
-  const admin: SupabaseClient = createAdminClient();
   const createdEmails: string[] = [];
   let app: INestApplication;
 
@@ -59,16 +62,16 @@ describe("confirm account and resend confirmation", () => {
   async function createAccount(label: string, firstName = "Ana") {
     const email = newEmail(label);
     const token = newToken();
-    const { data: userId, error } = await admin.rpc("auth_sign_up", {
-      p_first_name: firstName,
-      p_last_name: "Silva",
-      p_email: email,
-      p_password_hash: "$argon2id$v=19$m=65536,t=3,p=4$placeholder$placeholder",
-      p_token_hash: sha256(token),
-      p_token_expires_at: new Date(Date.now() + 24 * HOUR_MS).toISOString(),
+    const userId = await signUp({
+      firstName,
+      lastName: "Silva",
+      email,
+      passwordHash: "$argon2id$v=19$m=65536,t=3,p=4$placeholder$placeholder",
+      tokenHash: sha256(token),
+      tokenExpiresAt: new Date(Date.now() + 24 * HOUR_MS),
     });
 
-    expect(error).toBeNull();
+    expect(userId).not.toBeNull();
 
     return { email, token, userId: userId as string };
   }
@@ -78,55 +81,46 @@ describe("confirm account and resend confirmation", () => {
     userId: string,
     type: "email_confirmation" | "password_reset",
     expiresInMs = 24 * HOUR_MS,
-    usedAt: string | null = null,
+    usedAt: Date | null = null,
   ) {
     const token = newToken();
-    const { error } = await admin.from("auth_tokens").insert({
-      user_id: userId,
-      type,
-      token_hash: sha256(token),
-      expires_at: new Date(Date.now() + expiresInMs).toISOString(),
-      used_at: usedAt,
-    });
 
-    expect(error).toBeNull();
+    await insertToken({
+      userId,
+      type,
+      tokenHash: sha256(token),
+      expiresAt: new Date(Date.now() + expiresInMs),
+      usedAt,
+    });
 
     return token;
   }
 
   async function userRow(userId: string) {
-    const { data } = await admin.from("users").select("*").eq("id", userId).single();
+    const user = await findUserById(userId);
 
-    return data as { email_confirmed_at: string | null; updated_at: string };
+    return { email_confirmed_at: user?.email_confirmed_at ?? null, updated_at: user?.updated_at };
   }
 
-  async function confirmationTokens(userId: string) {
-    const { data } = await admin
-      .from("auth_tokens")
-      .select("*")
-      .eq("user_id", userId)
-      .eq("type", "email_confirmation")
-      .order("created_at", { ascending: true });
-
-    return data ?? [];
+  async function confirmationTokens(userId: string): Promise<TokenRow[]> {
+    return listTokensOfUser(userId, "email_confirmation");
   }
 
   async function snapshot(userId: string) {
-    const { data: tokens } = await admin
-      .from("auth_tokens")
-      .select("*")
-      .eq("user_id", userId)
-      .order("token_hash");
+    const tokens = await query(
+      "select * from public.auth_tokens where user_id = $1 order by token_hash",
+      [userId],
+    );
 
     return JSON.stringify({
       user: await userRow(userId),
-      tokens,
-      sessions: await sessionsOf(admin, userId),
+      tokens: tokens.rows,
+      sessions: await sessionsOf(userId),
     });
   }
 
   beforeAll(async () => {
-    await assertMigrationsApplied(admin);
+    await assertMigrationsApplied();
 
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
 
@@ -137,7 +131,7 @@ describe("confirm account and resend confirmation", () => {
 
   afterAll(async () => {
     await app.close();
-    await deleteUsersByEmail(admin, createdEmails);
+    await deleteUsersByEmail(createdEmails);
   });
 
   beforeEach(() => {
@@ -173,7 +167,7 @@ describe("confirm account and resend confirmation", () => {
 
       expect(stored?.used_at).not.toBeNull();
 
-      const sessions = await sessionsOf(admin, userId);
+      const sessions = await sessionsOf(userId);
 
       expect(sessions).toHaveLength(1);
       expect(sessions[0]?.revoked_at).toBeNull();
@@ -250,7 +244,7 @@ describe("confirm account and resend confirmation", () => {
       expect(again.status).toBe(400);
       expect(again.body).toMatchObject(INVALID_BODY);
       expect(await snapshot(userId)).toBe(before);
-      expect(await sessionsOf(admin, userId)).toHaveLength(1);
+      expect(await sessionsOf(userId)).toHaveLength(1);
     });
 
     it("refuses a token of another type (password_reset) and changes nothing", async () => {
@@ -324,7 +318,7 @@ describe("confirm account and resend confirmation", () => {
       const rejected = responses.find((response) => response.status === 400);
 
       expect(rejected?.body.error.code).toBe("TOKEN_INVALID_OR_EXPIRED");
-      expect(await sessionsOf(admin, userId)).toHaveLength(1);
+      expect(await sessionsOf(userId)).toHaveLength(1);
     });
 
     it("lets one of many simultaneous requests win", async () => {
@@ -351,7 +345,7 @@ describe("confirm account and resend confirmation", () => {
       expect((await http.get(SESSION_PATH).set(bearer(a.body.accessToken))).status).toBe(401);
       expect((await http.get(SESSION_PATH).set(bearer(b.body.accessToken))).status).toBe(200);
 
-      const sessions = await sessionsOf(admin, userId);
+      const sessions = await sessionsOf(userId);
 
       expect(sessions.filter((session) => session.revoked_at === null)).toHaveLength(1);
     });
@@ -433,7 +427,7 @@ describe("confirm account and resend confirmation", () => {
       expect(tokens[1]?.token_hash).toBe(sha256(newLinkToken as string));
       expect(JSON.stringify(tokens[1])).not.toContain(newLinkToken as string);
 
-      const expiresIn = new Date(tokens[1]?.expires_at).getTime() - Date.now();
+      const expiresIn = (tokens[1]?.expires_at.getTime() ?? 0) - Date.now();
 
       expect(expiresIn).toBeGreaterThan(24 * HOUR_MS - 60_000);
       expect(expiresIn).toBeLessThan(24 * HOUR_MS + 60_000);
@@ -464,13 +458,9 @@ describe("confirm account and resend confirmation", () => {
       await addToken(userId, "password_reset");
       await request(app.getHttpServer()).post(RESEND_PATH).send({ email });
 
-      const { data } = await admin
-        .from("auth_tokens")
-        .select("used_at")
-        .eq("user_id", userId)
-        .eq("type", "password_reset");
+      const resetTokens = await listTokensOfUser(userId, "password_reset");
 
-      expect(data).toEqual([{ used_at: null }]);
+      expect(resetTokens.map((token) => token.used_at)).toEqual([null]);
     });
 
     it("never leaves two valid links when requests are simultaneous", async () => {
@@ -587,80 +577,37 @@ describe("confirm account and resend confirmation", () => {
     });
   });
 
-  describe("function permissions", () => {
-    it.each(["anon", "authenticated"] as const)(
-      "cannot call auth_confirm_account through PostgREST as the %s role",
-      async (role) => {
-        const { token, userId } = await createAccount(`rpc-confirm-${role}`);
-        const response = await restRequest("rpc/auth_confirm_account", signRoleToken(role), {
-          method: "POST",
-          body: JSON.stringify({ p_token_hash: sha256(token) }),
-        });
-
-        expect(response.status).toBeGreaterThanOrEqual(400);
-        expect((await userRow(userId)).email_confirmed_at).toBeNull();
-      },
-    );
-
-    it.each(["anon", "authenticated"] as const)(
-      "cannot call auth_resend_confirmation through PostgREST as the %s role",
-      async (role) => {
-        const { email, userId } = await createAccount(`rpc-resend-${role}`);
-        const response = await restRequest("rpc/auth_resend_confirmation", signRoleToken(role), {
-          method: "POST",
-          body: JSON.stringify({
-            p_email: email,
-            p_token_hash: sha256(newToken()),
-            p_token_expires_at: new Date(Date.now() + HOUR_MS).toISOString(),
-          }),
-        });
-
-        expect(response.status).toBeGreaterThanOrEqual(400);
-        expect(await confirmationTokens(userId)).toHaveLength(1);
-      },
-    );
-
+  describe("the auth functions", () => {
     it("returns the user id for a valid token and null otherwise; never overwrites a confirmation date", async () => {
       const { token, userId } = await createAccount("rpc-confirm");
 
-      const done = await admin.rpc("auth_confirm_account", { p_token_hash: sha256(token) });
-      const again = await admin.rpc("auth_confirm_account", { p_token_hash: sha256(token) });
-      const unknown = await admin.rpc("auth_confirm_account", { p_token_hash: sha256("nope") });
+      const done = await confirmAccount(sha256(token));
+      const again = await confirmAccount(sha256(token));
+      const unknown = await confirmAccount(sha256("nope"));
 
-      expect(done.data).toBe(userId);
-      expect(again.data).toBeNull();
-      expect(unknown.data).toBeNull();
+      expect(done).toBe(userId);
+      expect(again).toBeNull();
+      expect(unknown).toBeNull();
 
       const confirmedAt = (await userRow(userId)).email_confirmed_at;
       const other = await addToken(userId, "email_confirmation");
 
-      expect((await admin.rpc("auth_confirm_account", { p_token_hash: sha256(other) })).data).toBe(
-        userId,
-      );
-      expect((await userRow(userId)).email_confirmed_at).toBe(confirmedAt);
+      expect(await confirmAccount(sha256(other))).toBe(userId);
+      expect((await userRow(userId)).email_confirmed_at).toEqual(confirmedAt);
     });
 
     it("returns the first name for an unconfirmed account and null otherwise", async () => {
       const unconfirmed = await createAccount("rpc-resend", "Dora");
       const confirmed = await createAccount("rpc-resend-confirmed");
 
-      await admin.rpc("auth_confirm_account", { p_token_hash: sha256(confirmed.token) });
+      await confirmAccount(sha256(confirmed.token));
 
-      const params = (email: string) => ({
-        p_email: email,
-        p_token_hash: sha256(randomUUID()),
-        p_token_expires_at: new Date(Date.now() + HOUR_MS).toISOString(),
-      });
+      const resend = (email: string) =>
+        resendConfirmation(email, sha256(randomUUID()), new Date(Date.now() + HOUR_MS));
 
-      expect((await admin.rpc("auth_resend_confirmation", params(unconfirmed.email))).data).toBe(
-        "Dora",
-      );
-      expect(
-        (await admin.rpc("auth_resend_confirmation", params(confirmed.email))).data,
-      ).toBeNull();
-      expect(
-        (await admin.rpc("auth_resend_confirmation", params(newEmail("rpc-x")))).data,
-      ).toBeNull();
+      expect(await resend(unconfirmed.email)).toBe("Dora");
+      expect(await resend(confirmed.email)).toBeNull();
+      expect(await resend(newEmail("rpc-x"))).toBeNull();
       expect(await confirmationTokens(confirmed.userId)).toHaveLength(1);
     });
   });

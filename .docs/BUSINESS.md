@@ -101,7 +101,7 @@ O fluxo acima é o alvo. Nenhuma etapa está implementada no repositório atual.
 Estas decisões afetam diretamente o modelo de dados e a arquitetura. Não as assuma sem validação:
 
 1. **Multi-tenant:** o isolamento é por clube, por usuário ou por workspace? RLS é obrigatória?
-2. **Autenticação:** Supabase Auth é suficiente ou haverá provedor próprio? Se houver, o `bcrypt` citado no stack original pode ser redundante.
+2. **Autenticação:** decidida: identidade própria na API (ADR `0007`), com Argon2id no lugar do `bcrypt` do stack original e sessão por JWT com `sid` no banco (ADR `0009`). Fica em aberto só um provedor externo (SSO) para clubes que o exijam.
 3. **LLM:** provedor único, multi-provedor ou chave trazida pelo cliente (BYOK)?
 4. **Ingestão:** sincronização contínua, agendada ou sob demanda? Quem paga o custo de indexação?
 5. **Permissões:** um expert pode acessar qualquer fonte do clube ou apenas as explicitamente vinculadas?

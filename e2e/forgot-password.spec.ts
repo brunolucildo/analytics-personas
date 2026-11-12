@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+import { query } from "./support/database";
 import { E2E_EMAIL_PREFIX } from "./support/global-teardown";
 
 const APP_URL = process.env.E2E_APP_URL ?? "http://localhost:5173";
@@ -40,21 +41,10 @@ async function createAccount(request: APIRequestContext, email: string, confirme
   expect(created.status()).toBe(201);
 
   if (confirmed) {
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY as string;
-    const confirmedAt = await fetch(
-      `${process.env.SUPABASE_URL}/rest/v1/users?email=eq.${encodeURIComponent(email)}`,
-      {
-        method: "PATCH",
-        headers: {
-          apikey: serviceRoleKey,
-          authorization: `Bearer ${serviceRoleKey}`,
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({ email_confirmed_at: new Date().toISOString() }),
-      },
-    );
-
-    expect(confirmedAt.ok).toBe(true);
+    await query("update public.users set email_confirmed_at = $1 where email = $2", [
+      new Date(),
+      email,
+    ]);
   }
 }
 

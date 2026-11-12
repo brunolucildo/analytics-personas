@@ -1,7 +1,7 @@
 -- 0009-auth-forgot-password: atomic "request a password reset" function.
 --
--- Same security model as 0004: called only by the API (service role) through RPC;
--- `execute` is revoked from public, anon and authenticated.
+-- Same security model as 0004: called by the API with `rondo_app`; `execute` is
+-- revoked from public and granted to `rondo_app` only.
 --
 -- Rollback (run manually):
 --   drop function if exists public.auth_request_password_reset(text, text, timestamptz);
@@ -50,6 +50,6 @@ end;
 $$;
 
 revoke all on function public.auth_request_password_reset(text, text, timestamptz)
-  from public, anon, authenticated;
+  from public;
 grant execute on function public.auth_request_password_reset(text, text, timestamptz)
-  to service_role;
+  to rondo_app;

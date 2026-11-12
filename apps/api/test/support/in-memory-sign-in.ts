@@ -10,7 +10,7 @@ export interface StoredAccount extends StoredCredentials {
   email: string;
 }
 
-/** In-memory `CredentialsRepository` for unit tests: same contract as the Supabase one. */
+/** In-memory `CredentialsRepository` for unit tests: same contract as the Postgres one. */
 export class InMemoryCredentialsRepository implements CredentialsRepository {
   constructor(private readonly accounts: StoredAccount[]) {}
 

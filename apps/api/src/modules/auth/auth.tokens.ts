@@ -1,4 +1,4 @@
-export const SUPABASE_ADMIN_CLIENT = Symbol("SUPABASE_ADMIN_CLIENT");
+export const PG_POOL = Symbol("PG_POOL");
 export const USER_REPOSITORY = Symbol("USER_REPOSITORY");
 export const PASSWORD_HASHER = Symbol("PASSWORD_HASHER");
 export const HASH_LIMITER = Symbol("HASH_LIMITER");

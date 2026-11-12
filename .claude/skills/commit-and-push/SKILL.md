@@ -54,11 +54,11 @@ Verifique a lista de arquivos modificados e novos (`git status --short`):
 | Verificar                                                                                                              | Se encontrar                                                |
 | ---------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
 | `.env`, `.env.*` (exceto `.env.example`), `*.pem`, `*.key`, `*.p12`, `id_rsa*`, `credentials*`                          | **Pare**, liste e pergunte. Não adicione.                   |
-| Conteúdo com chave ou token real (`BEGIN PRIVATE KEY`, `SERVICE_ROLE_KEY=` com valor, tokens `sk-`, `ghp_`, JWT longos) | **Pare**, mostre o arquivo e a linha (sem repetir o valor). |
-| Artefatos gerados fora do `.gitignore` (`node_modules`, `dist`, `.next`, `.turbo`, `coverage`, `test-results`, `supabase/.temp`) | **Pare** e proponha ajustar o `.gitignore`.                 |
+| Conteúdo com chave ou token real (`BEGIN PRIVATE KEY`, `DATABASE_URL=` com senha que não seja a de desenvolvimento, tokens `sk-`, `ghp_`, JWT longos) | **Pare**, mostre o arquivo e a linha (sem repetir o valor). |
+| Artefatos gerados fora do `.gitignore` (`node_modules`, `dist`, `.next`, `.turbo`, `coverage`, `test-results`) | **Pare** e proponha ajustar o `.gitignore`.                 |
 | Arquivo com mais de 5 MB                                                                                               | **Pare** e pergunte.                                        |
 
-Chaves demo públicas do Supabase local e placeholders do `.env.example` não são segredo. Em caso de dúvida, pare e pergunte.
+As credenciais de desenvolvimento `rondo`/`rondo` do Postgres local e os placeholders do `.env.example` não são segredo; uma `DATABASE_URL` de banco hospedado é. Em caso de dúvida, pare e pergunte.
 
 ## 4. Escrever a mensagem (Conventional Commits 1.0.0)
 
@@ -84,7 +84,7 @@ Todos os footers (`Refs`, `BREAKING-CHANGE`, `Co-Authored-By`) ficam em **um ún
 | `perf`     | Ganho de desempenho                                           |
 | `docs`     | Só documentação (`.docs/`, README, ADR, spec, plano)          |
 | `test`     | Só testes                                                     |
-| `build`    | Dependências, bundler, `package.json`, Docker, Supabase, `turbo.json` |
+| `build`    | Dependências, bundler, `package.json`, Docker, Postgres (`db/`), `turbo.json` |
 | `ci`       | Pipelines e hooks de CI                                       |
 | `style`    | Formatação sem efeito no código                               |
 | `chore`    | Manutenção que não cabe nos demais (ex.: skills, configs)     |
@@ -92,7 +92,7 @@ Todos os footers (`Refs`, `BREAKING-CHANGE`, `Co-Authored-By`) ficam em **um ún
 
 Escolha pelo conteúdo do diff, não pelo nome da tarefa. Uma spec que entrega funcionalidade costuma ser `feat`; uma que só mexe em ferramentas costuma ser `build` ou `chore`.
 
-**Scope** (opcional, minúsculo, uma área): `app`, `api`, `docs`, `ui`, `infra`, `supabase`, `scripts`, `e2e`, `deps`, `specs`, `adrs`, `skills`, `config`. Com várias áreas igualmente relevantes, omita o scope.
+**Scope** (opcional, minúsculo, uma área): `app`, `api`, `docs`, `ui`, `infra`, `db`, `scripts`, `e2e`, `deps`, `specs`, `adrs`, `skills`, `config`. Com várias áreas igualmente relevantes, omita o scope.
 
 **Regras:**
 

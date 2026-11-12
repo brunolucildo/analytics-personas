@@ -17,7 +17,7 @@ export interface FakeAccount {
   passwordHash?: string;
 }
 
-/** In-memory `PasswordResetRepository` for unit tests: same contract as the Supabase one. */
+/** In-memory `PasswordResetRepository` for unit tests: same contract as the Postgres one. */
 export class InMemoryPasswordResetRepository implements PasswordResetRepository {
   readonly tokens: Array<PasswordResetToken & { email: string; used: boolean }> = [];
 

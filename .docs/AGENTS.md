@@ -6,9 +6,9 @@
 
 ## 1. O que é o projeto
 
-**Rondo** (antes "Analytics Personas") é uma plataforma para criar, configurar e operar _experts_: agentes de IA especializados em funções de um clube de futebol (Head Coach, Analista de Desempenho, Jurídico Esportivo, Fisiologista etc.). Os experts consomem dados de conectores externos (Notion, Google Drive, PDF, Markdown, Confluence, Jira, Linear, ClickUp, Google Docs, Google Sheets) para produzir análises sob demanda. O nome do produto é **Rondo**; o único identificador técnico que ainda usa `analytics-personas` é o repositório remoto no GitHub, até ele ser renomeado; pacotes, containers do Docker, `project_id` do Supabase, telemetria e e-mails já usam Rondo.
+**Rondo** (antes "Analytics Personas") é uma plataforma para criar, configurar e operar _experts_: agentes de IA especializados em funções de um clube de futebol (Head Coach, Analista de Desempenho, Jurídico Esportivo, Fisiologista etc.). Os experts consomem dados de conectores externos (Notion, Google Drive, PDF, Markdown, Confluence, Jira, Linear, ClickUp, Google Docs, Google Sheets) para produzir análises sob demanda. O nome do produto é **Rondo**; o único identificador técnico que ainda usa `analytics-personas` é o repositório remoto no GitHub, até ele ser renomeado; pacotes, containers do Docker, telemetria e e-mails já usam Rondo.
 
-**Estado atual:** fundação técnica pronta (spec `0000-foundation`). O monorepo Turborepo tem um cliente React + Vite (`apps/app`), uma API Nest.js (`apps/api`), o site de docs em Next.js (`apps/docs`) e o design system (`packages/ui`), com Supabase local, observabilidade Grafana LGTM e testes unitário, de integração e E2E. O espaço de URLs (`/api/v1/*`, `/auth/*`, `/app/*`) e o idioma en-US estão definidos em `DEVELOPMENT.md` §13 (spec `0001`). **Ainda não existem** features de produto, autenticação completa (há cadastro, confirmação de conta, sign-in, sessão, sign-out e o pedido de redefinição de senha; redefinição de senha com troca da senha), ingestão de conectores, agentes nem CI. Não trate a arquitetura-alvo como se já estivesse implementada.
+**Estado atual:** fundação técnica pronta (spec `0000-foundation`). O monorepo Turborepo tem um cliente React + Vite (`apps/app`), uma API Nest.js (`apps/api`), o site de docs em Next.js (`apps/docs`) e o design system (`packages/ui`), com Postgres local (Docker, acesso por `pg`), observabilidade Grafana LGTM e testes unitário, de integração e E2E. O espaço de URLs (`/api/v1/*`, `/auth/*`, `/app/*`) e o idioma en-US estão definidos em `DEVELOPMENT.md` §13 (spec `0001`). **Ainda não existem** features de produto, autenticação completa (há cadastro, confirmação de conta, sign-in, sessão, sign-out e o pedido de redefinição de senha; redefinição de senha com troca da senha), ingestão de conectores, agentes nem CI. Não trate a arquitetura-alvo como se já estivesse implementada.
 
 ## 2. Leia antes de trabalhar
 
@@ -57,7 +57,7 @@ Portas: `apps/app` → **5173**; `apps/docs` → **3001**; `apps/api` → **3002
 3. **UI:** siga `DESIGN.md` e `DESIGN_SYSTEM.md`; garanta acessibilidade, foco visível e responsividade (mobile → desktop).
 4. **Toda tarefa de desenvolvimento** tem plano em `./.plans/`; decisões estruturais também geram ADR em `./.adrs/` (ver `RULES.md`). Tarefas triviais usam plano curto, mas não pulam o registro.
 5. **Não altere** `turbo.json` nem comandos do Turborepo sem ler os docs da versão instalada (`node_modules/turbo/docs/README.md`) e respeitar o bloco gerenciado do `AGENTS.md` da raiz.
-6. **Segredos** nunca entram no repositório. Só variáveis `VITE_*` vão para o bundle do browser e são públicas; `SUPABASE_SERVICE_ROLE_KEY` fica só no servidor.
+6. **Segredos** nunca entram no repositório. Só variáveis `VITE_*` vão para o bundle do browser e são públicas; `DATABASE_URL` e `DATABASE_MIGRATOR_URL` ficam só no servidor e nos scripts, nunca em `VITE_*`.
 7. **Se o código divergir destes docs, o código vence.** Atualize o `.docs` na mesma mudança.
 8. **Não edite artefatos gerados** (`.next/`, `.turbo/`, `dist/`, `coverage/`, `node_modules/`) nem o bloco `turborepo-agent-rules` do `AGENTS.md` da raiz.
 
@@ -112,16 +112,16 @@ apps/api                    # API (Nest.js) — porta 3002
 apps/docs                   # site de documentação (Next.js 16) — porta 3001
 packages/ui                 # design system compartilhado (@repo/ui)
 packages/typescript-config  # tsconfig base compartilhado
-supabase/                   # Supabase local (config.toml, migrations/)
+db/                         # Postgres local: migrations/ (SQL) e init/ (roles)
 infra/                      # configs de Grafana, Loki, Tempo, Mimir e OTel Collector
-scripts/                    # infra:up, infra:down, db:migrate (Bun)
+scripts/                    # infra:up, infra:down, infra:reset, db:migrate (Bun)
 e2e/                        # testes Playwright
 .claude/skills/             # skills carregadas pelo Claude Code
 .claude/agents/             # agentes próprios (code-reviewer), usados pelas skills
 .docs/                      # documentação canônica do projeto
 .specs/                     # specs executáveis (_template.md + <slug>.md)
 .plans/                     # planos de implementação (<slug>-plan.md)
-.adrs/                      # Architecture Decision Records (0001 a 0010)
+.adrs/                      # Architecture Decision Records (0001 a 0016)
 ```
 
 `apps/docs` (site Next.js) **não é** o mesmo que `.docs/` (Markdown canônico).

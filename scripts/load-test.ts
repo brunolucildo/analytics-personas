@@ -1,11 +1,12 @@
 import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { ensureLocalSupabaseEnv } from "./lib/supabase-env";
+import { Pool } from "pg";
 import { assertDocker } from "./lib/command";
+import { databaseUrlFromEnv, isLocalHost, parseDatabaseUrl } from "./lib/database";
 
 /**
  * Teste de carga com k6 contra uma API ISOLADA: este script sobe uma instancia propria (porta
- * LOAD_API_PORT, padrao 3013) apontada para o Supabase LOCAL, com e-mail capturado e
+ * LOAD_API_PORT, padrao 3013) apontada para o Postgres LOCAL, com e-mail capturado e
  * TRUST_PROXY=true, roda o k6 e apaga as contas de teste. Nunca usa a API de dev (porta 3002),
  * cujo `.env` pode apontar para um banco hospedado.
  *
@@ -75,34 +76,19 @@ function findK6(): string {
   process.exit(1);
 }
 
-/** Ignora variaveis ja definidas e le o Supabase do `supabase status`: so o banco local serve. */
-function localSupabase(): { url: string; serviceRoleKey: string; anonKey: string } {
-  for (const name of [
-    "SUPABASE_URL",
-    "SUPABASE_ANON_KEY",
-    "SUPABASE_SERVICE_ROLE_KEY",
-    "SUPABASE_JWT_SECRET",
-  ]) {
-    delete process.env[name];
-  }
+/** Resolve a `DATABASE_URL` (ou a credencial de desenvolvimento) e recusa qualquer host nao local. */
+function localDatabase(): string {
+  const connectionString = databaseUrlFromEnv();
+  const target = parseDatabaseUrl(connectionString);
 
-  ensureLocalSupabaseEnv();
-
-  const url = process.env.SUPABASE_URL as string;
-  const host = new URL(url).hostname;
-
-  if (host !== "127.0.0.1" && host !== "localhost") {
+  if (!isLocalHost(target.host)) {
     console.error(
-      `Recusado: o Supabase "${host}" nao e local. O teste de carga so roda contra o banco local.`,
+      `Recusado: o Postgres "${target.host}" nao e local. O teste de carga so roda contra o banco local.`,
     );
     process.exit(1);
   }
 
-  return {
-    url,
-    serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY as string,
-    anonKey: process.env.SUPABASE_ANON_KEY as string,
-  };
+  return connectionString;
 }
 
 async function answers(url: string): Promise<boolean> {
@@ -137,36 +123,30 @@ async function waitForHealth(deadlineMs: number): Promise<boolean> {
   return false;
 }
 
-/** Apaga as contas de teste (e, por cascata, tokens e sessoes) so no Supabase local. */
-async function cleanUsers(supabase: { url: string; serviceRoleKey: string }): Promise<void> {
-  const headers = {
-    apikey: supabase.serviceRoleKey,
-    authorization: `Bearer ${supabase.serviceRoleKey}`,
-    prefer: "count=exact",
-  };
-  const filter = `users?email=like.${EMAIL_PREFIX}*`;
+/** Apaga as contas de teste (e, por cascata, tokens e sessoes) so no Postgres local. */
+async function cleanUsers(connectionString: string): Promise<void> {
+  const pool = new Pool({ connectionString, max: 1, application_name: "rondo-load-cleanup" });
 
   try {
-    const response = await fetch(`${supabase.url}/rest/v1/${filter}`, {
-      method: "DELETE",
-      headers,
-    });
+    const result = await pool.query("delete from public.users where email like $1", [
+      `${EMAIL_PREFIX}%`,
+    ]);
 
-    console.log(
-      `Limpeza: contas ${EMAIL_PREFIX}* removidas do banco local (HTTP ${response.status}, ${response.headers.get("content-range") ?? "?"}).`,
-    );
+    console.log(`Limpeza: ${result.rowCount ?? 0} conta(s) ${EMAIL_PREFIX}* removida(s) do banco local.`);
   } catch (error) {
     console.error(
       "Nao consegui limpar as contas de teste:",
       error instanceof Error ? error.message : error,
     );
+  } finally {
+    await pool.end().catch(() => undefined);
   }
 }
 
 assertDocker();
 
 const k6 = findK6();
-const supabase = localSupabase();
+const databaseUrl = localDatabase();
 
 if (await answers(`${BASE_URL}/api/v1/health`)) {
   console.error(
@@ -205,7 +185,7 @@ const summaryPath = join(resultsDir, `${name}-${stamp}.json`);
 const apiErrorLog = join(resultsDir, `api-${name}-${stamp}.err.log`);
 
 console.log(
-  `\n> API isolada em ${BASE_URL} (Supabase ${supabase.url}, e-mail capturado, TRUST_PROXY=true)`,
+  `\n> API isolada em ${BASE_URL} (Postgres local, e-mail capturado, TRUST_PROXY=true)`,
 );
 
 if (Object.keys(extraApiEnv).length > 0) {
@@ -220,9 +200,7 @@ const api = Bun.spawn(["node", "dist/main.js"], {
   cwd: repo("apps", "api"),
   env: {
     ...process.env,
-    SUPABASE_URL: supabase.url,
-    SUPABASE_ANON_KEY: supabase.anonKey,
-    SUPABASE_SERVICE_ROLE_KEY: supabase.serviceRoleKey,
+    DATABASE_URL: databaseUrl,
     API_PORT: String(PORT),
     APP_URL: "http://localhost:5173",
     EMAIL_PROVIDER: "capture",
@@ -243,7 +221,7 @@ const shutdown = async () => {
   api.kill("SIGTERM");
   await Promise.race([api.exited, Bun.sleep(5000)]);
 
-  await cleanUsers(supabase);
+  await cleanUsers(databaseUrl);
 };
 
 process.once("SIGINT", () => {

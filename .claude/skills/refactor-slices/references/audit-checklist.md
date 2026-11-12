@@ -49,7 +49,7 @@ O script **não** encontra:
 - [ ] Entidades/value objects não importam framework, HTTP, banco ou SDK.
 - [ ] Regras puras (normalização, limites, TTL, validação de domínio) vivem aqui, não no controller.
 - [ ] Erros de domínio são classes tipadas, não strings/`Error` genérico.
-- [ ] Ports descrevem intenção de negócio, não detalhe de tecnologia (`UserRepository`, não `SupabaseClient`).
+- [ ] Ports descrevem intenção de negócio, não detalhe de tecnologia (`UserRepository`, não `Pool`).
 - [ ] Nenhum `execute`/orquestração de fluxo mora no domínio.
 - [ ] Nenhum DTO de HTTP, decorator de validação ou `ApiException` no domínio.
 
@@ -57,7 +57,7 @@ O script **não** encontra:
 
 - [ ] Cada fluxo tem **uma** classe de use case com **um** `execute`.
 - [ ] O use case recebe ports por construtor; não instancia adaptador.
-- [ ] O use case não importa `@nestjs/*`, `express`, `@supabase/*`, `pino`, `argon2`, `jose` nem `infrastructure`/`interface`.
+- [ ] O use case não importa `@nestjs/*`, `express`, `pg`, `pino`, `argon2`, `jose` nem `infrastructure`/`interface`.
 - [ ] O use case não conhece DTO, status HTTP, presenter ou `ApiException`.
 - [ ] Efeitos colaterais externos (e-mail, evento) acontecem **depois** do commit e não mudam a resposta.
 - [ ] Serviço em `application/services/` é capacidade reutilizável (ex.: `SessionService`), não um fluxo disfarçado.
@@ -65,7 +65,7 @@ O script **não** encontra:
 
 ### 2.3 `infrastructure`
 
-- [ ] Cada adaptador implementa um port e esconde o detalhe (Supabase, Argon2, Resend, HTTP).
+- [ ] Cada adaptador implementa um port e esconde o detalhe (Postgres, Argon2, Resend, HTTP).
 - [ ] Nenhuma regra de negócio (limite, normalização, decisão de fluxo) mora no adaptador.
 - [ ] Erros do provedor são traduzidos para erro tipado (`DataAccessError`, `EmailDeliveryError`).
 - [ ] Timeout, retry limitado e falha tipada existem em integração externa.

@@ -1,25 +1,28 @@
 import { SpanKind, SpanStatusCode, metrics, trace } from "@opentelemetry/api";
+import type { Pool, QueryResult, QueryResultRow } from "pg";
+import { isInfrastructureFailure, sqlStateOf } from "../common/sql-state";
 import { DURATION_BUCKETS_SECONDS } from "./duration-buckets";
 import { baseLogger } from "./logger";
 
 /**
- * Telemetry for every call the API makes to Postgres. The data layer is `supabase-js`
- * (ADR 0008), so each query is an HTTP call to PostgREST: `GET|POST|PATCH|DELETE /rest/v1/<table>`
- * or `POST /rest/v1/rpc/<function>`. Wrapping the client's `fetch` instruments all of them in one
- * place, with no change to the repositories.
+ * Telemetry for every call the API makes to Postgres through the `pg` Pool.
  *
- * What is recorded is derived from the *path* only: the operation, the table or the SQL function.
- * Never the query string, where PostgREST puts the filters (`email=eq.someone@example.com`,
- * `id=eq.<session id>`), nor the body, headers or response.
+ * The repositories declare what they are doing (`operation` plus the table or the
+ * SQL function). The wrapper never inspects the SQL: the statement and the
+ * parameters carry e-mail, hashes and session ids, so they are not read, recorded
+ * or logged. A name that is not a plain SQL identifier collapses to `unknown`.
+ *
+ * `error.type` is the SQLSTATE (or `connection` when there is none). Only an
+ * infrastructure failure (connection error or SQLSTATE classes 08, 53, 57 and 58)
+ * marks the span as `ERROR` and logs `db_operation_failed`: a unique/check
+ * violation (23*, 22*) is business flow and stays out of the error rate.
  */
 
 const TRACER_NAME = "rondo-api";
-const REST_PREFIX = "/rest/v1/";
-const RPC_PREFIX = "rpc/";
-
-/** Table and function names come from our own code; anything else collapses to `unknown`. */
 const SAFE_IDENTIFIER = /^[a-z_][a-z0-9_]{0,62}$/;
 const UNKNOWN = "unknown";
+
+const DB_OPERATIONS = new Set<DbOperation>(["select", "insert", "update", "delete", "rpc", "other"]);
 
 export type DbOperation = "select" | "insert" | "update" | "delete" | "rpc" | "other";
 
@@ -31,56 +34,56 @@ export interface DbCall {
   procedure?: string;
 }
 
-function operationOf(method: string): DbOperation {
-  switch (method.toUpperCase()) {
-    case "GET":
-    case "HEAD":
-      return "select";
-    case "POST":
-      return "insert";
-    case "PATCH":
-      return "update";
-    case "DELETE":
-      return "delete";
-    default:
-      return "other";
-  }
+/**
+ * The API's database handle. Repositories depend on this narrow interface, not on
+ * the Pool, so every query goes through the instrumentation and the tests can
+ * replace it with a fake.
+ */
+export interface DatabaseClient {
+  query<Row extends QueryResultRow = QueryResultRow>(
+    call: DbCall,
+    text: string,
+    values?: readonly unknown[],
+  ): Promise<QueryResult<Row>>;
+  end(): Promise<void>;
 }
 
 const identifier = (value: string | undefined): string =>
   value !== undefined && SAFE_IDENTIFIER.test(value) ? value : UNKNOWN;
 
-/** What a request to the data API does, or `undefined` when it is not a PostgREST call. */
-export function describeDbCall(method: string, url: string): DbCall | undefined {
-  let pathname: string;
+const operationOf = (value: DbOperation): DbOperation =>
+  DB_OPERATIONS.has(value) ? value : "other";
 
-  try {
-    pathname = new URL(url).pathname;
-  } catch {
-    return undefined;
-  }
-
-  if (!pathname.startsWith(REST_PREFIX)) {
-    return undefined;
-  }
-
-  const target = pathname.slice(REST_PREFIX.length);
-
-  if (target.startsWith(RPC_PREFIX)) {
-    return {
-      operation: "rpc",
-      procedure: identifier(target.slice(RPC_PREFIX.length).split("/")[0]),
-    };
-  }
-
-  return { operation: operationOf(method), collection: identifier(target.split("/")[0]) };
+interface SafeTarget {
+  collection?: string;
+  procedure?: string;
 }
 
+function targetOf(call: DbCall): SafeTarget {
+  if (call.procedure !== undefined) {
+    return { procedure: identifier(call.procedure) };
+  }
+
+  return { collection: identifier(call.collection) };
+}
+
+const spanNameOf = (operation: DbOperation, target: SafeTarget) =>
+  `${operation} ${target.procedure ?? target.collection}`;
+
+function attributesOf(operation: DbOperation, target: SafeTarget): Record<string, string> {
+  return {
+    "db.system.name": "postgresql",
+    "db.operation.name": operation,
+    ...(target.collection === undefined ? {} : { "db.collection.name": target.collection }),
+    ...(target.procedure === undefined ? {} : { "db.stored_procedure.name": target.procedure }),
+  };
+}
+
+/** A pg error carries the SQLSTATE in `code`; a connection failure carries none. */
 function createInstruments() {
   return {
     duration: metrics.getMeter(TRACER_NAME).createHistogram("db.client.operation.duration", {
-      description:
-        "Time Postgres took to answer an operation, as seen by the API (to the response headers).",
+      description: "Time Postgres took to answer an operation, as seen by the API.",
       unit: "s",
       advice: { explicitBucketBoundaries: DURATION_BUCKETS_SECONDS },
     }),
@@ -96,106 +99,75 @@ function getInstruments() {
   return instruments;
 }
 
-const spanNameOf = (call: DbCall) => `${call.operation} ${call.procedure ?? call.collection}`;
-
-function attributesOf(call: DbCall): Record<string, string> {
-  return {
-    "db.system.name": "postgresql",
-    "db.operation.name": call.operation,
-    ...(call.collection === undefined ? {} : { "db.collection.name": call.collection }),
-    ...(call.procedure === undefined ? {} : { "db.stored_procedure.name": call.procedure }),
-  };
-}
-
-function urlOf(input: Parameters<typeof fetch>[0]): string {
-  if (typeof input === "string") {
-    return input;
-  }
-
-  return input instanceof URL ? input.href : input.url;
-}
-
-function methodOf(input: Parameters<typeof fetch>[0], init?: RequestInit): string {
-  return init?.method ?? (typeof input === "object" && "method" in input ? input.method : "GET");
-}
-
 /**
- * A `fetch` that records a span (`<operation> <table|function>`, a child of whatever is active,
- * usually `auth.<operation>`) and the histogram `db.client.operation.duration` for each PostgREST
- * call, and passes everything else through untouched.
+ * Wraps the Pool so every query records one span (`<operation> <table|function>`,
+ * child of whatever is active, usually `auth.<operation>`) and one point in
+ * `db.client.operation.duration`. Anything else of `pg` is left untouched.
  *
- * `error.type` is the HTTP status for any 4xx/5xx and `network` when the call itself failed. Only
- * a 5xx or a network failure marks the span as `ERROR`: a 4xx from PostgREST is usually business
- * flow (`406` for a `maybeSingle()` with no row, `409` for a unique violation). A 5xx or a
- * network failure also logs `event: "db_operation_failed"` (operation, table or function, error
- * type: nothing from the query), which gives an exact count that the counter alone would lose for
- * the first failure of a new series. Telemetry is best-effort and never changes the answer.
+ * Telemetry is best-effort and never changes the answer: the original error is
+ * rethrown and any instrumentation failure is swallowed.
  */
-export function createInstrumentedFetch(baseFetch?: typeof fetch): typeof fetch {
-  return async (input, init) => {
-    const send = baseFetch ?? globalThis.fetch;
-    const call = describeDbCall(methodOf(input, init), urlOf(input));
+export function createDatabaseClient(pool: Pool): DatabaseClient {
+  return {
+    async query<Row extends QueryResultRow = QueryResultRow>(
+      call: DbCall,
+      text: string,
+      values: readonly unknown[] = [],
+    ): Promise<QueryResult<Row>> {
+      const operation = operationOf(call.operation);
+      const target = targetOf(call);
+      const attributes = attributesOf(operation, target);
 
-    if (call === undefined) {
-      return send(input, init);
-    }
-
-    const attributes = attributesOf(call);
-
-    return trace
-      .getTracer(TRACER_NAME)
-      .startActiveSpan(spanNameOf(call), { kind: SpanKind.CLIENT, attributes }, async (span) => {
-        const startedAt = performance.now();
-        let errorType: string | undefined;
-        let failed = false;
-
-        try {
-          const response = await send(input, init);
-
-          span.setAttribute("db.response.status_code", String(response.status));
-
-          if (response.status >= 400) {
-            errorType = String(response.status);
-            span.setAttribute("error.type", errorType);
-          }
-
-          if (response.status >= 500) {
-            failed = true;
-            span.setStatus({ code: SpanStatusCode.ERROR });
-          }
-
-          return response;
-        } catch (error) {
-          errorType = "network";
-          failed = true;
-          span.setAttribute("error.type", errorType);
-          span.setStatus({ code: SpanStatusCode.ERROR });
-
-          throw error;
-        } finally {
-          span.end();
+      return trace
+        .getTracer(TRACER_NAME)
+        .startActiveSpan(spanNameOf(operation, target), { kind: SpanKind.CLIENT, attributes }, async (span) => {
+          const startedAt = performance.now();
+          let errorType: string | undefined;
 
           try {
-            getInstruments().duration.record(
-              (performance.now() - startedAt) / 1000,
-              errorType === undefined ? attributes : { ...attributes, "error.type": errorType },
-            );
-            if (failed) {
-              baseLogger.warn(
-                {
-                  event: "db_operation_failed",
-                  operation: call.operation,
-                  ...(call.collection === undefined ? {} : { collection: call.collection }),
-                  ...(call.procedure === undefined ? {} : { procedure: call.procedure }),
-                  errorType,
-                },
-                "db_operation_failed",
-              );
+            return await pool.query<Row>(text, values as unknown[]);
+          } catch (error) {
+            const sqlState = sqlStateOf(error);
+
+            errorType = sqlState ?? "connection";
+            span.setAttribute("error.type", errorType);
+
+            if (isInfrastructureFailure(sqlState)) {
+              span.setStatus({ code: SpanStatusCode.ERROR });
+
+              try {
+                baseLogger.warn(
+                  {
+                    event: "db_operation_failed",
+                    operation,
+                    ...(target.collection === undefined
+                      ? {}
+                      : { collection: target.collection }),
+                    ...(target.procedure === undefined ? {} : { procedure: target.procedure }),
+                    errorType,
+                  },
+                  "db_operation_failed",
+                );
+              } catch {
+                // Telemetry must never take a request down.
+              }
             }
-          } catch {
-            // Telemetry must never take a request down.
+
+            throw error;
+          } finally {
+            span.end();
+
+            try {
+              getInstruments().duration.record(
+                (performance.now() - startedAt) / 1000,
+                errorType === undefined ? attributes : { ...attributes, "error.type": errorType },
+              );
+            } catch {
+              // Telemetry must never take a request down.
+            }
           }
-        }
-      });
+        });
+    },
+    end: () => pool.end(),
   };
 }

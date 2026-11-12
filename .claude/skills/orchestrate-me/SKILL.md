@@ -22,7 +22,7 @@ Implementar **várias specs de uma única vez**: o agente principal vira **orque
 1. **Paralelismo respeita dependências.** Specs independentes rodam juntas; uma spec só começa quando **todas** as suas dependências já estão mescladas na integração. Isso é um agendador contínuo (não ondas rígidas): a spec entra assim que sua última dependência é integrada.
 2. **Um worktree por subagent.** Nenhum subagent escreve na árvore principal. Evita colisão em `app.module.ts`, `bun.lock`, índices e no `git add -A` do `commit-and-push`.
 3. **Subagents não conversam com a pessoa.** Toda dúvida humana é resolvida **antes** do lançamento (pré-voo). Bloqueio inesperado vira status `blocked` + relatório; quem decide é o orquestador/usuário.
-4. **Recursos compartilhados são serializados.** Supabase local, portas e migrations são únicos: quem precisa deles pega o **lock de infra** (§6).
+4. **Recursos compartilhados são serializados.** O Postgres local (`postgres` do Compose, porta 5432), as demais portas e o schema são únicos: quem precisa deles pega o **lock de infra** (§6).
 5. **Progresso é observável.** Cada subagent grava um arquivo de status a cada fase; o orquestador mostra uma tabela de progresso.
 
 ## 1. Resolver o range
@@ -126,14 +126,14 @@ Quando uma spec for integrada (§7) e liberar dependentes, lance os novos subage
 
 ## 6. Recursos compartilhados
 
-Só há **um** Supabase local, uma faixa de portas e um banco. Regras que o brief impõe aos subagents:
+Só há **um** Postgres local (um volume, um schema, `rondo_app` e `rondo_migrator`), uma faixa de portas e uma infra de observabilidade. Regras que o brief impõe aos subagents:
 
 | Gate / ação | Onde roda | Concorrência |
 | --- | --- | --- |
 | `bun install`, `lint`, `check-types`, `build`, testes unitários | no worktree do subagent | livre |
-| `supabase db reset`/`migration up`, `test:integration`, `test:e2e`, qualquer coisa que suba API/SPA em porta fixa | worktree do subagent, **sob o lock de infra** | **uma por vez** |
+| `bun run db:migrate`, `infra:reset`, `test:integration`, `test:e2e`, qualquer coisa que suba API/SPA em porta fixa | worktree do subagent, **sob o lock de infra** | **uma por vez** |
 
-Lock: `mkdir "<RUN_DIR>/infra.lock"` (atômico; falha se já existir). Se falhar, aguarda 30 s e tenta de novo, até 20 min; ao terminar (inclusive em erro) faz `rmdir`. Dentro do lock grava `owner` (spec) e hora. Lock mais antigo que 30 min sem status recente do dono é considerado **órfão**: o orquestador investiga e remove. Se Docker/Supabase não estiver no ar, o subagent **não** o sobe sozinho fora do lock; registra `blocked` com o comando necessário.
+Lock: `mkdir "<RUN_DIR>/infra.lock"` (atômico; falha se já existir). Se falhar, aguarda 30 s e tenta de novo, até 20 min; ao terminar (inclusive em erro) faz `rmdir`. Dentro do lock grava `owner` (spec) e hora. Lock mais antigo que 30 min sem status recente do dono é considerado **órfão**: o orquestador investiga e remove. Se o Docker ou o Postgres local não estiver no ar, o subagent **não** o sobe sozinho fora do lock; registra `blocked` com o comando necessário (`bun run infra:up`). O runner de migrations (`db:migrate`) ignora migrations aplicadas por outro worktree que não existem neste, mas **recusa** uma migration já aplicada cujo conteúdo mudou (checksum); nesse caso o subagent não força nada e registra `blocked`, pois `infra:reset` apaga o banco de todos.
 
 Outros recursos que o orquestador trata, não os subagents:
 
@@ -244,7 +244,7 @@ O relatório por spec, no formato de `.docs/RULES.md` §6, fica em `.claude/orch
 - Todo subagent roda em **worktree próprio** e termina com `commit-and-push` na sua branch; nada vai para `main`.
 - Nenhuma spec inicia antes de suas dependências estarem **mescladas**; o paralelismo vem de specs independentes.
 - Dúvidas humanas vão **todas no pré-voo**; subagent nunca interroga a pessoa.
-- Gates de infra (Supabase, portas, migrations) só sob o **lock**.
+- Gates de infra (Postgres local, portas, migrations) só sob o **lock**.
 - Não declare spec concluída sem ter lido o relatório, o commit e a saída real dos gates; relato de subagent não é prova.
 - Não altere o mapa do épico, ADRs numerados nem índices fora do orquestrador.
 - Não use `--force`, `--amend`, `rebase`, `reset --hard` em branches de trabalho; não abra PR nem mescle na `main`.

@@ -1,5 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { uniqueEmail } from "./supabase";
+import { insertUser, listSessionsOfUser, uniqueEmail, type SessionRow } from "./database";
 
 export interface SeededUser {
   id: string;
@@ -9,44 +8,27 @@ export interface SeededUser {
 }
 
 /**
- * Inserts a confirmed user straight into the database (service role), so session
- * tests need no sign-up or sign-in. The password hash is a placeholder: nothing
- * in these tests verifies a password. Remove it with `deleteUsersByEmail`.
+ * Inserts a confirmed user straight into the database, so session tests need no
+ * sign-up or sign-in. The password hash is a placeholder: nothing in these tests
+ * verifies a password. Remove it with `deleteUsersByEmail`.
  */
 export async function seedConfirmedUser(
-  admin: SupabaseClient,
   label: string,
   names: { firstName: string; lastName: string } = { firstName: "Ana", lastName: "Silva" },
 ): Promise<SeededUser> {
   const email = uniqueEmail(label);
-  const { data, error } = await admin
-    .from("users")
-    .insert({
-      first_name: names.firstName,
-      last_name: names.lastName,
-      email,
-      password_hash: "$argon2id$v=19$m=65536,t=3,p=4$placeholder$placeholder",
-      email_confirmed_at: new Date().toISOString(),
-    })
-    .select("id")
-    .single();
+  const { id } = await insertUser({
+    firstName: names.firstName,
+    lastName: names.lastName,
+    email,
+    passwordHash: "$argon2id$v=19$m=65536,t=3,p=4$placeholder$placeholder",
+    emailConfirmedAt: new Date(),
+  });
 
-  if (error || !data) {
-    throw new Error(
-      "Could not seed a user. Run `bun run infra:up` and `bun run db:migrate` from the repository root.",
-    );
-  }
-
-  return { id: data.id as string, ...names, email };
+  return { id, ...names, email };
 }
 
 /** Sessions of a user, newest first, as stored (snake_case columns). */
-export async function sessionsOf(admin: SupabaseClient, userId: string) {
-  const { data } = await admin
-    .from("sessions")
-    .select("*")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false });
-
-  return data ?? [];
+export async function sessionsOf(userId: string): Promise<SessionRow[]> {
+  return listSessionsOfUser(userId);
 }

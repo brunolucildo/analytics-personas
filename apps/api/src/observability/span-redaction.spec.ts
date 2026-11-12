@@ -4,8 +4,8 @@ import { outgoingUrlAttributes, redactHttpRequestSpan, withoutQuery } from "./sp
 
 describe("withoutQuery", () => {
   it("keeps the origin and the path and drops the query string and the fragment", () => {
-    expect(withoutQuery("https://project.supabase.co/rest/v1/users?email=eq.a%40b.com#x")).toBe(
-      "https://project.supabase.co/rest/v1/users",
+    expect(withoutQuery("https://project.example.test/rest/v1/users?email=eq.a%40b.com#x")).toBe(
+      "https://project.example.test/rest/v1/users",
     );
     expect(withoutQuery("http://127.0.0.1:54321/rest/v1/rpc/auth_sign_up")).toBe(
       "http://127.0.0.1:54321/rest/v1/rpc/auth_sign_up",
@@ -20,12 +20,12 @@ describe("withoutQuery", () => {
 describe("outgoingUrlAttributes", () => {
   it("overrides url.full without the filter and empties url.query", () => {
     const attributes = outgoingUrlAttributes({
-      origin: "https://project.supabase.co",
+      origin: "https://project.example.test",
       path: "/rest/v1/users?select=id&email=eq.someone%40example.com",
     });
 
     expect(attributes).toEqual({
-      "url.full": "https://project.supabase.co/rest/v1/users",
+      "url.full": "https://project.example.test/rest/v1/users",
       "url.query": "",
     });
     expect(JSON.stringify(attributes)).not.toContain("example.com");

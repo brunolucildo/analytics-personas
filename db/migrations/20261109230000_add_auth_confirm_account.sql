@@ -1,7 +1,7 @@
 -- 0006-auth-confirm-account: atomic "confirm account" and "resend confirmation" functions.
 --
--- Same security model as 0004: called only by the API (service role) through RPC;
--- `execute` is revoked from public, anon and authenticated.
+-- Same security model as 0004: called by the API with `rondo_app`; `execute` is
+-- revoked from public and granted to `rondo_app` only.
 --
 -- Rollback (run manually):
 --   drop function if exists public.auth_confirm_account(text);
@@ -85,11 +85,11 @@ end;
 $$;
 
 revoke all on function public.auth_confirm_account(text)
-  from public, anon, authenticated;
+  from public;
 grant execute on function public.auth_confirm_account(text)
-  to service_role;
+  to rondo_app;
 
 revoke all on function public.auth_resend_confirmation(text, text, timestamptz)
-  from public, anon, authenticated;
+  from public;
 grant execute on function public.auth_resend_confirmation(text, text, timestamptz)
-  to service_role;
+  to rondo_app;

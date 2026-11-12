@@ -12,8 +12,8 @@
 | Tipos                       | Configurado em `app`, `api`, `docs` e `@repo/ui`; passa                                                                                                                                         |
 | Build                       | `apps/app/dist`, `apps/api/dist` e `apps/docs/.next`; passa                                                                                                                                     |
 | Testes unitários            | Vitest em `app` e `api`; passam                                                                                                                                                                 |
-| Testes de integração        | Vitest + Supertest em `api`, contra o Supabase local (exige `infra:up` e `db:migrate`); passa                                                                                                   |
-| Testes E2E                  | Playwright (`home`, `routing`, `sign-up`, `forgot-password`, `confirm-account`, `session`, `sign-out`, `sign-in`, `reset-password`); sobe app e API (`capture`) e exige o Supabase local; passa |
+| Testes de integração        | Vitest + Supertest em `api`, contra o Postgres local (exige `infra:up` e `db:migrate`); passa                                                                                                   |
+| Testes E2E                  | Playwright (`home`, `routing`, `sign-up`, `forgot-password`, `confirm-account`, `session`, `sign-out`, `sign-in`, `reset-password`); sobe app e API (`capture`) e exige o Postgres local; passa |
 | Cobertura                   | `bun run test:coverage` gera `coverage/`; sem threshold                                                                                                                                         |
 | Hooks de pre-commit         | Configurados (`lefthook.yml`); validados no commit raiz `227e0ad`                                                                                                                               |
 | CI                          | Não configurado                                                                                                                                                                                 |
@@ -32,7 +32,7 @@
 | `bun run test:coverage`    | Passa     | Gera `coverage/api` e `coverage/app`                                       |
 | `bun run format` (2×)      | Passa     | Segunda execução sem diff                                                  |
 | `bun run code:fix`         | Passa     | OXLint `--fix` + OXFmt                                                     |
-| `bun run infra:up`         | Passa     | Supabase em 54321; Grafana, Loki, Tempo, Mimir e Collector `healthy`       |
+| `bun run infra:up`         | Passa     | Banco local (stack anterior à spec 0016) em 54321; Grafana, Loki, Tempo, Mimir e Collector `healthy`       |
 | `bun run db:migrate`       | Passa     | Sem migrations: a CLI aplica `[]` e o script informa que não há pendências |
 | `bun run infra:down` (2×)  | Passa     | Idempotente; nenhum container do projeto fica                              |
 
@@ -77,7 +77,7 @@ Observabilidade (R9), com `bun run infra:up` (5 containers `healthy`) e a API co
 
 ### 1.4 Verificação da spec 0003 em 2026-11-09
 
-Executado na raiz, no worktree da spec (sem UI, sem Supabase e sem portas fixas: os testes de integração usam o servidor em processo do Supertest):
+Executado na raiz, no worktree da spec (sem UI, sem banco e sem portas fixas: os testes de integração usam o servidor em processo do Supertest):
 
 | Gate                       | Resultado | Observação                                                                                        |
 | -------------------------- | --------- | ------------------------------------------------------------------------------------------------- |
@@ -96,7 +96,7 @@ Executado no worktree da spec (código de saída 0): `bun run lint`, `bun run ch
 
 ### 1.6 Verificação da spec 0004 em 2026-11-09
 
-Executado no worktree da spec, na ordem abaixo (código de saída 0). Supabase local no ar com a migration aplicada; `test:e2e` rodou com `E2E_APP_PORT=5183 E2E_API_PORT=3012` porque a 5173 já havia um `vite` de outro processo (a configuração agora nunca reaproveita um servidor existente).
+Executado no worktree da spec, na ordem abaixo (código de saída 0). Banco local (stack anterior à spec 0016) no ar com a migration aplicada; `test:e2e` rodou com `E2E_APP_PORT=5183 E2E_API_PORT=3012` porque a 5173 já havia um `vite` de outro processo (a configuração agora nunca reaproveita um servidor existente).
 
 | Gate                       | Resultado | Observação                                                                                                                                          |
 | -------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -111,11 +111,11 @@ Banco (`psql` no container): RLS ligada em `users` e `auth_tokens`, 0 policies e
 
 Verificação manual de UI (`/auth/sign-up`, Chromium via Playwright, vite em dev): 375 / 768 / 1280 px sem scroll horizontal (`scrollWidth` = largura da viewport, inclusive com os erros de validação abertos); um único `h1` (30px); `lang="en-US"`; ordem de Tab: nome, sobrenome, e-mail, senha, confirmação, botão, link `Sign in`; foco com anel de 2px + 4px `#5C8001`; alvos de toque: campos 44px, botão 48px, link `Sign in` 52×44px; console sem erro nem warning (o 409 aparece só como log de rede do browser). Contraste calculado: erro `#B91C1C` sobre `#FFFDF5` 6,35:1; texto secundário `#6B6B6B` 5,23:1; texto do botão 6,42:1; anel de foco 4,54:1. **Achado e corrigido:** o erro de campo mostrado no `blur` deslocava o botão e engolia o clique (o `click` caía no `form`); os erros de validação agora aparecem no envio. **Não verificado:** leitor de tela; hover/active; `prefers-reduced-motion` (o spinner tem `motion-reduce:animate-none`, sem teste); `vite preview`.
 
-**Pré-requisitos novos:** `test:integration` e `test:e2e` exigem Docker, `bun run infra:up` e `bun run db:migrate` (sem o banco a `globalSetup` falha com a instrução). As chaves do Supabase vêm do ambiente ou de `supabase status -o env`. O E2E sobe uma API própria com `EMAIL_PROVIDER=capture` na 3002 e o app na 5173 (`E2E_APP_PORT` e `E2E_API_PORT` mudam as portas).
+**Pré-requisitos novos:** `test:integration` e `test:e2e` exigem Docker, `bun run infra:up` e `bun run db:migrate` (sem o banco a `globalSetup` falha com a instrução). As chaves do banco vinham do ambiente ou da CLI do banco local (stack anterior à spec 0016). O E2E sobe uma API própria com `EMAIL_PROVIDER=capture` na 3002 e o app na 5173 (`E2E_APP_PORT` e `E2E_API_PORT` mudam as portas).
 
 ### 1.7 Verificação da spec 0005 em 2026-11-09
 
-Executado no worktree da spec (código de saída 0), com o Supabase local no ar e a migration `20261109210000_create_sessions.sql` aplicada. O `test:e2e` rodou com `E2E_APP_PORT=5195 E2E_API_PORT=3025` porque a 5173 estava ocupada por outro processo.
+Executado no worktree da spec (código de saída 0), com o banco local (stack anterior à spec 0016) no ar e a migration `20261109210000_create_sessions.sql` aplicada. O `test:e2e` rodou com `E2E_APP_PORT=5195 E2E_API_PORT=3025` porque a 5173 estava ocupada por outro processo.
 
 | Gate                       | Resultado | Observação                                                                                                                                                                                                                             |
 | -------------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -134,7 +134,7 @@ Verificação manual de UI (`/app` carregando, erro e home, Chromium via Playwri
 
 ### 1.9 Verificação da spec 0009 em 2026-11-09
 
-Executado no worktree da spec, em paralelo com a spec 0005 (outro worktree, mesmo Supabase local), com o lock de infraestrutura da orquestração. `test:e2e` rodou com `E2E_APP_PORT=5193 E2E_API_PORT=3022` porque a 5173 estava ocupada por outro processo. **`bun run db:migrate` falhou neste worktree** com `MigrationMissingLocalError` (o banco compartilhado já tinha a migration `20261109210000` da 0005, que não existe aqui); a migration `20261109220000` foi aplicada com `psql` no container (`docker exec ... psql -f`) e registrada em `supabase_migrations.schema_migrations`. Depois da integração das branches, `db:migrate` volta a funcionar.
+Executado no worktree da spec, em paralelo com a spec 0005 (outro worktree, mesmo banco local (stack anterior à spec 0016)), com o lock de infraestrutura da orquestração. `test:e2e` rodou com `E2E_APP_PORT=5193 E2E_API_PORT=3022` porque a 5173 estava ocupada por outro processo. **`bun run db:migrate` falhou neste worktree** com `MigrationMissingLocalError` (o banco compartilhado já tinha a migration `20261109210000` da 0005, que não existe aqui); a migration `20261109220000` foi aplicada com `psql` no container (`docker exec ... psql -f`) e registrada na tabela de migrations da CLI da época. Depois da integração das branches, `db:migrate` volta a funcionar.
 
 | Gate                       | Resultado | Observação                                                                                                                                                                                                 |
 | -------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -158,7 +158,7 @@ Verificação manual de UI (`/auth/forgot-password`, Chromium via Playwright, vi
 | `bun run test:integration` | Passa     | 153 testes; `auth-confirm-account` (36): R1 a R6 (token ruim de quatro tipos com o mesmo corpo e sem alterar linhas, concorrência 1x200 e 1x400, sessão A derrubada, 429, permissões)        |
 | `bun run test:e2e`         | Passa     | 30 testes (Chromium), 5 novos em `confirm-account`: link de e-mail leva a `/app` e o mesmo link depois é inválido, link do cadastro, link sem token ou falso, reenvio invalida o link antigo |
 
-Os E2E de `confirm-account` semeiam a conta não confirmada pela API do Supabase (`e2e/support/confirmation.ts`) em vez de chamar `POST /auth/sign-up`: a política `sign-up` (5 por hora por IP) já é consumida pelos outros specs. O e-mail do link vem do reenvio, lido no provider `capture`.
+Os E2E de `confirm-account` semeiam a conta não confirmada pelo banco (`e2e/support/confirmation.ts`) em vez de chamar `POST /auth/sign-up`: a política `sign-up` (5 por hora por IP) já é consumida pelos outros specs. O e-mail do link vem do reenvio, lido no provider `capture`.
 
 Verificação manual de UI (`/auth/confirm-account` e `/auth/resend-confirmation`, Chromium via Playwright, vite em dev, API interceptada): 375 / 768 / 1280 px sem scroll horizontal (`scrollWidth` = largura da viewport, também com o erro de validação e com a mensagem de sucesso); um único `h1` (30px); `lang="en-US"`; sem erro de console; ordem de Tab do reenvio: e-mail, botão, link `Back to sign in`, todos com `:focus-visible`; na página de link inválido o primeiro Tab cai em `Request a new confirmation email` (alvo de 256x44 px).
 
@@ -168,11 +168,11 @@ Verificação manual de UI (`/auth/confirm-account` e `/auth/resend-confirmation
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | Bun 1.4.4 e Node >= 24 | Instalação local                                                                                                         |
 | Docker em execução     | Necessário para `infra:up`, `db:migrate`, `test:integration` e `test:e2e`; lint, tipos, build e `test` não dependem dele |
-| Supabase CLI           | `devDependency` (`supabase`); roda via `bunx supabase`                                                                   |
+| Postgres local             | Docker (`bun run infra:up`); a imagem `postgres:17-alpine` é baixada na primeira vez                                     |
 | Browsers do Playwright | `bunx playwright install` (uma vez)                                                                                      |
-| `.env` na raiz         | Copie `.env.example` e preencha as chaves com `bunx supabase status -o env`                                              |
+| `.env` na raiz         | Copie `.env.example`; `DATABASE_URL` e `DATABASE_MIGRATOR_URL` já apontam para o Postgres local (`rondo`/`rondo`, credenciais públicas só de desenvolvimento) |
 
-A API **não sobe** sem `SUPABASE_URL`, `SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY` (falha com exit 1 e mensagem acionável). Os testes definem valores fictícios em `apps/api/test/setup-env.ts`.
+A API **não sobe** sem `DATABASE_URL` (falha com exit 1 e mensagem acionável, sem ecoar o valor) e `db:migrate` exige `DATABASE_MIGRATOR_URL`. Se a porta 5432 estiver ocupada por outro Postgres, pare-o ou ajuste a porta no Compose e nas duas URLs. Os testes usam o banco local por padrão (`apps/api/test/setup-env.ts` e `playwright.config.ts` só definem `DATABASE_URL` se o ambiente não trouxer uma): **nunca** exporte uma `DATABASE_URL` de banco hospedado ao rodar `test:integration` ou `test:e2e`, porque a semeadura e a limpeza são feitas por SQL. `infra:reset` só apaga o volume Docker local.
 
 ## 3. Gates obrigatórios
 
@@ -185,7 +185,7 @@ Execute na raiz do repositório, na ordem abaixo:
 | 3   | `bun run check-types`      | `tsc --noEmit` (e `next typegen` em `docs`)   | Zero erro de tipo (`types:check` é alias)                       |
 | 4   | `bun run build`            | Build de produção dos três apps               | Concluído; dispensa justificada só para docs/config sem impacto |
 | 5   | `bun run test`             | Vitest (unitário) em `app` e `api`            | Todos passam; sem modo watch                                    |
-| 6   | `bun run test:integration` | Supertest contra a API e o Supabase local     | Todos passam                                                    |
+| 6   | `bun run test:integration` | Supertest contra a API e o Postgres local     | Todos passam                                                    |
 | 7   | `bun run test:e2e`         | Playwright (app 5173 + API 3002 em `capture`) | Todos passam                                                    |
 | 8   | Verificação manual         | Ver seção 5                                   | Checklist aplicável à mudança                                   |
 
@@ -196,9 +196,10 @@ Outros comandos:
 | `bun run test:coverage` | Vitest com cobertura em `coverage/` (sem threshold nesta fase)                        |
 | `bun run format`        | OXFmt escreve nos arquivos; escopo limitado por `.oxfmtrc.json`                       |
 | `bun run code:fix`      | `oxlint --fix` e `oxfmt --write`                                                      |
-| `bun run infra:up`      | `supabase start` + `docker compose up -d --wait` (até 300 s); sai != 0 se algo falhar |
-| `bun run infra:down`    | `supabase stop` + `docker compose down`; idempotente                                  |
-| `bun run db:migrate`    | `supabase migration up --local`; idempotente                                          |
+| `bun run infra:up`      | `docker compose up -d --build --wait` (até 300 s): Postgres e LGTM; sai != 0 se algo falhar e mantém o que subiu |
+| `bun run infra:down`    | `docker compose down`; preserva o volume `postgres-data`; idempotente                 |
+| `bun run infra:reset`   | `docker compose down -v` + `infra:up`: **apaga** o volume do Postgres local e avisa; rode `db:migrate` depois |
+| `bun run db:migrate`    | Runner próprio (`scripts/db-migrate.ts`): aplica `db/migrations` em ordem, uma transação por arquivo, checksum em `schema_migrations`; idempotente |
 | `bun run hooks:install` | `lefthook install` (grava `.git/hooks`; rode uma vez em cada clone)                   |
 
 `bun run lint` cobre apenas os workspaces. `scripts/` e `e2e/` na raiz passam por `bun run code:fix` e por lint-staged, mas não pelo `lint` do Turbo.
@@ -214,7 +215,7 @@ Outros comandos:
 
 ```bash
 bun install
-cp .env.example .env        # preencha as chaves com `bunx supabase status -o env`
+cp .env.example .env # DATABASE_URL e DATABASE_MIGRATOR_URL já apontam para o Postgres local
 bun run infra:up
 bun run db:migrate
 bun run dev
@@ -226,11 +227,11 @@ bun run dev
 | `apps/docs` (site de docs) | http://localhost:3001                         | 3001  |
 | `apps/api`                 | http://localhost:3002                         | 3002  |
 | Grafana                    | http://localhost:3000 (admin/admin, só local) | 3000  |
-| Supabase API / Studio      | http://127.0.0.1:54321 / :54323               | 54321 |
+| Postgres                   | localhost:5432 (banco `rondo`)                | 5432  |
 
 Para subir um app isolado: `bun run dev --filter=app`, `--filter=api` ou `--filter=docs`.
 
-**E2E de autenticação** (`sign-up`, `confirm-account`, `sign-in`...): exige `bun run infra:up` e `bun run db:migrate` (Supabase local, usado para semear contas e pelas funções SQL). O `playwright.config.ts` sobe sozinho o app e uma API nova (`EMAIL_PROVIDER=capture`, rate limit em memória zerado, `AUTH_JWT_SECRET` de teste), lendo as chaves de `supabase status`; com as portas 5173/3002 ocupadas use `E2E_APP_PORT` e `E2E_API_PORT`.
+**E2E de autenticação** (`sign-up`, `confirm-account`, `sign-in`...): exige `bun run infra:up` e `bun run db:migrate` (Postgres local, usado para semear contas por SQL e pelas funções SQL). O `playwright.config.ts` sobe sozinho o app e uma API nova (`EMAIL_PROVIDER=capture`, rate limit em memória zerado, `AUTH_JWT_SECRET` de teste), com a `DATABASE_URL` do banco local; com as portas 5173/3002 ocupadas use `E2E_APP_PORT` e `E2E_API_PORT`.
 
 `apps/docs` é o site Next.js; `.docs/` é a documentação Markdown canônica. Não confunda.
 
@@ -253,7 +254,7 @@ Os dashboards do projeto são provisionados por arquivo (`infra/grafana/dashboar
 
 ### 4.2 Teste de carga (k6)
 
-O teste de carga usa o [k6](https://k6.io) (`winget install GrafanaLabs.k6`, fora do repositório) contra uma **API isolada** que o runner sobe sozinho; nunca contra a API de dev. Pré-requisitos: `bun run infra:up` (Supabase local, Grafana, Mimir, Collector) e `bun run db:migrate`.
+O teste de carga usa o [k6](https://k6.io) (`winget install GrafanaLabs.k6`, fora do repositório) contra uma **API isolada** que o runner sobe sozinho; nunca contra a API de dev. Pré-requisitos: `bun run infra:up` (Postgres local, Grafana, Mimir, Collector) e `bun run db:migrate`.
 
 ```bash
 bun run load smoke
@@ -266,7 +267,7 @@ bun run load smoke
 | `stress`   | ~9 min   | Rampa além da capacidade (até 50 jornadas e 200 leitores) para achar o ponto de quebra. Os limites informam.                             |
 | `capacity` | ~2,5 min | Um caminho por vez, com `--only=edges`, `invalidCredentials`, `browse` ou `validation`, para comparar configurações em condições iguais. |
 
-O runner (`scripts/load-test.ts`): lê o Supabase de `supabase status` e **recusa** qualquer host que não seja local; recusa porta ocupada (`LOAD_API_PORT`, padrão 3013), porque um processo antigo atenderia no lugar e com outro código; compila e sobe a API com `EMAIL_PROVIDER=capture` e `TRUST_PROXY=true`; roda o k6, envia as métricas dele ao Mimir (`--no-prom` desliga) e, ao fim, derruba a API e apaga as contas `k6-*` do banco local. O resumo de cada execução fica em `load/results/` (ignorado pelo git).
+O runner (`scripts/load-test.ts`): lê a `DATABASE_URL` e **recusa** qualquer host que não seja local (`localhost`, `127.0.0.1`, `::1` ou `postgres`); recusa porta ocupada (`LOAD_API_PORT`, padrão 3013), porque um processo antigo atenderia no lugar e com outro código; compila e sobe a API com `EMAIL_PROVIDER=capture` e `TRUST_PROXY=true`; roda o k6, envia as métricas dele ao Mimir (`--no-prom` desliga) e, ao fim, derruba a API e apaga as contas `k6-*` do banco local por SQL. O resumo de cada execução fica em `load/results/` (ignorado pelo git).
 
 **Cenários** (`load/k6/lib/scenarios.js`): `lifecycle` (sign-up, e-mail capturado, confirm-account, session, resend-confirmation, sign-out, sign-in, forgot-password, reset-password e sign-in com a senha antiga e a nova), `browse` (health e session com token), `invalidCredentials` (401), `validation` (400 em todos os POSTs), `antiEnumeration` (202 para e-mails desconhecidos), `badTokens` (400), `edges` (404, preflight CORS, rotas fechadas sem sessão e health), `testSupport` (lista de e-mails) e `rateLimit` (estoura o sign-in e o sign-up de um mesmo IP e espera 429). `DELETE /test-support/emails` é chamado uma vez no `setup`.
 
@@ -323,8 +324,8 @@ Aplique apenas o que a mudança afeta, mas registre o que foi verificado.
 - [ ] Com `infra:up` e a API rodando, `GET /api/v1/health` gera trace no Tempo e log no Loki com `requestId` e sem PII.
 - [ ] Com o Collector parado (`docker compose stop otel-collector`), a API continua respondendo.
 - [ ] Observabilidade de auth (spec `0011`), com `infra:up` e a API compilada (`bun run build`; depois, em `apps/api`, `API_PORT=3012 EMAIL_PROVIDER=capture OTEL_SERVICE_NAME=rondo-api node dist/main.js`): faça sign-up, confirmação, sign-in (certo e errado), sign-out, forgot-password (com conta e sem) e reset. Aguarde até ~1 minuto (as métricas saem a cada 15 s) e confirme: no Mimir, `sum by (operation, outcome, reason) (auth_operations_total)` traz uma série por combinação, e `http_server_request_duration_seconds_count` tem `http_route` com templates (`unmatched` para path inexistente e preflight); no Loki, `{service_name="rondo-api"} | event="auth_operation"` traz uma linha por tentativa com `trace_id`; no Tempo, `{ name =~ "auth.*" }` traz `auth.sign_in` dentro do span HTTP, com a falha marcada e só `auth.error_code`. Nada de e-mail, senha, token, IP, `userId` ou `sid` em nenhum dos três. No Grafana, abra "Rondo — Observabilidade da API" (pasta "Rondo") e clique em **Open trace** numa linha de log (derived field); o Tempo deve abrir o trace.
-- [ ] Observabilidade do Postgres (spec `0013`), com `infra:up` (o Supabase local no ar) e a API compilada: **suba-a numa porta livre** (confira antes que nada escuta nela; um `node dist/main.js` esquecido atende no lugar e roda código velho e outro banco) e com `SUPABASE_URL`, `SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY` do `bunx supabase status -o env` no ambiente do processo (o `.env` não os sobrescreve). Faça sign-up, sign-in (certo e errado) e forgot-password, espere ~40 s e confirme: no Mimir, `db_client_operation_duration_seconds_count` por `db_operation_name`, `db_collection_name` e `db_stored_procedure_name` (`users`, `auth_sign_up`, `auth_issue_session`…) e `postgresql_backends{job="rondo-postgres"}`; no Tempo, `{ span.db.system.name = "postgresql" }` mostra `select users` e `rpc …` dentro de `auth.*`; e nenhum trace traz o e-mail usado em `span.url.full` ou `span.url.query`, nem `client.address` nos spans de entrada. Nos primeiros ~30 s, `increase()` mostra 0 ou NaN para séries novas (limitação do contador OTLP, ver `ARCHITECTURE.md` §4.4).
-- [ ] Alertas (spec `0012`): depois de `docker compose restart grafana`, em Alerting > Alert rules (pasta "Rondo") as 19 regras aparecem com saúde `ok`. Pare a API por 3 minutos e confira que "API sem telemetria" dispara.
+- [ ] Observabilidade do Postgres (spec `0013`), com `infra:up` (o Postgres local no ar) e a API compilada: **suba-a numa porta livre** (confira antes que nada escuta nela; um `node dist/main.js` esquecido atende no lugar e roda código velho e outro banco) e com a `DATABASE_URL` do Postgres local no ambiente do processo (confira o host: o `.env` de quem desenvolve pode apontar para outro banco). Faça sign-up, sign-in (certo e errado) e forgot-password, espere ~40 s e confirme: no Mimir, `db_client_operation_duration_seconds_count` por `db_operation_name`, `db_collection_name` e `db_stored_procedure_name` (`users`, `auth_sign_up`, `auth_issue_session`…) e `postgresql_backends{job="rondo-postgres"}`; no Tempo, `{ span.db.system.name = "postgresql" }` mostra `select users` e `rpc …` dentro de `auth.*`; e nenhum trace traz o e-mail usado em `span.url.full` ou `span.url.query`, nem `db.statement`, nem `client.address` nos spans de entrada. Nos primeiros ~30 s, `increase()` mostra 0 ou NaN para séries novas (limitação do contador OTLP, ver `ARCHITECTURE.md` §4.4).
+- [ ] Alertas (spec `0012`): depois de `docker compose restart grafana`, em Alerting > Alert rules (pasta "Rondo") as 17 regras aparecem com saúde `ok`. Pare a API por 3 minutos e confira que "API sem telemetria" dispara.
 - [ ] Proteção do hash (spec `0015`): com a API de teste (`bun run load capacity --only=browse,invalidCredentials`), o `session` fica na casa de centenas de ms enquanto o login inválido satura, e as recusas aparecem como 503 `SERVICE_BUSY` (motivo `service_busy`); com `--only=invalidCredentials --api-env=TRUST_PROXY=false` (um IP real, e-mails sempre diferentes) o 61º sign-in em 10 min recebe 429 da política `sign-in-ip`. No dashboard, "Fila de hashes (argon2)" mostra a ocupação e as recusas.
 
 ## 6. Dívidas de QA conhecidas
@@ -337,7 +338,7 @@ Aplique apenas o que a mudança afeta, mas registre o que foi verificado.
 | 4   | Sem verificação de acessibilidade automatizada                                    | Regressões de a11y só aparecem na revisão manual        |
 | 5   | Leitor de tela, hover/disabled/loading e `prefers-reduced-motion` não verificados | Cobertura parcial de a11y (ver §1.2)                    |
 | 6   | `Button` usa `text-sm` (14px) e transições sem variante `motion-reduce`           | Fora de `DESIGN.md` §3 e §6 para o rótulo e o movimento |
-| 7   | Cobertura sem threshold; `lib/supabase.ts` com 0%                                 | Código sem teste não é sinalizado                       |
+| 7   | Cobertura sem threshold                                 | Código sem teste não é sinalizado                       |
 | 8   | Imagens LGTM em `:latest`                                                         | Reprodutibilidade da infra local                        |
 
 ## 7. Template de evidência
@@ -388,7 +389,7 @@ Copie para o relatório final da tarefa:
 
 ### 1.10 Verificação da spec 0008 em 2026-11-09
 
-Executado no worktree da spec, em paralelo com a spec 0006 (outro worktree, mesmo Supabase local), com o lock de infraestrutura da orquestração. `test:e2e` rodou com `E2E_APP_PORT=5220 E2E_API_PORT=3050`. Sem a 0007, o E2E semeia o usuário e emite a sessão por helper (`e2e/support/session.ts`), como o `session.spec.ts`. Nenhuma migration nova.
+Executado no worktree da spec, em paralelo com a spec 0006 (outro worktree, mesmo banco local (stack anterior à spec 0016)), com o lock de infraestrutura da orquestração. `test:e2e` rodou com `E2E_APP_PORT=5220 E2E_API_PORT=3050`. Sem a 0007, o E2E semeia o usuário e emite a sessão por helper (`e2e/support/session.ts`), como o `session.spec.ts`. Nenhuma migration nova.
 
 | Gate                       | Resultado | Observação                                                                                                                                                                              |
 | -------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -420,7 +421,7 @@ Verificação manual de UI (`/auth/sign-in`, Chromium via Playwright, vite em de
 
 ### 1.12 Verificação da spec 0010 em 2026-11-09
 
-Executado no worktree da spec, com o lock de infraestrutura da orquestração. `test:e2e` rodou com `E2E_APP_PORT=5250 E2E_API_PORT=3080` (5173 e 5240 ocupadas por outros processos). **Migration aplicada** no Supabase local compartilhado: `20261109250000_add_auth_reset_password.sql` (função `auth_reset_password`, aditiva, `execute` só para `service_role`).
+Executado no worktree da spec, com o lock de infraestrutura da orquestração. `test:e2e` rodou com `E2E_APP_PORT=5250 E2E_API_PORT=3080` (5173 e 5240 ocupadas por outros processos). **Migration aplicada** no banco local compartilhado (stack anterior à spec 0016): `20261109250000_add_auth_reset_password.sql` (função `auth_reset_password`, aditiva, `execute` só para o role da API).
 
 | Gate                       | Resultado | Observação                                                                                                                                                                                                                                                                                                                                                |
 | -------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -452,8 +453,36 @@ Verificação manual com o SDK ligado (API compilada em `node dist/main.js`, `AP
 
 - **Mimir:** `auth_operations_total` com uma série por combinação de `operation`, `outcome` e `reason` (12) e o histograma `auth_operation_duration_seconds_*`; `http_server_request_duration_seconds_count` com `http_route` em templates (`/api/v1/auth/sign-in`, `/api/v1/health`…). Dois defeitos encontrados e corrigidos nesta verificação: um path inexistente saía como `/api/v1*path` (rota _catch-all_ do Nest) e o preflight `OPTIONS` saía sem `http_route`; agora ambos saem como `unmatched`.
 - **Loki:** `{service_name="rondo-api"} | event="auth_operation"` devolveu uma linha por tentativa, com `trace_id` e `span_id` e só `operation`, `outcome`, `reason` e `requestId` além dos campos do pino.
-- **Tempo:** o trace do sign-in tem o span `POST /api/v1/auth/sign-in` (agora com `http.route`) e `auth.sign_in` dentro dele, com `auth.operation` e `auth.outcome`; as chamadas ao Supabase aparecem como filhas.
+- **Tempo:** o trace do sign-in tem o span `POST /api/v1/auth/sign-in` (agora com `http.route`) e `auth.sign_in` dentro dele, com `auth.operation` e `auth.outcome`; as chamadas ao banco aparecem como filhas.
 - **Dashboards:** as consultas de todos os painéis de "Rondo — API" e "Rondo — Auth" foram executadas contra Mimir, Loki e Tempo e rodaram sem erro (o painel de 5xx volta vazio porque não houve 5xx). O log do Grafana não mostrou erro de provisionamento e os dois JSONs estão montados em `/var/lib/grafana/dashboards`.
 - As 3 contas de teste (`qa-obs-*@example.test`) criadas na verificação foram removidas do banco local.
 
 **Não verificado:** a interface do Grafana (o login foi pedido e `admin/admin` foi recusado: a senha local foi trocada), portanto não foram vistos os painéis renderizados, o clique em **Open trace** (derived field) nem o _trace to logs_; `R12` com o Collector parado (o comportamento já existia e o middleware engole erro de telemetria, coberto por teste, mas o `docker compose stop otel-collector` não foi repetido); clone limpo com `infra:up` do zero; R17 (spans filhos para hash e e-mail, Could) não foi feito.
+
+### 1.14 Verificação da spec 0016 em 2026-11-12
+
+Executado na árvore principal, no Windows, com Docker. O Postgres novo subiu na 5432 (`rondo-postgres-1`, `healthy`); os containers antigos da stack anterior continuavam rodando em outras portas e não foram tocados. A primeira `bun run infra:up` **saiu com erro**: a porta 3200 (Tempo) estava ocupada por um `next start -p 3200` alheio ao projeto, e Grafana, Tempo e Collector não subiram. Com a autorização do Owner o processo foi encerrado e a segunda execução subiu os 6 containers (`postgres`, Loki, Mimir, Tempo, Grafana e Collector), todos `healthy`.
+
+| Gate                       | Resultado                  | Observação                                                                                                                                 |
+| -------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `bun run lint`             | Passa                      | 4 tasks, 0 warnings, 0 erros                                                                                                               |
+| `bun run check-types`      | Passa                      | 4 tasks                                                                                                                                    |
+| `bun run build`            | Passa                      | `app`, `api` e `docs`                                                                                                                      |
+| `bun run test`             | Passa                      | `api`: 464 testes (57 arquivos; novo teste em `grafana-assets.spec.ts` contra referências a banco de terceiros); `app`: 226 testes         |
+| `bun run db:migrate` (2×)  | Passa                      | 1ª aplica as 5 migrations; 2ª "Nada a aplicar: 5 migration(s) já registrada(s)"                                                            |
+| `bun run test:integration` | Passa                      | 212 testes (15 arquivos) contra o Postgres local; tabelas `users`, `auth_tokens` e `sessions` ficaram com 0 linhas depois                  |
+| `bun run test:e2e`         | **Não executado**          | O classificador de permissões da sessão bloqueou o comando; não foi contornado. Precisa rodar em outra sessão, com as portas 5173/3002 livres |
+
+**Banco e privilégios (R2, R5):** só existem `rondo_app` e `rondo_migrator`; não existem `anon`, `authenticated` nem `service_role`. Como `rondo_app`, `CREATE TABLE`, `ALTER TABLE users` e `DROP TABLE users` falham com `42501`; `select` nas três tabelas e `auth_confirm_account` funcionam; há 6 `EXECUTE` em funções `auth_*` para `rondo_app` e nenhuma para `public`. `pg_monitor` dá acesso a `pg_stat_database` e `pg_stat_user_tables`, e `rondo_app` **não** lê `pg_authid`.
+
+**Runner de migrations (R4):** migration com erro no meio (`select 1/0` depois de um `create table`) sai com 1, faz rollback do arquivo (a tabela não existe) e não grava linha em `schema_migrations`; duas execuções simultâneas aplicaram a migration pendente uma única vez (a outra viu "Nada a aplicar"); arquivo aplicado com checksum diferente falha sem executar nada. As migrations temporárias e a linha de teste foram removidas.
+
+**API (R3, R9):** sem `DATABASE_URL` o boot sai com 1 citando a variável e o `.env.example`; com `mysql://…` sai com 1 e a senha da URL **não** aparece na saída; com a URL local, numa porta livre (3012, em modo `capture`), `GET /api/v1/health` responde 200 e `GET /api/v1/auth/session` sem token responde 401.
+
+**Collector e Grafana (R12, R13):** `otelcol validate` com a configuração nova retorna 0, e `postgresql_backends{job="rondo-postgres", database="rondo", instance="postgres:5432"}` chega ao Mimir. O dashboard "Rondo — Observabilidade da API" carrega com 102 painéis, sem nenhum painel de banco de terceiros, e o Grafana lista 17 regras de alerta, todas com saúde `ok` ("API sem telemetria" dispara porque a API estava parada). As 2 regras antigas de dependência HTTP do banco de terceiros (grupo `rondo-dependencias`) **continuavam no Grafana**: o provisionamento não apaga regra que só saiu do arquivo. Foram removidas com um `deleteRules` temporário, reinício do Grafana e remoção do arquivo; quem tiver um volume antigo do Grafana precisa do mesmo passo (ou de `docker compose down -v`).
+
+**Defeitos achados e corrigidos nesta verificação:** (1) `scripts/lib/command.ts` resolvia a raiz do repositório um nível acima do correto (`scripts/` em vez da raiz), então `db:migrate` dizia que não havia migrations; (2) o `globalSetup` do Vitest roda antes do `setup-env.ts` e abortava a integração por falta de `DATABASE_URL`; (3) o checksum das migrations mudava entre checkouts com CRLF e LF (agora o fim de linha é normalizado); (4) as tabelas de traces do dashboard ainda selecionavam `span.db.response.status_code`, que o wrapper do Pool não emite (agora `span.error.type`); (5) as skills próprias `implement-me`, `orchestrate-me`, `breakdown-specs`, `code-review` e `refactor-slices` ainda descreviam a stack anterior (banco local da CLI anterior, RLS, RPC) e foram atualizadas.
+
+**Resíduo (R19):** o `rg -i` nos caminhos do R19 só encontra o nome da skill de terceiros de boas práticas de Postgres (`.docs/AGENTS.md`, `.docs/RULES.md`, `implement-me` e o checklist de `code-review`) e o teste-guarda de `grafana-assets.spec.ts`, que precisa conter a palavra para proibi-la. `bun.lock` não tem o cliente nem a CLI do banco anterior.
+
+**Não verificado:** `test:e2e`; span de sign-in no Tempo sem `db.statement` (o Tempo subiu, mas nenhum fluxo foi executado contra a API real; a ausência de SQL/PII é coberta por `db-telemetry.spec.ts` e `auth-observability.int-spec.ts`); métrica `db_client_operation_duration` e painéis "API → banco" com dados (dependem de tráfego na API); `infra:reset`; desligamento gracioso do Pool por SIGTERM; teste de carga (`load smoke`, R21, que também exige o k6).

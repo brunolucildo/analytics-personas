@@ -1,9 +1,10 @@
-import { createClient } from "@supabase/supabase-js";
-import { Module } from "@nestjs/common";
+import { Inject, Module, type OnModuleDestroy } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { APP_GUARD } from "@nestjs/core";
+import { Pool } from "pg";
 import type { Environment } from "../../config/environment";
-import { createInstrumentedFetch } from "../../observability/db-telemetry";
+import { createPostgresPoolConfig } from "../../config/database";
+import { createDatabaseClient, type DatabaseClient } from "../../observability/db-telemetry";
 import { EmailModule, EmailService } from "../email";
 import { ConfirmAccount } from "./application/use-cases/confirm-account.use-case";
 import { GetSession } from "./application/use-cases/get-session.use-case";
@@ -44,7 +45,7 @@ import {
   PASSWORD_RESET_MAILER,
   PASSWORD_RESET_REPOSITORY,
   PASSWORD_VERIFIER,
-  SUPABASE_ADMIN_CLIENT,
+  PG_POOL,
   TOKEN_GENERATOR,
   TOKEN_HASHER,
   USER_REPOSITORY,
@@ -59,12 +60,12 @@ import { EmailServiceConfirmationMailer } from "./infrastructure/email-service-c
 import { EmailServiceNewSessionMailer } from "./infrastructure/email-service-new-session-mailer";
 import { EmailServicePasswordChangedMailer } from "./infrastructure/email-service-password-changed-mailer";
 import { EmailServicePasswordResetMailer } from "./infrastructure/email-service-password-reset-mailer";
-import { SupabaseCredentialsRepository } from "./infrastructure/supabase-credentials.repository";
-import { SupabaseConfirmationRepository } from "./infrastructure/supabase-confirmation.repository";
-import { SupabasePasswordResetRepository } from "./infrastructure/supabase-password-reset.repository";
+import { PostgresCredentialsRepository } from "./infrastructure/postgres-credentials.repository";
+import { PostgresConfirmationRepository } from "./infrastructure/postgres-confirmation.repository";
+import { PostgresPasswordResetRepository } from "./infrastructure/postgres-password-reset.repository";
 import { JoseAccessTokenSigner } from "./infrastructure/jose-access-token-signer";
-import { SupabaseSessionRepository } from "./infrastructure/supabase-session.repository";
-import { SupabaseUserRepository } from "./infrastructure/supabase-user.repository";
+import { PostgresSessionRepository } from "./infrastructure/postgres-session.repository";
+import { PostgresUserRepository } from "./infrastructure/postgres-user.repository";
 import { AuthGuard } from "./interface/guards/auth.guard";
 import { ConfirmAccountRequestHandler } from "./interface/request-handlers/confirm-account.request-handler";
 import { ForgotPasswordRequestHandler } from "./interface/request-handlers/forgot-password.request-handler";
@@ -89,25 +90,19 @@ import { SignUpRequestHandler } from "./interface/request-handlers/sign-up.reque
   ],
   providers: [
     {
-      // Service role: server only. It bypasses RLS, which is why the tables have no policies.
-      provide: SUPABASE_ADMIN_CLIENT,
+      // Server only: the Pool does DML and calls the SQL functions as `rondo_app`.
+      provide: PG_POOL,
       inject: [ConfigService],
       useFactory: (config: ConfigService<Environment, true>) =>
-        createClient(
-          config.get("supabaseUrl", { infer: true }),
-          config.get("supabaseServiceRoleKey", { infer: true }),
-          {
-            auth: { persistSession: false, autoRefreshToken: false },
-            // One span and one histogram point per Postgres call, with no query string or body.
-            global: { fetch: createInstrumentedFetch() },
-          },
+        createDatabaseClient(
+          new Pool(createPostgresPoolConfig(config.get("databaseUrl", { infer: true }))),
         ),
     },
     {
       provide: USER_REPOSITORY,
-      inject: [SUPABASE_ADMIN_CLIENT],
-      useFactory: (client: ConstructorParameters<typeof SupabaseUserRepository>[0]) =>
-        new SupabaseUserRepository(client),
+      inject: [PG_POOL],
+      useFactory: (client: ConstructorParameters<typeof PostgresUserRepository>[0]) =>
+        new PostgresUserRepository(client),
     },
     {
       // One budget for every argon2 call of the process (hash and verify).
@@ -144,9 +139,9 @@ import { SignUpRequestHandler } from "./interface/request-handlers/sign-up.reque
     },
     {
       provide: PASSWORD_RESET_REPOSITORY,
-      inject: [SUPABASE_ADMIN_CLIENT],
-      useFactory: (client: ConstructorParameters<typeof SupabasePasswordResetRepository>[0]) =>
-        new SupabasePasswordResetRepository(client),
+      inject: [PG_POOL],
+      useFactory: (client: ConstructorParameters<typeof PostgresPasswordResetRepository>[0]) =>
+        new PostgresPasswordResetRepository(client),
     },
     {
       provide: PASSWORD_RESET_MAILER,
@@ -165,9 +160,9 @@ import { SignUpRequestHandler } from "./interface/request-handlers/sign-up.reque
     },
     {
       provide: SESSION_REPOSITORY,
-      inject: [SUPABASE_ADMIN_CLIENT],
-      useFactory: (client: ConstructorParameters<typeof SupabaseSessionRepository>[0]) =>
-        new SupabaseSessionRepository(client),
+      inject: [PG_POOL],
+      useFactory: (client: ConstructorParameters<typeof PostgresSessionRepository>[0]) =>
+        new PostgresSessionRepository(client),
     },
     {
       provide: ACCESS_TOKEN_SIGNER,
@@ -188,9 +183,9 @@ import { SignUpRequestHandler } from "./interface/request-handlers/sign-up.reque
     },
     {
       provide: CONFIRMATION_REPOSITORY,
-      inject: [SUPABASE_ADMIN_CLIENT],
-      useFactory: (client: ConstructorParameters<typeof SupabaseConfirmationRepository>[0]) =>
-        new SupabaseConfirmationRepository(client),
+      inject: [PG_POOL],
+      useFactory: (client: ConstructorParameters<typeof PostgresConfirmationRepository>[0]) =>
+        new PostgresConfirmationRepository(client),
     },
     {
       provide: ResendConfirmation,
@@ -212,9 +207,9 @@ import { SignUpRequestHandler } from "./interface/request-handlers/sign-up.reque
     },
     {
       provide: CREDENTIALS_REPOSITORY,
-      inject: [SUPABASE_ADMIN_CLIENT],
-      useFactory: (client: ConstructorParameters<typeof SupabaseCredentialsRepository>[0]) =>
-        new SupabaseCredentialsRepository(client),
+      inject: [PG_POOL],
+      useFactory: (client: ConstructorParameters<typeof PostgresCredentialsRepository>[0]) =>
+        new PostgresCredentialsRepository(client),
     },
     {
       provide: PASSWORD_VERIFIER,
@@ -259,4 +254,10 @@ import { SignUpRequestHandler } from "./interface/request-handlers/sign-up.reque
     { provide: APP_GUARD, useClass: AuthGuard },
   ],
 })
-export class AuthModule {}
+export class AuthModule implements OnModuleDestroy {
+  constructor(@Inject(PG_POOL) private readonly database: DatabaseClient) {}
+
+  async onModuleDestroy(): Promise<void> {
+    await this.database.end();
+  }
+}

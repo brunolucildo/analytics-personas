@@ -1,5 +1,4 @@
 import type { INestApplication } from "@nestjs/common";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { Test } from "@nestjs/testing";
 import request from "supertest";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -14,16 +13,15 @@ import { resetRateLimitStore } from "./support/rate-limit";
 import { type TelemetryRecorder, startTelemetryRecorder } from "./support/telemetry";
 import {
   assertMigrationsApplied,
-  createAdminClient,
   deleteUsersByEmail,
+  listUsersByEmail,
   uniqueEmail,
-} from "./support/supabase";
+} from "./support/database";
 
 const PREFIX = "/api/v1/auth";
 const WRONG_PASSWORD = "Sentinel-Wrong-93f1c7";
 
 describe("password hash protection (real API)", () => {
-  const admin: SupabaseClient = createAdminClient();
   const createdEmails: string[] = [];
   const apps: INestApplication[] = [];
   let recorder: TelemetryRecorder;
@@ -50,7 +48,7 @@ describe("password hash protection (real API)", () => {
       .send({ email, password: WRONG_PASSWORD });
 
   beforeAll(async () => {
-    await assertMigrationsApplied(admin);
+    await assertMigrationsApplied();
     recorder = startTelemetryRecorder();
   });
 
@@ -58,7 +56,7 @@ describe("password hash protection (real API)", () => {
     for (const app of apps) await app.close();
 
     await recorder.stop();
-    await deleteUsersByEmail(admin, createdEmails);
+    await deleteUsersByEmail(createdEmails);
   });
 
   beforeEach(() => {
@@ -186,9 +184,9 @@ describe("password hash protection (real API)", () => {
       expect(response.status).toBe(503);
       expect(response.body.error.code).toBe("SERVICE_BUSY");
 
-      const { data } = await admin.from("users").select("id").eq("email", email);
+      const users = await listUsersByEmail(email);
 
-      expect(data).toEqual([]);
+      expect(users).toEqual([]);
     });
 
     it("refuses a password reset before it touches the token", async () => {
